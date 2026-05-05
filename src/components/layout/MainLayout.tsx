@@ -3,6 +3,16 @@ import type { ReactNode } from 'react';
 import { IdentityWidget } from '../ui/IdentityWidget';
 import { SearchBar } from '../ui/SearchBar';
 
+const externalTools = [
+  { label: 'iTeams', href: 'https://example.com/iteams' },
+  { label: 'Jira', href: 'https://example.com/jira' },
+  { label: 'Portal RGA', href: 'https://example.com/portal-rga' },
+  { label: 'Wiki Tecnica', href: 'https://example.com/wiki-tecnica' },
+];
+
+// Recordatorio de arquitectura: Para cualquier lógica Java que gestione flujos
+// de datos o BBDD, implementar siempre try-catch-resources.
+
 interface MainLayoutProps {
   children: ReactNode;
   topBarContent?: ReactNode;
@@ -28,13 +38,13 @@ export function MainLayout({
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="flex min-h-screen">
         <aside className="sticky top-0 flex h-screen w-80 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white">
-          <div className="shrink-0 border-b border-slate-200 bg-slate-50/85 p-4 backdrop-blur supports-[backdrop-filter]:bg-slate-50/70">
+          <div className="shrink-0 bg-slate-50/85 p-4 backdrop-blur supports-[backdrop-filter]:bg-slate-50/70">
             <IdentityWidget />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-100 p-4">
             {sidebarContent ?? (
-              <div>
+              <div className="space-y-6">
                 <button
                   type="button"
                   onClick={() => {
@@ -45,9 +55,31 @@ export function MainLayout({
                 >
                   Asistente RGA
                 </button>
-                <p className="mt-2 text-sm text-slate-600">
-                  Navegacion del asistente de supervivencia.
-                </p>
+
+                <div>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    Herramientas Externas
+                  </p>
+                  <nav aria-label="Herramientas externas">
+                    <ul className="space-y-2">
+                      {externalTools.map((tool) => (
+                        <li key={tool.label}>
+                          <a
+                            href={tool.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-slate-600 transition-all duration-200 hover:text-sky-700"
+                          >
+                            <span>{tool.label}</span>
+                            <span aria-hidden="true" className="text-xs text-slate-400">
+                              ↗
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
+                </div>
               </div>
             )}
           </div>
