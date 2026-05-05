@@ -4,14 +4,54 @@ import { IdentityWidget } from '../ui/IdentityWidget';
 import { SearchBar } from '../ui/SearchBar';
 
 const externalTools = [
-  { label: 'iTeams', href: 'https://example.com/iteams' },
-  { label: 'Jira', href: 'https://example.com/jira' },
-  { label: 'Portal RGA', href: 'https://example.com/portal-rga' },
-  { label: 'Wiki Tecnica', href: 'https://example.com/wiki-tecnica' },
+  { name: 'Jira indra', url: 'https://jira.indra.es/secure/Dashboard.jspa' },
+  {
+    name: 'iTeams',
+    url: 'http://10.22.206.214:8180/ione-gestion-configuracion/CULogin/LoginAceptar.do?&SESSION_CLIENT_STATE=1777993003974#',
+  },
+  {
+    name: 'Escritorio onesait Local',
+    url: 'http://localhost.npa.com:8080/npa-escritorio',
+  },
+  {
+    name: 'Escritorio onesait int1',
+    url: 'https://acdc-int1.caja.rural:8543/npa-escritorio',
+  },
+  {
+    name: 'Escritorio onesait int2',
+    url: 'https://acdc-int2.caja.rural:8543/npa-escritorio',
+  },
+  {
+    name: 'Escritorio onesait uat',
+    url: 'https://acdc-uat.caja.rural:8643/npa-escritorio',
+  },
+  {
+    name: 'Escritorio onesait pre',
+    url: 'https://acdc-pre.caja.rural:8443/npa-escritorio',
+  },
+  {
+    name: 'Correo corporativo indra',
+    url: 'https://outlook.cloud.microsoft/mail/',
+  },
+  {
+    name: 'Correo corporativo Keapps',
+    url: 'https://serviciodecorreo.es/?_task=mail&_mbox=INBOX',
+  },
+  { name: 'Word 365', url: 'https://word.cloud.microsoft/' },
+  {
+    name: 'Excel 365',
+    url: 'https://excel.cloud.microsoft/?wdOrigin=OFFICECOM-WEB.APPGALLERY',
+  },
+  {
+    name: 'Cezanne Keapps',
+    url: 'https://w3.cezanneondemand.com/CezanneHR/-/KEAPPS/view/9ebaad0a-8ad5-4d97-b2f1-e5d179149a81?ce=3&et=4d8970cb-6164-4162-b780-4574ff852be1&n=6c5063b4-8307-4f55-b968-ddc3e36e154d',
+  },
+  { name: 'Wiki onesait general', url: '#' },
+  { name: 'Wiki onesait 5.0', url: '#' },
 ];
 
-// Recordatorio de arquitectura: Para cualquier lógica Java que gestione flujos
-// de datos o BBDD, implementar siempre try-catch-resources.
+// Para cualquier desarrollo Java posterior que gestione estos enlaces o
+// servicios, recuerda aplicar try-catch-resources para el manejo de excepciones.
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -61,16 +101,16 @@ export function MainLayout({
                     Herramientas Externas
                   </p>
                   <nav aria-label="Herramientas externas">
-                    <ul className="space-y-2">
+                    <ul className="max-h-72 space-y-1 overflow-y-auto pr-1">
                       {externalTools.map((tool) => (
-                        <li key={tool.label}>
+                        <li key={tool.name}>
                           <a
-                            href={tool.href}
+                            href={tool.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-2 text-sm text-slate-600 transition-all duration-200 hover:text-sky-700"
+                            className="inline-flex items-start gap-2 text-[11px] leading-4 text-slate-600 transition-all duration-200 hover:text-sky-700"
                           >
-                            <span>{tool.label}</span>
+                            <span>{tool.name}</span>
                             <span aria-hidden="true" className="text-xs text-slate-400">
                               ↗
                             </span>
