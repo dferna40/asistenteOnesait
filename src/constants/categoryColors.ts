@@ -7,6 +7,7 @@ export const categoryColors: Record<KnowledgeCategory, string> = {
   UI: 'indigo',
   General: 'indigo',
   Seguros: 'rose',
+  Accesos: 'violet',
 };
 
 export const categoryThemes: Record<
@@ -65,5 +66,13 @@ export const categoryThemes: Record<
       'border-rose-200 bg-rose-50 text-rose-700 hover:border-rose-300 hover:bg-rose-100 hover:text-rose-800',
     button:
       'hover:border-rose-300 hover:bg-rose-50 hover:text-rose-800',
+  },
+  Accesos: {
+    cardAccent: 'border-l-violet-500',
+    badge: 'bg-violet-50 text-violet-700',
+    chip:
+      'border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100 hover:text-violet-800',
+    button:
+      'hover:border-violet-300 hover:bg-violet-50 hover:text-violet-800',
   },
 };

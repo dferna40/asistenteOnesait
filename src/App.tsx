@@ -11,6 +11,7 @@ export const App = () => {
   const entries = manualEntries as KnowledgeEntry[];
   const homeCategories: KnowledgeCategory[] = [
     'Entorno',
+    'Accesos',
     'Batch',
     'UML',
     'UI',
@@ -19,6 +20,7 @@ export const App = () => {
   ];
   const categoryDescriptions: Record<KnowledgeCategory, string> = {
     Entorno: 'Accesos remotos, puertos y rutas de configuracion local.',
+    Accesos: 'Credenciales de correo, SSH, Oracle y portales corporativos.',
     Batch: 'Procesos, tablas de configuracion y comandos SQL.',
     UML: 'Protocolos de diseno, MagicDraw y bloqueos en SVN.',
     UI: 'Arquitectura de capas NPA, literales y componentes.',
@@ -32,6 +34,7 @@ export const App = () => {
   const hasSearchTerm = searchTerm.trim().length > 0;
   const categorySearchMap: Record<KnowledgeCategory, string> = {
     Entorno: '/env ',
+    Accesos: 'Accesos',
     Batch: '/cmd ',
     UI: 'UI',
     UML: '/uml ',

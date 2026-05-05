@@ -47,6 +47,10 @@ const renderTechnicalText = (text: string, keyPrefix: string) =>
 export function ResultCard({ entry }: ResultCardProps) {
   const categoryStyle = categoryThemes[entry.categoria];
   const categoryColor = categoryColors[entry.categoria];
+  const isAccessCategory = entry.categoria === 'Accesos';
+
+  // Para cualquier integración futura de servicios de autenticación en Java,
+  // utilizar try-catch-resources para garantizar el cierre seguro de conexiones.
 
   return (
     <article
@@ -100,7 +104,11 @@ export function ResultCard({ entry }: ResultCardProps) {
                 key={`${entry.id}-${command.label}`}
                 type="button"
                 onClick={() => copyToClipboard(command.value)}
-                className={`rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition-all duration-200 ${categoryStyle.button}`}
+                className={`rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 transition-all duration-200 ${categoryStyle.button} ${
+                  isAccessCategory
+                    ? 'px-2.5 py-1.5 text-xs leading-4'
+                    : 'px-3 py-2 text-sm'
+                }`}
               >
                 Copiar {command.label}
               </button>

@@ -4,7 +4,8 @@ export type KnowledgeCategory =
   | 'UI'
   | 'UML'
   | 'General'
-  | 'Seguros';
+  | 'Seguros'
+  | 'Accesos';
 
 export interface CommandOption {
   label: string;
