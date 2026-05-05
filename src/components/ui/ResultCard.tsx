@@ -54,7 +54,7 @@ export function ResultCard({ entry }: ResultCardProps) {
 
   return (
     <article
-      className={`rounded-2xl border border-slate-100 border-l-4 bg-white p-5 shadow-sm ${categoryStyle.cardAccent}`}
+      className={`w-full rounded-2xl border border-slate-100 border-l-4 bg-white p-4 shadow-sm sm:p-5 ${categoryStyle.cardAccent}`}
       data-category-color={categoryColor}
     >
       {entry.categoria === 'UML' ? (
@@ -63,17 +63,19 @@ export function ResultCard({ entry }: ResultCardProps) {
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-2">
           <span
             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${categoryStyle.badge}`}
           >
             {entry.categoria}
           </span>
-          <h3 className="text-xl font-semibold text-slate-900">{entry.titulo}</h3>
+          <h3 className="text-lg font-semibold text-slate-900 sm:text-xl">
+            {entry.titulo}
+          </h3>
         </div>
 
-        <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
+        <span className="w-fit rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
           {entry.id}
         </span>
       </div>
@@ -98,13 +100,13 @@ export function ResultCard({ entry }: ResultCardProps) {
       {entry.comandos?.length ? (
         <div className="mt-5">
           <h4 className="text-sm font-semibold text-slate-800">Comandos utiles</h4>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {entry.comandos.map((command) => (
               <button
                 key={`${entry.id}-${command.label}`}
                 type="button"
                 onClick={() => copyToClipboard(command.value)}
-                className={`rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 transition-all duration-200 ${categoryStyle.button} ${
+                className={`w-full rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 transition-all duration-200 sm:w-auto ${categoryStyle.button} ${
                   isAccessCategory
                     ? 'px-2.5 py-1.5 text-xs leading-4'
                     : 'px-3 py-2 text-sm'
