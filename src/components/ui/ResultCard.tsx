@@ -4,6 +4,9 @@ interface ResultCardProps {
   entry: KnowledgeEntry;
 }
 
+const windowsPathPattern = /([A-Za-z]:\\[^\s\n]+)/g;
+const isWindowsPath = (value: string) => /^[A-Za-z]:\\[^\s\n]+$/.test(value);
+
 const copyToClipboard = async (text: string) => {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(text);
@@ -21,8 +24,16 @@ const copyToClipboard = async (text: string) => {
 };
 
 export function ResultCard({ entry }: ResultCardProps) {
+  const formattedContent = entry.contenido.split(windowsPathPattern);
+
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/70">
+      {entry.categoria === 'UML' ? (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800">
+          ⚠️ PROTOCOLO CRÍTICO: ¿Has hecho el LOCK en SVN?
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-2">
           <span className="inline-flex rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
@@ -36,7 +47,20 @@ export function ResultCard({ entry }: ResultCardProps) {
         </span>
       </div>
 
-      <p className="mt-4 text-sm leading-6 text-slate-600">{entry.contenido}</p>
+      <div className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+        {formattedContent.map((part, index) =>
+          isWindowsPath(part) ? (
+            <code
+              key={`${entry.id}-content-${index}`}
+              className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[13px] text-slate-800"
+            >
+              {part}
+            </code>
+          ) : (
+            <span key={`${entry.id}-content-${index}`}>{part}</span>
+          ),
+        )}
+      </div>
 
       {entry.pasos?.length ? (
         <div className="mt-5">

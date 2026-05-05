@@ -15,9 +15,9 @@ export const App = () => {
   const hasSearchTerm = searchTerm.trim().length > 0;
   const categorySearchMap: Record<KnowledgeCategory, string> = {
     Entorno: '/env ',
-    Batch: 'Batch',
+    Batch: '/cmd ',
     UI: 'UI',
-    UML: 'UML',
+    UML: '/uml ',
     General: 'General',
   };
 

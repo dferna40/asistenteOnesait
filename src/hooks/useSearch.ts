@@ -58,6 +58,27 @@ export function useSearch(entries: KnowledgeEntry[], rawSearchTerm: string) {
       });
     }
 
+    if (term.startsWith('/uml')) {
+      const umlQuery = normalize(term.replace('/uml', ''));
+
+      return entries.filter((entry) => {
+        if (entry.categoria !== 'UML') {
+          return false;
+        }
+
+        if (!umlQuery) {
+          return true;
+        }
+
+        return (
+          entry.titulo.toLowerCase().includes(umlQuery) ||
+          entry.contenido.toLowerCase().includes(umlQuery) ||
+          entry.tags.some((tag) => tag.toLowerCase().includes(umlQuery)) ||
+          entry.pasos?.some((step) => step.toLowerCase().includes(umlQuery))
+        );
+      });
+    }
+
     return entries.filter(
       (entry) =>
         entry.titulo.toLowerCase().includes(term) ||
