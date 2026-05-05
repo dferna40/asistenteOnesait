@@ -13,6 +13,13 @@ export const App = () => {
     new Set(entries.map((entry) => entry.categoria)),
   ) as KnowledgeCategory[];
   const hasSearchTerm = searchTerm.trim().length > 0;
+  const categorySearchMap: Record<KnowledgeCategory, string> = {
+    Entorno: '/env ',
+    Batch: 'Batch',
+    UI: 'UI',
+    UML: 'UML',
+    General: 'General',
+  };
 
   return (
     <MainLayout searchTerm={searchTerm} onSearchTermChange={setSearchTerm}>
@@ -59,12 +66,14 @@ export const App = () => {
 
             <div className="mt-6 flex flex-wrap gap-3">
               {categories.map((category) => (
-                <span
+                <button
                   key={category}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700"
+                  type="button"
+                  onClick={() => setSearchTerm(categorySearchMap[category] ?? category)}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-800"
                 >
                   {category}
-                </span>
+                </button>
               ))}
             </div>
           </div>

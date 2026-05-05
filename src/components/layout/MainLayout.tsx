@@ -19,6 +19,18 @@ interface SidebarAccount {
 
 const sidebarAccounts: SidebarAccount[] = [
   {
+    id: 'company-01',
+    company: 'Compania 01',
+    username: 'testoip3',
+    password: 'T3$t01p@2020',
+  },
+  {
+    id: 'company-02',
+    company: 'Compania 02',
+    username: 'testoip3',
+    password: 'T3$t01p@2020',
+  },
+  {
     id: 'onesait-rga',
     company: 'Onesait / RGA',
     username: 'testoip4',
