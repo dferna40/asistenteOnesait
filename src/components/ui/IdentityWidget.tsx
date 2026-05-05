@@ -44,7 +44,7 @@ export function IdentityWidget() {
             Accesos
           </p>
           <h2 className="mt-1 text-lg font-semibold text-slate-900">
-            Guia de acceso
+            Acceso distintos entornos
           </h2>
         </div>
         <span className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">

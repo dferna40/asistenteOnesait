@@ -91,7 +91,7 @@ export function MainLayout({
               <div className="flex h-full flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-72 flex-1 items-center gap-4">
                   <h1 className="text-base font-semibold md:text-lg">
-                    Asistente de Supervivencia RGA
+                    Asistente Onesite RGA
                   </h1>
                   <SearchBar
                     value={activeSearchTerm}
