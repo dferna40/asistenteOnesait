@@ -122,7 +122,7 @@ const markdownComponents = {
   a: (props: ComponentProps<'a'>) => (
     <a
       {...props}
-      className="font-medium text-sky-700 underline decoration-sky-200 underline-offset-4 transition-colors hover:text-sky-800 dark:text-sky-300 dark:decoration-sky-500"
+      className="font-medium text-sky-700 underline decoration-sky-200 underline-offset-4 transition-colors hover:text-sky-800 dark:text-blue-400 dark:decoration-blue-500"
       target={props.href?.startsWith('http') ? '_blank' : undefined}
       rel={props.href?.startsWith('http') ? 'noreferrer' : undefined}
     />
@@ -150,13 +150,16 @@ const markdownComponents = {
     <img {...props} className="max-w-full rounded-lg shadow-md" loading="lazy" />
   ),
   li: (props: ComponentProps<'li'>) => (
-    <li {...props} className="leading-7 text-slate-700 dark:text-slate-200" />
+    <li {...props} className="leading-7 text-slate-700 dark:text-slate-200 marker:text-slate-500 dark:marker:text-slate-300" />
   ),
   ol: (props: ComponentProps<'ol'>) => (
     <ol {...props} className="my-4 list-decimal space-y-2 pl-5" />
   ),
   p: (props: ComponentProps<'p'>) => (
     <p {...props} className="my-3 leading-7 text-slate-700 dark:text-slate-200" />
+  ),
+  strong: (props: ComponentProps<'strong'>) => (
+    <strong {...props} className="font-semibold text-slate-900 dark:text-white" />
   ),
   table: (props: ComponentProps<'table'>) => (
     <div className="my-4 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700">
@@ -175,7 +178,7 @@ const markdownComponents = {
   th: (props: ComponentProps<'th'>) => (
     <th
       {...props}
-      className="bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:bg-slate-950 dark:text-slate-400"
+      className="bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:bg-slate-950 dark:text-slate-300"
     />
   ),
   ul: (props: ComponentProps<'ul'>) => (
@@ -201,7 +204,7 @@ function MarkdownSectionAccordion({
         >
           {section.title}
         </span>
-        <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400 transition-transform group-open:rotate-45 dark:text-slate-500">
+        <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400 transition-transform group-open:rotate-45 dark:text-slate-400">
           +
         </span>
       </summary>

@@ -104,7 +104,7 @@ export function MainLayout({
                 <span>{tool.name}</span>
                 <span
                   aria-hidden="true"
-                  className="text-xs text-slate-400 dark:text-slate-500"
+                  className="text-xs text-slate-400 dark:text-slate-400"
                 >
                   ↗
                 </span>

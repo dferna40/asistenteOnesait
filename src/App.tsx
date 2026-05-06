@@ -398,6 +398,7 @@ export const App = () => {
     null,
   );
   const [formError, setFormError] = useState('');
+  const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
   const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
 
   const categoryMap = useMemo(
@@ -739,6 +740,23 @@ export const App = () => {
   ) as CategoryColorKey;
   const entryThemeVars = buildThemeVars(entryEditorColorKey);
   const categoryThemeVars = buildThemeVars(categoryForm?.color ?? 'blue');
+  const toolbarContainerStyle = {
+    ...entryThemeVars,
+    borderColor: getCategoryColorHex(entryEditorColorKey),
+    boxShadow: `0 0 0 1px ${hexToRgba(getCategoryColorHex(entryEditorColorKey), 0.2)}, 0 0 14px ${hexToRgba(getCategoryColorHex(entryEditorColorKey), 0.08)}`,
+  } as CSSProperties;
+  const handleToolbarActionClick = (actionIndex: number, action: ToolbarAction) => {
+    action.onClick();
+    const actionKey = `${actionIndex}`;
+    setActiveToolbarActionId(actionKey);
+    window.setTimeout(() => {
+      setActiveToolbarActionId((currentValue) =>
+        currentValue === actionKey ? '' : currentValue,
+      );
+    }, 240);
+  };
+
+  // Recordatorio: Si se implementa una logica Java para personalizar estas barras de herramientas o cargar macros de texto dinamicas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de configuracion de la interfaz.
   const toolbarActions: ToolbarAction[] = [
     {
       label: '**Negrita**',
@@ -849,12 +867,12 @@ export const App = () => {
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-2xl font-semibold text-slate-900">
+                  <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
                     Resultados
                   </h2>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                     {results.length} coincidencia{results.length === 1 ? '' : 's'} para{' '}
-                    <span className="font-medium text-slate-800">"{searchTerm}"</span>.
+                    <span className="font-medium text-slate-800 dark:text-slate-100">"{searchTerm}"</span>.
                   </p>
                 </div>
 
@@ -904,10 +922,10 @@ export const App = () => {
             <div className="animate-fade-in rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+                  <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
                     Ecosistema de Conocimiento RGA
                   </h2>
-                  <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+                  <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
                     Centro de mando dinamico para documentacion viva, protocolos
                     de actuacion y credenciales tecnicas del equipo.
                   </p>
@@ -1041,10 +1059,10 @@ export const App = () => {
                   <div className="space-y-6 p-5 sm:p-6">
                     <section className="neon-card space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
                           Contexto de la ficha
                         </p>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                           Define seccion, metadatos y soporte operativo antes de redactar el documento.
                         </p>
                       </div>
@@ -1174,17 +1192,52 @@ export const App = () => {
                     </section>
 
                     <section className="neon-card space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
-                      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
-                        {toolbarActions.map((action) => (
+                      <div
+                        className="flex flex-wrap items-center gap-2 rounded-xl border-b border-slate-200 bg-slate-50/80 px-2 py-2 dark:bg-slate-900/80 dark:border-slate-800"
+                        style={toolbarContainerStyle}
+                      >
+                        {toolbarActions.map((action, index) => {
+                          const toolbarMeta = [
+                            { icon: 'B', label: 'Negrita' },
+                            { icon: '<>', label: 'Codigo' },
+                            { icon: '[]', label: 'Imagen' },
+                            { icon: '•', label: 'Lista' },
+                            { icon: '::', label: 'Tabla' },
+                          ][index] ?? { icon: '+', label: action.label };
+                          const isActive = activeToolbarActionId === `${index}`;
+
+                          return (
                           <button
                             key={action.label}
                             type="button"
-                            onClick={action.onClick}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+                            onClick={() => handleToolbarActionClick(index, action)}
+                            aria-label={`Insertar ${toolbarMeta.label}`}
+                            title={`Insertar ${toolbarMeta.label}`}
+                            className={`inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-all duration-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 ${
+                              isActive
+                                ? 'scale-[1.02] shadow-sm'
+                                : ''
+                            }`}
+                            style={
+                              isActive
+                                ? {
+                                    borderColor: getCategoryColorHex(entryEditorColorKey),
+                                    color: getCategoryColorHex(entryEditorColorKey),
+                                    boxShadow: `0 0 0 1px ${hexToRgba(getCategoryColorHex(entryEditorColorKey), 0.2)}, 0 0 10px ${hexToRgba(getCategoryColorHex(entryEditorColorKey), 0.22)}`,
+                                  }
+                                : undefined
+                            }
                           >
-                            {action.label}
+                            <span
+                              className="font-mono text-[11px]"
+                              aria-hidden="true"
+                            >
+                              {toolbarMeta.icon}
+                            </span>
+                            <span>{toolbarMeta.label}</span>
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       <div className="space-y-2">
@@ -1192,7 +1245,7 @@ export const App = () => {
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             Documento Markdown
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500">
+                          <p className="text-xs text-slate-400 dark:text-slate-300">
                             Soporta codigo, tablas, acordeones por encabezado e imagenes locales en `/public/images/`
                           </p>
                         </div>
@@ -1342,7 +1395,7 @@ export const App = () => {
                         {entryForm.titulo || 'Vista previa de la ficha'}
                       </h2>
 
-                      <div className="mt-4 text-sm leading-6 text-slate-700 dark:text-slate-300">
+                      <div className="mt-4 text-sm leading-6 text-slate-700 dark:text-slate-200">
                         <MarkdownRenderer content={entryForm.contenido} />
                       </div>
                     </div>
@@ -1352,7 +1405,7 @@ export const App = () => {
                         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                           Pasos
                         </h3>
-                        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-300">
+                        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
                           {splitLines(entryForm.pasos).map((step) => (
                             <li key={step}>{step}</li>
                           ))}

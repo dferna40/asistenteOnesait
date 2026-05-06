@@ -240,7 +240,7 @@ export function SidebarUtilities({
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                   {expandedTool === 'json' ? 'JSON Formatter' : 'SQL Beautifier'}
                 </h3>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                   Editor ampliado para trabajar con volumenes largos de datos.
                 </p>
               </div>

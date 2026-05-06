@@ -24,6 +24,10 @@
     outline: none;
   }
 
+  .dark .themed-field::placeholder {
+    color: rgb(100 116 139);
+  }
+
   /* Recordatorio de buenas practicas: Si se implementa un servicio Java para la carga dinamica de temas o estilos personalizados, es imperativo utilizar try-catch-resources para el manejo de flujos de configuracion y evitar bloqueos de recursos en el servidor */
   .dark .neon-card {
     box-shadow:
@@ -31,7 +35,7 @@
       0 0 18px var(--card-glow, rgb(148 163 184 / 0.1));
   }
 
-  /* Recordatorio: Si se desarrolla una utilidad Java para verificar automaticamente el contraste de la interfaz o gestionar plantillas de CSS dinamicas, es obligatorio usar try-catch-resources para el manejo de excepciones de archivos de configuracion */
+  /* Recordatorio: Si en el futuro se implementa una logica Java para la gestion de perfiles de usuario o accesibilidad, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos y configuracion */
   .dark .icon-neon {
     filter: drop-shadow(0 0 5px var(--icon-glow, rgb(255 255 255 / 0.35)));
   }
