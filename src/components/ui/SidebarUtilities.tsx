@@ -3,6 +3,7 @@ import type { KnowledgeEntry } from '../../types';
 
 interface SidebarUtilitiesProps {
   onExportBackup: () => void;
+  onExportManual: () => void;
   onImportBackupClick: () => void;
   onRestoreEntry: (entryId: string) => void;
   trashEntries: KnowledgeEntry[];
@@ -69,6 +70,7 @@ const formatSqlInput = (rawValue: string) => {
 
 export function SidebarUtilities({
   onExportBackup,
+  onExportManual,
   onImportBackupClick,
   onRestoreEntry,
   trashEntries,
@@ -188,6 +190,13 @@ export function SidebarUtilities({
               className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
             >
               Exportar Backup
+            </button>
+            <button
+              type="button"
+              onClick={onExportManual}
+              className="rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
+            >
+              Descargar manual.json
             </button>
             <button
               type="button"

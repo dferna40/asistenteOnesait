@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { ClipboardEvent as ReactClipboardEvent, CSSProperties } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
@@ -88,6 +88,41 @@ interface ToolbarAction {
   label: string;
   onClick: () => void;
 }
+
+interface SaveToastState {
+  message: string;
+  tone: 'error' | 'success';
+}
+
+type SaveSyncState = 'error' | 'idle' | 'pending' | 'saved' | 'saving';
+
+type ServerHealthState = 'checking' | 'offline' | 'online';
+
+interface CategoryDeleteConfirmationState {
+  categoryName: string;
+  entryCount: number;
+}
+
+interface PdfCodeSegment {
+  color: [number, number, number];
+  fontStyle: 'bold' | 'normal';
+  text: string;
+}
+
+interface PdfListItem {
+  marker: string;
+  text: string;
+}
+
+interface PdfTableRow {
+  cells: string[];
+}
+
+type PdfContentBlock =
+  | { content: string; type: 'text' }
+  | { content: string; language?: string; type: 'code' }
+  | { items: PdfListItem[]; type: 'list' }
+  | { rows: PdfTableRow[]; type: 'table' };
 
 type ModalState =
   | {
@@ -276,6 +311,11 @@ const readStoredManualData = (): ManualData => {
   }
 };
 
+const areEntriesEqual = (
+  firstEntries: KnowledgeEntry[],
+  secondEntries: KnowledgeEntry[],
+) => JSON.stringify(firstEntries) === JSON.stringify(secondEntries);
+
 const persistManualData = (manualData: ManualData) => {
   if (typeof window === 'undefined') {
     return;
@@ -404,6 +444,29 @@ const updateContentSelection = (
   });
 };
 
+const insertTextAtCursor = (
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+  textToInsert: string,
+) => {
+  if (!textarea) {
+    setValue(`${currentValue}${textToInsert}`);
+    return;
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const nextValue = `${currentValue.slice(0, start)}${textToInsert}${currentValue.slice(end)}`;
+  setValue(nextValue);
+
+  requestAnimationFrame(() => {
+    const nextCursorPosition = start + textToInsert.length;
+    textarea.focus();
+    textarea.setSelectionRange(nextCursorPosition, nextCursorPosition);
+  });
+};
+
 const normalizePdfText = (value: string) =>
   value
     .replace(/\*\*(.+?)\*\*/g, '$1')
@@ -412,14 +475,293 @@ const normalizePdfText = (value: string) =>
     .replace(/^[-*]\s+/gm, '- ')
     .trim();
 
-const splitPdfText = (value: string) =>
-  normalizePdfText(value)
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
+  const blocks: PdfContentBlock[] = [];
+  const lines = value.replace(/\r\n/g, '\n').split('\n');
+  let textBuffer: string[] = [];
+  let codeBuffer: string[] = [];
+  let listBuffer: PdfListItem[] = [];
+  let tableBuffer: string[] = [];
+  let codeLanguage = '';
+  let isInsideCodeBlock = false;
+  const isMarkdownTableLine = (line: string) => {
+    const trimmedLine = line.trim();
+    return trimmedLine.includes('|') && trimmedLine.split('|').length >= 3;
+  };
+  const isMarkdownTableSeparator = (line: string) =>
+    /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line.trim());
+  const parseTableRow = (line: string) =>
+    line
+      .trim()
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .map((cell) => normalizePdfText(cell.trim()));
+  const parseListLine = (line: string) => {
+    const bulletMatch = line.match(/^\s*([-*])\s+(.+)$/);
+    if (bulletMatch) {
+      return {
+        marker: bulletMatch[1],
+        text: normalizePdfText(bulletMatch[2]),
+      };
+    }
+
+    const orderedMatch = line.match(/^\s*(\d+\.)\s+(.+)$/);
+    if (orderedMatch) {
+      return {
+        marker: orderedMatch[1],
+        text: normalizePdfText(orderedMatch[2]),
+      };
+    }
+
+    return null;
+  };
+
+  const flushTextBuffer = () => {
+    if (!textBuffer.length) {
+      return;
+    }
+
+    const normalizedText = normalizePdfText(textBuffer.join('\n'));
+    if (normalizedText.trim()) {
+      blocks.push({ content: normalizedText, type: 'text' });
+    }
+
+    textBuffer = [];
+  };
+
+  const flushListBuffer = () => {
+    if (!listBuffer.length) {
+      return;
+    }
+
+    blocks.push({
+      items: listBuffer.filter((item) => item.text.trim().length > 0),
+      type: 'list',
+    });
+    listBuffer = [];
+  };
+
+  const flushTableBuffer = () => {
+    if (!tableBuffer.length) {
+      return;
+    }
+
+    const rows = tableBuffer
+      .filter((line) => !isMarkdownTableSeparator(line))
+      .map((line) => ({ cells: parseTableRow(line) }))
+      .filter((row) => row.cells.some((cell) => cell.length > 0));
+
+    if (rows.length) {
+      blocks.push({
+        rows,
+        type: 'table',
+      });
+    }
+
+    tableBuffer = [];
+  };
+
+  const flushCodeBuffer = () => {
+    const codeContent = codeBuffer.join('\n').replace(/\s+$/, '');
+    if (codeContent.trim()) {
+      blocks.push({
+        content: codeContent,
+        language: codeLanguage || undefined,
+        type: 'code',
+      });
+    }
+
+    codeBuffer = [];
+    codeLanguage = '';
+  };
+
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
+
+    if (trimmedLine.startsWith('```')) {
+      flushTextBuffer();
+      flushListBuffer();
+      flushTableBuffer();
+
+      if (isInsideCodeBlock) {
+        flushCodeBuffer();
+        isInsideCodeBlock = false;
+      } else {
+        flushTextBuffer();
+        isInsideCodeBlock = true;
+        codeLanguage = trimmedLine.slice(3).trim();
+      }
+
+      return;
+    }
+
+    if (isInsideCodeBlock) {
+      codeBuffer.push(line.replace(/\t/g, '  '));
+      return;
+    }
+
+    const parsedListItem = parseListLine(line);
+    if (parsedListItem) {
+      flushTextBuffer();
+      flushTableBuffer();
+      listBuffer.push(parsedListItem);
+      return;
+    }
+
+    if (listBuffer.length) {
+      flushListBuffer();
+    }
+
+    if (isMarkdownTableLine(line)) {
+      flushTextBuffer();
+      tableBuffer.push(line);
+      return;
+    }
+
+    if (tableBuffer.length) {
+      flushTableBuffer();
+    }
+
+    textBuffer.push(line);
+  });
+
+  if (isInsideCodeBlock) {
+    flushCodeBuffer();
+  }
+
+  flushTextBuffer();
+  flushListBuffer();
+  flushTableBuffer();
+
+  return blocks;
+};
+
+const pdfCodeKeywords = new Set([
+  'abstract',
+  'boolean',
+  'break',
+  'byte',
+  'case',
+  'catch',
+  'char',
+  'class',
+  'const',
+  'continue',
+  'default',
+  'do',
+  'double',
+  'else',
+  'enum',
+  'extends',
+  'false',
+  'final',
+  'finally',
+  'float',
+  'for',
+  'if',
+  'implements',
+  'import',
+  'instanceof',
+  'int',
+  'interface',
+  'long',
+  'native',
+  'new',
+  'null',
+  'package',
+  'private',
+  'protected',
+  'public',
+  'record',
+  'return',
+  'short',
+  'static',
+  'strictfp',
+  'super',
+  'switch',
+  'synchronized',
+  'this',
+  'throw',
+  'throws',
+  'transient',
+  'true',
+  'try',
+  'var',
+  'void',
+  'volatile',
+  'while',
+]);
+
+const markdownImagePattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
+
+const resolvePdfImageUrl = (source: string) => {
+  if (/^https?:\/\//i.test(source)) {
+    return source;
+  }
+
+  if (source.startsWith('/images/')) {
+    return `http://localhost:3001${source}`;
+  }
+
+  if (source.startsWith('/')) {
+    return `${window.location.origin}${source}`;
+  }
+
+  return source;
+};
+
+const readBlobAsDataUrl = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error('No se pudo convertir la imagen a data URL.'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Error leyendo la imagen.'));
+    reader.readAsDataURL(blob);
+  });
+
+const loadImageDimensions = (dataUrl: string) =>
+  new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      resolve({
+        width: image.naturalWidth || image.width,
+        height: image.naturalHeight || image.height,
+      });
+    };
+    image.onerror = () => reject(new Error('No se pudo cargar la imagen para el PDF.'));
+    image.src = dataUrl;
+  });
+
+const resolvePdfImageAsset = async (source: string) => {
+  const response = await fetch(resolvePdfImageUrl(source));
+
+  if (!response.ok) {
+    throw new Error(`No se pudo cargar la imagen ${source}.`);
+  }
+
+  // Si este flujo de lectura de imagenes se migra a Java, es obligatorio usar
+  // try-catch-resources con FileInputStream u otros Streams para liberar los
+  // recursos correctamente tras generar el PDF [cite: 2026-02-12].
+  const blob = await response.blob();
+  const dataUrl = await readBlobAsDataUrl(blob);
+  const dimensions = await loadImageDimensions(dataUrl);
+
+  return {
+    dataUrl,
+    ...dimensions,
+  };
+};
 
 export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [manualData, setManualData] = useState<ManualData>(() =>
     readStoredManualData(),
   );
@@ -435,7 +777,16 @@ export const App = () => {
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const [deleteConfirmationEntryId, setDeleteConfirmationEntryId] = useState('');
+  const [deleteConfirmationCategory, setDeleteConfirmationCategory] =
+    useState<CategoryDeleteConfirmationState | null>(null);
   const [exportEntryId, setExportEntryId] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [saveToast, setSaveToast] = useState<SaveToastState | null>(null);
+  const [saveSyncState, setSaveSyncState] = useState<SaveSyncState>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState('');
+  const [serverHealthState, setServerHealthState] =
+    useState<ServerHealthState>('checking');
+  const shouldPersistToServerRef = useRef(false);
 
   const categoryMap = useMemo(
     () =>
@@ -447,7 +798,7 @@ export const App = () => {
       ),
     [manualData.categories],
   );
-  const results = useSearch(manualData.entries, searchTerm);
+  const results = useSearch(manualData.entries, debouncedSearchTerm);
   const sortPinnedEntries = (entries: KnowledgeEntry[]) =>
     [...entries].sort((firstEntry, secondEntry) => {
       if (firstEntry.isPinned !== secondEntry.isPinned) {
@@ -465,7 +816,7 @@ export const App = () => {
     [manualData.entries],
   );
   const hasSearchTerm = searchTerm.trim().length > 0;
-  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const normalizedSearchTerm = debouncedSearchTerm.trim().toLowerCase();
   const activeResultCategory = manualData.categories.find(
     (category) => category.name.toLowerCase() === normalizedSearchTerm,
   );
@@ -479,6 +830,124 @@ export const App = () => {
       manualData.settings.darkMode,
     );
   }, [manualData.settings.darkMode]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 220);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (!saveToast) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSaveToast(null);
+    }, 3200);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [saveToast]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const checkServerHealth = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/health');
+
+        if (!response.ok) {
+          throw new Error('Servidor no disponible');
+        }
+
+        if (!isCancelled) {
+          setServerHealthState('online');
+        }
+      } catch {
+        if (!isCancelled) {
+          setServerHealthState('offline');
+        }
+      }
+    };
+
+    void checkServerHealth();
+
+    const intervalId = window.setInterval(() => {
+      void checkServerHealth();
+    }, 20000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shouldPersistToServerRef.current) {
+      return;
+    }
+
+    shouldPersistToServerRef.current = false;
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(() => {
+
+    const persistManualOnServer = async () => {
+      setSaveSyncState('saving');
+      try {
+        const response = await fetch('http://localhost:3001/save-manual', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(manualData.entries),
+        });
+
+        if (!response.ok) {
+          throw new Error('La respuesta del servidor no fue valida.');
+        }
+
+        if (!isCancelled) {
+          setServerHealthState('online');
+          setSaveSyncState('saved');
+          setLastSavedAt(
+            new Intl.DateTimeFormat('es-ES', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }).format(new Date()),
+          );
+          setSaveToast({
+            message: 'Cambios guardados permanentemente en el archivo.',
+            tone: 'success',
+          });
+        }
+      } catch {
+        if (!isCancelled) {
+          setServerHealthState('offline');
+          setSaveSyncState('error');
+          setSaveToast({
+            message:
+              'Error de conexión con el servidor. Por favor, descarga el JSON manualmente para no perder los cambios.',
+            tone: 'error',
+          });
+        }
+      }
+    };
+
+    void persistManualOnServer();
+    }, 800);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [manualData.entries]);
 
   const openCreateEntryModal = (
     prefilledCategory?: string,
@@ -539,6 +1008,14 @@ export const App = () => {
   ) => {
     setManualData((currentManualData) => {
       const nextManualData = normalizeManualData(updater(currentManualData));
+      const entriesChanged = !areEntriesEqual(
+        currentManualData.entries,
+        nextManualData.entries,
+      );
+      shouldPersistToServerRef.current = entriesChanged;
+      if (entriesChanged) {
+        setSaveSyncState('pending');
+      }
       persistManualData(nextManualData);
       return nextManualData;
     });
@@ -645,6 +1122,490 @@ export const App = () => {
         });
       };
 
+      const writeImagePlaceholder = (label: string) => {
+        const placeholderHeight = 18;
+        ensureSpace(placeholderHeight + 4);
+        pdf.setDrawColor(203, 213, 225);
+        pdf.setFillColor(248, 250, 252);
+        pdf.roundedRect(margin, cursorY, contentWidth, placeholderHeight, 2, 2, 'FD');
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(10);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(label, margin + 4, cursorY + 11);
+        cursorY += placeholderHeight + 4;
+      };
+
+      const writeCodeBlock = (content: string, language?: string) => {
+        const blockPaddingX = 4;
+        const blockPaddingY = 4;
+        const blockWidth = contentWidth;
+        const lineGap = 1.45;
+        const fontSize = 9;
+        const innerWidth = blockWidth - blockPaddingX * 2;
+        const defaultCodeColor: [number, number, number] = [15, 23, 42];
+        const commentCodeColor: [number, number, number] = [100, 116, 139];
+        const importCodeColor: [number, number, number] = [37, 99, 235];
+        const keywordCodeColor: [number, number, number] = [79, 70, 229];
+        const stringCodeColor: [number, number, number] = [5, 150, 105];
+        const annotationCodeColor: [number, number, number] = [225, 29, 72];
+        const typeCodeColor: [number, number, number] = [67, 56, 202];
+        const findInlineCommentIndex = (line: string) => {
+          let quote: '"' | "'" | null = null;
+          let escaped = false;
+
+          for (let index = 0; index < line.length - 1; index += 1) {
+            const currentChar = line[index];
+            const nextChar = line[index + 1];
+
+            if (quote) {
+              if (escaped) {
+                escaped = false;
+                continue;
+              }
+
+              if (currentChar === '\\') {
+                escaped = true;
+                continue;
+              }
+
+              if (currentChar === quote) {
+                quote = null;
+              }
+
+              continue;
+            }
+
+            if (currentChar === '"' || currentChar === "'") {
+              quote = currentChar;
+              continue;
+            }
+
+            if (
+              (currentChar === '/' && nextChar === '/') ||
+              (currentChar === '/' && nextChar === '*')
+            ) {
+              return index;
+            }
+          }
+
+          return -1;
+        };
+        const measureSegmentWidth = (segment: PdfCodeSegment) => {
+          pdf.setFont('courier', segment.fontStyle);
+          pdf.setFontSize(fontSize);
+          return pdf.getTextWidth(segment.text);
+        };
+        const wrapStyledLine = (segments: PdfCodeSegment[]) => {
+          const wrappedLines: PdfCodeSegment[][] = [];
+          let currentLine: PdfCodeSegment[] = [];
+          let currentLineWidth = 0;
+
+          const pushCurrentLine = () => {
+            wrappedLines.push(currentLine.length ? currentLine : [{
+              color: defaultCodeColor,
+              fontStyle: 'normal',
+              text: ' ',
+            }]);
+            currentLine = [];
+            currentLineWidth = 0;
+          };
+
+          const appendSegment = (segment: PdfCodeSegment) => {
+            const segmentWidth = measureSegmentWidth(segment);
+
+            if (currentLineWidth + segmentWidth <= innerWidth || !currentLine.length) {
+              currentLine.push(segment);
+              currentLineWidth += segmentWidth;
+              return;
+            }
+
+            pushCurrentLine();
+            currentLine.push(segment);
+            currentLineWidth = segmentWidth;
+          };
+
+          segments.forEach((segment) => {
+            const tokenWidth = measureSegmentWidth(segment);
+
+            if (tokenWidth <= innerWidth) {
+              appendSegment(segment);
+              return;
+            }
+
+            let chunk = '';
+
+            for (const character of segment.text) {
+              const candidate = `${chunk}${character}`;
+              const candidateSegment = { ...segment, text: candidate };
+
+              if (measureSegmentWidth(candidateSegment) > innerWidth && chunk) {
+                appendSegment({ ...segment, text: chunk });
+                chunk = character;
+                continue;
+              }
+
+              chunk = candidate;
+            }
+
+            if (chunk) {
+              appendSegment({ ...segment, text: chunk });
+            }
+          });
+
+          if (currentLine.length) {
+            pushCurrentLine();
+          }
+
+          return wrappedLines;
+        };
+        const tokenizeCodeLine = (
+          line: string,
+          isInsideBlockComment: boolean,
+        ): { inBlockComment: boolean; segments: PdfCodeSegment[] } => {
+          const trimmedLine = line.trim();
+
+          if (isInsideBlockComment) {
+            return {
+              inBlockComment: !trimmedLine.includes('*/'),
+              segments: [
+                {
+                  color: commentCodeColor,
+                  fontStyle: 'normal',
+                  text: line.length > 0 ? line : ' ',
+                },
+              ],
+            };
+          }
+
+          if (trimmedLine.startsWith('//')) {
+            return {
+              inBlockComment: false,
+              segments: [
+                {
+                  color: commentCodeColor,
+                  fontStyle: 'normal',
+                  text: line.length > 0 ? line : ' ',
+                },
+              ],
+            };
+          }
+
+          if (trimmedLine.startsWith('/*')) {
+            return {
+              inBlockComment: !trimmedLine.includes('*/'),
+              segments: [
+                {
+                  color: commentCodeColor,
+                  fontStyle: 'normal',
+                  text: line.length > 0 ? line : ' ',
+                },
+              ],
+            };
+          }
+
+          const inlineCommentIndex = findInlineCommentIndex(line);
+          const codePart =
+            inlineCommentIndex >= 0 ? line.slice(0, inlineCommentIndex) : line;
+          const commentPart =
+            inlineCommentIndex >= 0 ? line.slice(inlineCommentIndex) : '';
+          const tokens =
+            codePart.match(
+              /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|@\w+|\s+|[A-Za-z_]\w*|[^\sA-Za-z_]+)/g,
+            ) ?? [codePart || ' '];
+          const codeSegments = tokens.map((token) => {
+            if (/^\s+$/.test(token)) {
+              return {
+                color: defaultCodeColor,
+                fontStyle: 'normal' as const,
+                text: token,
+              };
+            }
+
+            if (
+              (token.startsWith('"') && token.endsWith('"')) ||
+              (token.startsWith("'") && token.endsWith("'"))
+            ) {
+              return {
+                color: stringCodeColor,
+                fontStyle: 'normal' as const,
+                text: token,
+              };
+            }
+
+            if (token.startsWith('@')) {
+              return {
+                color: annotationCodeColor,
+                fontStyle: 'bold' as const,
+                text: token,
+              };
+            }
+
+            if (token === 'import') {
+              return {
+                color: importCodeColor,
+                fontStyle: 'bold' as const,
+                text: token,
+              };
+            }
+
+            if (pdfCodeKeywords.has(token)) {
+              return {
+                color: keywordCodeColor,
+                fontStyle: 'bold' as const,
+                text: token,
+              };
+            }
+
+            if (/^[A-Z][A-Za-z0-9_]*$/.test(token)) {
+              return {
+                color: typeCodeColor,
+                fontStyle: 'bold' as const,
+                text: token,
+              };
+            }
+
+            return {
+              color: defaultCodeColor,
+              fontStyle: 'normal' as const,
+              text: token,
+            };
+          });
+
+          return {
+            inBlockComment:
+              inlineCommentIndex >= 0 &&
+              commentPart.startsWith('/*') &&
+              !commentPart.includes('*/'),
+            segments: commentPart
+              ? [
+                  ...codeSegments,
+                  {
+                    color: commentCodeColor,
+                    fontStyle: 'normal' as const,
+                    text: commentPart,
+                  },
+                ]
+              : codeSegments,
+          };
+        };
+        const codeLines = content.split('\n');
+        const renderedLines: PdfCodeSegment[][] = [];
+        let isInsideBlockComment = false;
+
+        codeLines.forEach((line) => {
+          const tokenizedLine = tokenizeCodeLine(line, isInsideBlockComment);
+          isInsideBlockComment = tokenizedLine.inBlockComment;
+          renderedLines.push(...wrapStyledLine(tokenizedLine.segments));
+        });
+        const lineHeight = fontSize * 0.3528 * lineGap;
+        let currentIndex = 0;
+        let isFirstChunk = true;
+
+        while (currentIndex < renderedLines.length) {
+          const currentLanguageBadgeHeight = language && isFirstChunk ? 8 : 0;
+          const availableHeight = pageHeight - margin - cursorY - 6;
+          let maxLinesForChunk = Math.floor(
+            (availableHeight - blockPaddingY * 2 - currentLanguageBadgeHeight - 2) /
+              lineHeight,
+          );
+
+          if (maxLinesForChunk <= 0) {
+            pdf.addPage();
+            cursorY = margin;
+            continue;
+          }
+
+          const chunkLines = renderedLines.slice(
+            currentIndex,
+            currentIndex + maxLinesForChunk,
+          );
+          const blockHeight =
+            blockPaddingY * 2 +
+            currentLanguageBadgeHeight +
+            chunkLines.length * lineHeight +
+            2;
+
+          pdf.setFillColor(248, 250, 252);
+          pdf.setDrawColor(226, 232, 240);
+          pdf.roundedRect(margin, cursorY, blockWidth, blockHeight, 2, 2, 'FD');
+
+          let textY = cursorY + blockPaddingY + 2;
+
+          if (language && isFirstChunk) {
+            pdf.setFillColor(226, 232, 240);
+            pdf.roundedRect(margin + blockPaddingX, cursorY + 3, 16, 5, 1.5, 1.5, 'F');
+            pdf.setFont('helvetica', 'bold');
+            pdf.setFontSize(7);
+            pdf.setTextColor(71, 85, 105);
+            pdf.text(language.toUpperCase(), margin + blockPaddingX + 1.5, cursorY + 6.7);
+            textY += currentLanguageBadgeHeight;
+          }
+
+          chunkLines.forEach((lineSegments, lineIndex) => {
+            let cursorX = margin + blockPaddingX;
+            const lineY = textY + lineIndex * lineHeight;
+
+            lineSegments.forEach((segment) => {
+              pdf.setFont('courier', segment.fontStyle);
+              pdf.setFontSize(fontSize);
+              pdf.setTextColor(...segment.color);
+              pdf.text(segment.text, cursorX, lineY);
+              cursorX += measureSegmentWidth(segment);
+            });
+          });
+
+          cursorY += blockHeight + 6;
+          currentIndex += chunkLines.length;
+          isFirstChunk = false;
+        }
+      };
+
+      const writeListBlock = (items: PdfListItem[]) => {
+        const markerWidth = 12;
+        const itemGap = 2.5;
+
+        items.forEach((item) => {
+          const itemLines = pdf.splitTextToSize(
+            item.text,
+            contentWidth - markerWidth,
+          ) as string[];
+          const lineHeight = 10 * 0.3528 * 1.55;
+          const itemHeight = itemLines.length * lineHeight + 2;
+
+          ensureSpace(itemHeight + itemGap);
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(10);
+          pdf.setTextColor(51, 65, 85);
+          pdf.text(item.marker, margin, cursorY + 4);
+
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text(itemLines, margin + markerWidth, cursorY + 4);
+          cursorY += itemHeight + itemGap;
+        });
+      };
+
+      const writeTableBlock = (rows: PdfTableRow[]) => {
+        if (!rows.length) {
+          return;
+        }
+
+        const columnCount = Math.max(...rows.map((row) => row.cells.length));
+        const columnWidth = contentWidth / columnCount;
+        const cellPaddingX = 2.5;
+        const cellPaddingY = 2.5;
+        const fontSize = 9.5;
+        const lineHeight = fontSize * 0.3528 * 1.45;
+
+        rows.forEach((row, rowIndex) => {
+          const normalizedCells = Array.from({ length: columnCount }, (_, index) =>
+            row.cells[index] ?? '',
+          );
+          const wrappedCells = normalizedCells.map(
+            (cell) =>
+              pdf.splitTextToSize(
+                cell || ' ',
+                columnWidth - cellPaddingX * 2,
+              ) as string[],
+          );
+          const rowHeight =
+            Math.max(...wrappedCells.map((lines) => lines.length), 1) * lineHeight +
+            cellPaddingY * 2 +
+            2;
+
+          ensureSpace(rowHeight + 1.5);
+
+          normalizedCells.forEach((_, columnIndex) => {
+            const cellX = margin + columnIndex * columnWidth;
+            const fillColor: [number, number, number] =
+              rowIndex === 0
+                ? [226, 232, 240]
+                : rowIndex % 2 === 0
+                  ? [248, 250, 252]
+                  : [255, 255, 255];
+
+            pdf.setFillColor(fillColor[0], fillColor[1], fillColor[2]);
+            pdf.setDrawColor(203, 213, 225);
+            pdf.rect(cellX, cursorY, columnWidth, rowHeight, 'FD');
+
+            pdf.setFont('helvetica', rowIndex === 0 ? 'bold' : 'normal');
+            pdf.setFontSize(fontSize);
+            pdf.setTextColor(rowIndex === 0 ? 30 : 15, rowIndex === 0 ? 41 : 23, rowIndex === 0 ? 59 : 42);
+            pdf.text(
+              wrappedCells[columnIndex],
+              cellX + cellPaddingX,
+              cursorY + cellPaddingY + 3,
+            );
+          });
+
+          cursorY += rowHeight + 1.5;
+        });
+
+        cursorY += 2;
+      };
+
+      const writeImageToPdf = async (source: string) => {
+        try {
+          const imageAsset = await resolvePdfImageAsset(source);
+          const maxWidth = contentWidth;
+          const maxHeight = 120;
+          let renderWidth = maxWidth;
+          let renderHeight = (imageAsset.height / imageAsset.width) * renderWidth;
+
+          if (renderHeight > maxHeight) {
+            renderHeight = maxHeight;
+            renderWidth = (imageAsset.width / imageAsset.height) * renderHeight;
+          }
+
+          const imageFormat = imageAsset.dataUrl.includes('image/jpeg')
+            ? 'JPEG'
+            : 'PNG';
+
+          ensureSpace(renderHeight + 8);
+          pdf.addImage(
+            imageAsset.dataUrl,
+            imageFormat,
+            margin,
+            cursorY,
+            renderWidth,
+            renderHeight,
+          );
+          cursorY += renderHeight + 6;
+        } catch {
+          writeImagePlaceholder('Imagen no disponible');
+        }
+      };
+
+      const writeMarkdownLine = async (line: string) => {
+        const matches = Array.from(line.matchAll(markdownImagePattern));
+
+        if (!matches.length) {
+          writeText(normalizePdfText(line));
+          return;
+        }
+
+        let lastIndex = 0;
+
+        for (const match of matches) {
+          const [fullMatch, , imageSource = ''] = match;
+          const matchIndex = match.index ?? 0;
+          const beforeText = line.slice(lastIndex, matchIndex).trim();
+
+          if (beforeText) {
+            writeText(normalizePdfText(beforeText));
+          }
+
+          await writeImageToPdf(imageSource);
+          lastIndex = matchIndex + fullMatch.length;
+        }
+
+        const afterText = line.slice(lastIndex).trim();
+        if (afterText) {
+          writeText(normalizePdfText(afterText));
+        }
+      };
+
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(18);
       pdf.setTextColor(15, 23, 42);
@@ -654,17 +1615,31 @@ export const App = () => {
       pdf.text(titleLines, margin, cursorY);
       cursorY += titleLines.length * titleLineHeight + 8;
 
-      splitPdfText(entry.contenido).forEach((line) => {
-        if (/^!\[[^\]]*]\(([^)]+)\)$/.test(line)) {
-          writeText(line.replace(/^!\[([^\]]*)]\(([^)]+)\)$/, 'Imagen: $2'), {
-            color: [71, 85, 105],
-            fontSize: 10,
-          });
-          return;
+      for (const block of parsePdfContentBlocks(entry.contenido)) {
+        if (block.type === 'code') {
+          writeCodeBlock(block.content, block.language);
+          continue;
         }
 
-        writeText(line);
-      });
+        if (block.type === 'list') {
+          writeListBlock(block.items);
+          continue;
+        }
+
+        if (block.type === 'table') {
+          writeTableBlock(block.rows);
+          continue;
+        }
+
+        const textLines = block.content
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean);
+
+        for (const line of textLines) {
+          await writeMarkdownLine(line);
+        }
+      }
 
       if (entry.pasos?.length) {
         writeSectionTitle('Pasos');
@@ -737,11 +1712,25 @@ export const App = () => {
       return;
     }
 
+    const customEntryId = entryForm.id.trim();
+    const originalId =
+      modalState?.type === 'entry' && modalState.mode === 'edit'
+        ? modalState.entryId
+        : undefined;
+    const duplicateEntryId = customEntryId
+      ? manualData.entries.some(
+          (entry) => entry.id === customEntryId && entry.id !== originalId,
+        )
+      : false;
+
+    if (duplicateEntryId) {
+      setFormError(
+        'Ya existe una ficha con ese ID. Usa otro identificador o deja el campo vacio para autogenerarlo.',
+      );
+      return;
+    }
+
     updateManualData((currentManualData) => {
-      const originalId =
-        modalState?.type === 'entry' && modalState.mode === 'edit'
-          ? modalState.entryId
-          : undefined;
       const nextId = ensureUniqueEntryId(
         entryForm.id || `${trimmedCategory}-${trimmedTitle}`,
         currentManualData.entries,
@@ -920,6 +1909,42 @@ export const App = () => {
     });
   };
 
+  const handleDeleteCategory = (categoryName: string) => {
+    const entriesInCategory = manualData.entries.filter(
+      (entry) => entry.categoria.toLowerCase() === categoryName.toLowerCase(),
+    );
+
+    setDeleteConfirmationCategory({
+      categoryName,
+      entryCount: entriesInCategory.length,
+    });
+  };
+
+  const handleCancelDeleteCategory = () => {
+    setDeleteConfirmationCategory(null);
+  };
+
+  const handleConfirmDeleteCategory = () => {
+    if (!deleteConfirmationCategory) {
+      return;
+    }
+
+    const { categoryName } = deleteConfirmationCategory;
+
+    updateManualData((currentManualData) => ({
+      ...currentManualData,
+      categories: currentManualData.categories.filter(
+        (category) => category.name.toLowerCase() !== categoryName.toLowerCase(),
+      ),
+      entries: currentManualData.entries.filter(
+        (entry) => entry.categoria.toLowerCase() !== categoryName.toLowerCase(),
+      ),
+    }));
+
+    setDeleteConfirmationCategory(null);
+    closeModal();
+  };
+
   const handleExport = () => {
     const exportPayload = manualData.entries;
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
@@ -976,14 +2001,6 @@ export const App = () => {
       return;
     }
 
-    const confirmed = window.confirm(
-      'Importar un backup sobrescribirá el estado local actual. ¿Quieres continuar?',
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     try {
       // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
       const rawBackup = await file.text();
@@ -991,11 +2008,79 @@ export const App = () => {
       const nextManualData = normalizeManualData(
         extractManualImportSource(parsedBackup),
       );
+      const importSummaryConfirmed = window.confirm(
+        `Se importaran ${nextManualData.entries.length} fichas y ${nextManualData.categories.length} secciones. El estado local actual sera reemplazado. ¿Quieres continuar?`,
+      );
+
+      if (!importSummaryConfirmed) {
+        return;
+      }
+
       persistManualData(nextManualData);
+      shouldPersistToServerRef.current = true;
+      setSaveSyncState('pending');
       setManualData(nextManualData);
       setSearchTerm('');
     } catch {
       window.alert('No se pudo importar el backup. Revisa que el JSON sea valido.');
+    }
+  };
+
+  const handleContentPaste = async (
+    event: ReactClipboardEvent<HTMLTextAreaElement>,
+  ) => {
+    const clipboardFiles = Array.from(event.clipboardData.files);
+    const imageFile = clipboardFiles.find((file) =>
+      file.type.startsWith('image/'),
+    );
+
+    if (!imageFile) {
+      return;
+    }
+
+    event.preventDefault();
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('image', imageFile);
+
+      // Si en el futuro esta logica de envio de archivos se procesa en un
+      // servidor Java, es imperativo usar try-catch-resources para el manejo
+      // de los Streams y asegurar la liberacion de memoria en el entorno RGA
+      // [cite: 2026-02-12].
+      const response = await fetch('http://localhost:3001/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('La subida de la imagen no se completo correctamente.');
+      }
+
+      const result = (await response.json()) as {
+        filename?: string;
+        path?: string;
+      };
+      const imagePath = result.path ?? `/images/${result.filename ?? ''}`;
+
+      if (!imagePath || imagePath.endsWith('/')) {
+        throw new Error('No se ha recibido una ruta valida para la imagen.');
+      }
+
+      insertTextAtCursor(
+        contentEditorRef.current,
+        entryForm.contenido,
+        (nextValue) =>
+          setEntryForm((current) => ({ ...current, contenido: nextValue })),
+        `![descripcion](${imagePath})`,
+      );
+    } catch {
+      window.alert(
+        'No se pudo subir la imagen pegada. Revisa que el servidor de imagenes este activo en el puerto 3001.',
+      );
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -1099,6 +2184,7 @@ export const App = () => {
   const sidebarContent = (
     <SidebarUtilities
       onExportBackup={handleExportBackup}
+      onExportManual={handleExport}
       onImportBackupClick={handleImportBackupClick}
       onRestoreEntry={handleRestoreEntry}
       trashEntries={manualData.trash}
@@ -1106,61 +2192,94 @@ export const App = () => {
   );
 
   // Recordatorio: Para cualquier proceso en Java que gestione la configuración de estos iconos o estados de usuario, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
+  const saveStatusLabel =
+    saveSyncState === 'error'
+      ? 'Error al guardar'
+      : saveSyncState === 'pending'
+        ? 'Pendiente de guardar'
+        : saveSyncState === 'saving'
+          ? 'Guardando...'
+          : saveSyncState === 'saved' && lastSavedAt
+            ? `Guardado a las ${lastSavedAt}`
+            : 'Sin cambios';
+  const saveStatusTone =
+    saveSyncState === 'error'
+      ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
+      : saveSyncState === 'saved'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
+        : saveSyncState === 'saving' || saveSyncState === 'pending'
+          ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
+          : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300';
+  const serverStatusLabel =
+    serverHealthState === 'online'
+      ? 'Servidor OK'
+      : serverHealthState === 'offline'
+        ? 'Servidor KO'
+        : 'Comprobando servidor';
+  const serverStatusTone =
+    serverHealthState === 'online'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200'
+      : serverHealthState === 'offline'
+        ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
+        : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-300';
   const headerActions = (
     <>
-      <button
-        type="button"
-        onClick={toggleDarkMode}
-        aria-label={
-          manualData.settings.darkMode ? 'Activar modo claro' : 'Activar modo oscuro'
-        }
-        title={
-          manualData.settings.darkMode ? 'Activar modo claro' : 'Activar modo oscuro'
-        }
-        className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white transition-colors dark:bg-slate-900 ${
-          manualData.settings.darkMode
-            ? 'border-indigo-300/60 text-indigo-500 hover:border-indigo-400 hover:bg-indigo-50 dark:border-indigo-400/40 dark:text-indigo-400 dark:hover:bg-indigo-950/30'
-            : 'border-amber-300/60 text-amber-500 hover:border-amber-400 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-400 dark:hover:bg-amber-950/30'
-        }`}
+      <div
+        className={`hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 sm:inline-flex ${serverStatusTone}`}
       >
-        {manualData.settings.darkMode ? (
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            className="h-5 w-5"
-          >
-            <path
-              d="M16.5 12.5A7.2 7.2 0 0 1 7.5 3.5 7.2 7.2 0 1 0 16.5 12.5Z"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.7"
-            />
-          </svg>
-        ) : (
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            className="h-5 w-5"
-          >
-            <circle cx="10" cy="10" r="3.5" stroke="currentColor" strokeWidth="1.6" />
-            <path
-              d="M10 1.8v2M10 16.2v2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M1.8 10h2M16.2 10h2M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeWidth="1.6"
-            />
-          </svg>
-        )}
-      </button>
-      <button
-        type="button"
-        onClick={handleExport}
-        className="rounded-xl border border-slate-200 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:border-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+        {serverStatusLabel}
+      </div>
+      <div
+        className={`hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 lg:inline-flex ${saveStatusTone}`}
       >
-        Exportar Manual Actualizado
+        {saveStatusLabel}
+      </div>
+      <button
+      type="button"
+      onClick={toggleDarkMode}
+      aria-label={
+        manualData.settings.darkMode ? 'Activar modo claro' : 'Activar modo oscuro'
+      }
+      title={
+        manualData.settings.darkMode ? 'Activar modo claro' : 'Activar modo oscuro'
+      }
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white transition-colors dark:bg-slate-900 ${
+        manualData.settings.darkMode
+          ? 'border-indigo-300/60 text-indigo-500 hover:border-indigo-400 hover:bg-indigo-50 dark:border-indigo-400/40 dark:text-indigo-400 dark:hover:bg-indigo-950/30'
+          : 'border-amber-300/60 text-amber-500 hover:border-amber-400 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-400 dark:hover:bg-amber-950/30'
+      }`}
+    >
+      {manualData.settings.darkMode ? (
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-5 w-5"
+        >
+          <path
+            d="M16.5 12.5A7.2 7.2 0 0 1 7.5 3.5 7.2 7.2 0 1 0 16.5 12.5Z"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.7"
+          />
+        </svg>
+      ) : (
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-5 w-5"
+        >
+          <circle cx="10" cy="10" r="3.5" stroke="currentColor" strokeWidth="1.6" />
+          <path
+            d="M10 1.8v2M10 16.2v2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M1.8 10h2M16.2 10h2M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="1.6"
+          />
+        </svg>
+      )}
       </button>
     </>
   );
@@ -1400,6 +2519,20 @@ export const App = () => {
         }}
       />
 
+      {saveToast ? (
+        <div className="fixed bottom-4 right-4 z-[80] max-w-sm rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+          <p
+            className={`text-sm font-medium ${
+              saveToast.tone === 'success'
+                ? 'text-emerald-700 dark:text-emerald-300'
+                : 'text-red-700 dark:text-red-300'
+            }`}
+          >
+            {saveToast.message}
+          </p>
+        </div>
+      ) : null}
+
       {modalState ? (
         <div className="fixed inset-0 z-50 bg-slate-950/70">
           {modalState.type === 'entry' ? (
@@ -1625,20 +2758,30 @@ export const App = () => {
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             Documento Markdown
                           </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-300">
-                            Soporta codigo, tablas, acordeones por encabezado e imagenes locales en `/public/images/`
-                          </p>
+                          <div className="flex items-center gap-3">
+                            {isUploadingImage ? (
+                              <span className="text-xs font-medium text-sky-600 dark:text-sky-300">
+                                Subiendo imagen...
+                              </span>
+                            ) : null}
+                            <p className="text-xs text-slate-400 dark:text-slate-300">
+                              Soporta codigo, tablas, acordeones por encabezado e imagenes locales en `/public/images/`
+                            </p>
+                          </div>
                         </div>
                         <textarea
                           ref={contentEditorRef}
                           value={entryForm.contenido}
+                          onPaste={(event) => {
+                            void handleContentPaste(event);
+                          }}
                           onChange={(event) =>
                             setEntryForm((current) => ({
                               ...current,
                               contenido: event.target.value,
                             }))
                           }
-                          className="themed-field min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                          className={`themed-field min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white ${isUploadingImage ? 'cursor-wait' : ''}`}
                           placeholder="# Titulo de seccion&#10;&#10;Escribe aqui tu documentacion en Markdown..."
                         />
                       </div>
@@ -1922,6 +3065,19 @@ export const App = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
+                  {modalState.mode === 'edit' ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        categoryForm?.name
+                          ? handleDeleteCategory(categoryForm.name)
+                          : undefined
+                      }
+                      className="mr-auto rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 transition-all duration-200 hover:border-rose-300 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/20"
+                    >
+                      Eliminar sección
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     onClick={closeModal}
@@ -1969,6 +3125,45 @@ export const App = () => {
                 className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteConfirmationCategory ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Confirmar borrado de sección
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">
+              Esta acción eliminará la sección y sus fichas asociadas.
+            </p>
+            <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+              {deleteConfirmationCategory.categoryName} ·{' '}
+              {deleteConfirmationCategory.entryCount} ficha
+              {deleteConfirmationCategory.entryCount === 1 ? '' : 's'}
+            </p>
+            {deleteConfirmationCategory.entryCount >= 5 ? (
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                Esta sección tiene bastante contenido. Revisa el backup antes de confirmar el borrado.
+              </p>
+            ) : null}
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCancelDeleteCategory}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-all duration-200 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteCategory}
+                className="rounded-xl border border-rose-600 bg-rose-600 px-4 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:border-rose-700 hover:bg-rose-700 dark:border-rose-500 dark:bg-rose-600 dark:hover:border-rose-400 dark:hover:bg-rose-500"
+              >
+                Eliminar sección
               </button>
             </div>
           </div>

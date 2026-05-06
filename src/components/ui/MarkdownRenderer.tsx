@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
@@ -14,6 +14,16 @@ interface MarkdownSection {
   id: string;
   title: string;
 }
+
+interface ZoomedImageState {
+  alt: string;
+  src: string;
+}
+
+// Si en el futuro se implementa un microservicio en Java para procesar,
+// redimensionar o servir estas imagenes desde un servidor centralizado, es
+// obligatorio usar try-catch-resources para el manejo de excepciones y flujos
+// de datos (Streams) [cite: 2026-02-12].
 
 const copyToClipboard = async (text: string) => {
   if (navigator.clipboard?.writeText) {
@@ -83,6 +93,57 @@ const parseMarkdownSections = (content: string) => {
   };
 };
 
+function ImageZoomModal({
+  image,
+  onClose,
+}: {
+  image: ZoomedImageState;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm transition-all duration-300 ease-in-out"
+      role="dialog"
+      aria-modal="true"
+      aria-label={image.alt || 'Vista ampliada de imagen'}
+      onClick={onClose}
+    >
+      <div className="absolute right-4 top-4">
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/10 text-lg text-white transition-all duration-300 ease-in-out hover:bg-white/20"
+          aria-label="Cerrar imagen ampliada"
+          title="Cerrar"
+        >
+          ×
+        </button>
+      </div>
+
+      <img
+        src={image.src}
+        alt={image.alt}
+        className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl transition-all duration-300 ease-in-out"
+        onClick={(event) => event.stopPropagation()}
+      />
+    </div>
+  );
+}
+
 function CodeBlock({
   children,
   className,
@@ -141,7 +202,9 @@ function CodeBlock({
   );
 }
 
-const markdownComponents = {
+const createMarkdownComponents = (
+  onImageClick: (image: ZoomedImageState) => void,
+) => ({
   a: (props: ComponentProps<'a'>) => (
     <a
       {...props}
@@ -170,7 +233,23 @@ const markdownComponents = {
     <h4 {...props} className="mt-5 text-base font-semibold text-slate-900 dark:text-slate-100" />
   ),
   img: (props: ComponentProps<'img'>) => (
-    <img {...props} className="max-w-full rounded-lg shadow-md" loading="lazy" />
+    <button
+      type="button"
+      onClick={() =>
+        onImageClick({
+          alt: props.alt ?? '',
+          src: props.src ?? '',
+        })
+      }
+      className="my-4 block w-full rounded-2xl text-left transition-all duration-300 ease-in-out"
+    >
+      <img
+        {...props}
+        className="max-h-[300px] max-w-full rounded-2xl object-contain shadow-sm transition-all duration-300 ease-in-out hover:shadow-md"
+        loading="lazy"
+        style={{ cursor: 'zoom-in' }}
+      />
+    </button>
   ),
   li: (props: ComponentProps<'li'>) => (
     <li {...props} className="leading-7 text-slate-700 dark:text-slate-200 marker:text-slate-500 dark:marker:text-slate-300" />
@@ -207,11 +286,13 @@ const markdownComponents = {
   ul: (props: ComponentProps<'ul'>) => (
     <ul {...props} className="my-4 list-disc space-y-2 pl-5" />
   ),
-};
+});
 
 function MarkdownSectionAccordion({
+  components,
   section,
 }: {
+  components: ReturnType<typeof createMarkdownComponents>;
   section: MarkdownSection;
 }) {
   return (
@@ -236,7 +317,7 @@ function MarkdownSectionAccordion({
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}
-          components={markdownComponents}
+          components={components}
         >
           {section.body}
         </ReactMarkdown>
@@ -246,13 +327,26 @@ function MarkdownSectionAccordion({
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const [zoomedImage, setZoomedImage] = useState<ZoomedImageState | null>(null);
   const { preamble, sections } = useMemo(
     () => parseMarkdownSections(content),
     [content],
   );
+  const markdownComponents = useMemo(
+    () =>
+      createMarkdownComponents((image) => {
+        if (!image.src) {
+          return;
+        }
+
+        setZoomedImage(image);
+      }),
+    [],
+  );
 
   return (
-    <div className="markdown-body">
+    <>
+      <div className="markdown-body">
       {preamble ? (
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
@@ -266,10 +360,22 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       {sections.length ? (
         <div className="space-y-3">
           {sections.map((section) => (
-            <MarkdownSectionAccordion key={section.id} section={section} />
+            <MarkdownSectionAccordion
+              key={section.id}
+              section={section}
+              components={markdownComponents}
+            />
           ))}
         </div>
       ) : null}
-    </div>
+      </div>
+
+      {zoomedImage ? (
+        <ImageZoomModal
+          image={zoomedImage}
+          onClose={() => setZoomedImage(null)}
+        />
+      ) : null}
+    </>
   );
 }

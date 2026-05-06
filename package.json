@@ -4,13 +4,17 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run vite-dev\" \"node server.js\"",
+    "vite-dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "highlight.js": "^11.11.1",
     "html2pdf.js": "^0.14.0",
+    "multer": "^2.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
@@ -22,6 +26,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^9.2.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
