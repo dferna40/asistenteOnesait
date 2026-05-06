@@ -18,11 +18,13 @@ import type {
   CommandOption,
   CommandOverridesByEntry,
   KnowledgeEntry,
+  ManualBackupPayload,
   ManualData,
 } from './types';
 
 const STORAGE_KEY = 'knowledge-manual-state-v2';
 const LEGACY_COMMAND_STORAGE_KEY = 'result-card-command-overrides';
+const ASSISTANT_VERSION = '1.0.0';
 const defaultSettings: AppSettings = {
   darkMode: false,
 };
@@ -227,6 +229,18 @@ const normalizeManualData = (source: unknown): ManualData => {
     settings: defaultSettings,
     trash: [],
   };
+};
+
+const extractManualImportSource = (source: unknown) => {
+  if (source && typeof source === 'object' && 'data' in source) {
+    const backupCandidate = source as Partial<ManualBackupPayload>;
+
+    if (Array.isArray(backupCandidate.data)) {
+      return backupCandidate.data;
+    }
+  }
+
+  return source;
 };
 
 const readStoredManualData = (): ManualData => {
@@ -907,24 +921,24 @@ export const App = () => {
   };
 
   const handleExport = () => {
-    const exportPayload = manualData;
+    const exportPayload = manualData.entries;
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
       type: 'application/json',
     });
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = downloadUrl;
-    link.download = 'manual_actualizado.json';
+    link.download = 'manual.json';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(downloadUrl);
     window.alert(
-      'Guia: mueve el archivo descargado a src/data/, renombralo como manual.json y machaca el archivo original para convertirlo en la nueva base del asistente.',
+      'Guia: este archivo ya sale como manual.json. Sustituyelo en src/data/manual.json para convertirlo en la nueva base del asistente.',
     );
   };
 
-  const downloadJsonFile = (payload: ManualData, filename: string) => {
+  const downloadJsonFile = (payload: unknown, filename: string) => {
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: 'application/json',
     });
@@ -940,9 +954,16 @@ export const App = () => {
 
   const handleExportBackup = () => {
     // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
+    const backupPayload: ManualBackupPayload = {
+      fecha_creacion: new Date().toISOString(),
+      total_entradas: manualData.entries.length,
+      version_asistente: ASSISTANT_VERSION,
+      data: manualData.entries,
+    };
+
     downloadJsonFile(
-      manualData,
-      `manual_backup_${new Date().toISOString().slice(0, 10)}.json`,
+      backupPayload,
+      `RGA_Backup_${new Date().toISOString().slice(0, 10)}.json`,
     );
   };
 
@@ -966,7 +987,10 @@ export const App = () => {
     try {
       // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
       const rawBackup = await file.text();
-      const nextManualData = normalizeManualData(JSON.parse(rawBackup));
+      const parsedBackup = JSON.parse(rawBackup);
+      const nextManualData = normalizeManualData(
+        extractManualImportSource(parsedBackup),
+      );
       persistManualData(nextManualData);
       setManualData(nextManualData);
       setSearchTerm('');

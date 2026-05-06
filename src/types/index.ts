@@ -34,6 +34,13 @@ export interface ManualData {
   trash: KnowledgeEntry[];
 }
 
+export interface ManualBackupPayload {
+  data: KnowledgeEntry[];
+  fecha_creacion: string;
+  total_entradas: number;
+  version_asistente: string;
+}
+
 export interface CommandOverride {
   label: string;
   value: string;
