@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { categoryColors, categoryThemes } from '../../constants/categoryColors';
 import type { KnowledgeEntry } from '../../types';
 
@@ -7,6 +8,8 @@ interface ResultCardProps {
 
 const technicalTokenPattern =
   /([A-Za-z]:\\[^\s\n]+|\/[a-z]+|[A-Z_]{2,}(?:\.[A-Z_]+)?|SELECT\s+[^.\n;]+;?)/g;
+
+const sensitiveLabelPattern = /\b(password|pass|clave)\b/i;
 
 const copyToClipboard = async (text: string) => {
   if (navigator.clipboard?.writeText) {
@@ -30,6 +33,10 @@ const isTechnicalToken = (value: string) =>
   /^[A-Z_]{2,}(?:\.[A-Z_]+)?$/.test(value) ||
   /^SELECT\s+/i.test(value);
 
+const isSensitiveLabel = (label: string) => sensitiveLabelPattern.test(label);
+
+const maskValue = (value: string) => '•'.repeat(Math.max(value.length, 8));
+
 const renderTechnicalText = (text: string, keyPrefix: string) =>
   text.split(technicalTokenPattern).map((part, index) =>
     isTechnicalToken(part) ? (
@@ -45,12 +52,18 @@ const renderTechnicalText = (text: string, keyPrefix: string) =>
   );
 
 export function ResultCard({ entry }: ResultCardProps) {
+  const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
   const categoryStyle = categoryThemes[entry.categoria];
   const categoryColor = categoryColors[entry.categoria];
-  const isAccessCategory = entry.categoria === 'Accesos';
 
-  // Para cualquier integración futura de servicios de autenticación en Java,
-  // utilizar try-catch-resources para garantizar el cierre seguro de conexiones.
+  // Recordatorio: Para cualquier lógica Java que procese estos parámetros de configuración o acceso, es obligatorio el uso de try-catch-resources para la gestión de excepciones y cierre de flujos.
+
+  const toggleFieldVisibility = (fieldKey: string) => {
+    setHiddenFields((current) => ({
+      ...current,
+      [fieldKey]: !current[fieldKey],
+    }));
+  };
 
   return (
     <article
@@ -100,21 +113,121 @@ export function ResultCard({ entry }: ResultCardProps) {
       {entry.comandos?.length ? (
         <div className="mt-5">
           <h4 className="text-sm font-semibold text-slate-800">Comandos utiles</h4>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            {entry.comandos.map((command) => (
-              <button
-                key={`${entry.id}-${command.label}`}
-                type="button"
-                onClick={() => copyToClipboard(command.value)}
-                className={`w-full rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700 transition-all duration-200 sm:w-auto ${categoryStyle.button} ${
-                  isAccessCategory
-                    ? 'px-2.5 py-1.5 text-xs leading-4'
-                    : 'px-3 py-2 text-sm'
-                }`}
-              >
-                Copiar {command.label}
-              </button>
-            ))}
+          <div className="mt-3 space-y-2">
+            {entry.comandos.map((command, index) => {
+              const fieldKey = `${entry.id}-${command.label}-${index}`;
+              const sensitive = isSensitiveLabel(command.label);
+              const isHidden = sensitive && hiddenFields[fieldKey];
+              const displayedValue = isHidden
+                ? maskValue(command.value)
+                : command.value;
+
+              return (
+                <div
+                  key={fieldKey}
+                  className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white/90 p-2.5 sm:grid-cols-[minmax(96px,120px)_minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <span className="text-xs font-semibold text-slate-700">
+                    {command.label}
+                  </span>
+
+                  <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-800">
+                    <span className="block overflow-x-auto whitespace-nowrap">
+                      {displayedValue}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1">
+                    {sensitive ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleFieldVisibility(fieldKey)}
+                        aria-label={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
+                        title={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                      >
+                        {isHidden ? (
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            className="h-4 w-4"
+                          >
+                            <path
+                              d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <circle
+                              cx="10"
+                              cy="10"
+                              r="2.5"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                            />
+                          </svg>
+                        ) : (
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            className="h-4 w-4"
+                          >
+                            <path
+                              d="M3 3l14 14"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M8.9 5.4A9.4 9.4 0 0 1 10 5c5 0 8 5 8 5a14.3 14.3 0 0 1-2.5 2.9M11.4 11.5A2.5 2.5 0 0 1 8.5 8.6M5.1 7.1A14.5 14.5 0 0 0 2 10s3 5 8 5c1.2 0 2.3-.3 3.3-.8"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(command.value)}
+                      aria-label={`Copiar ${command.label}`}
+                      title={`Copiar ${command.label}`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        className="h-4 w-4"
+                      >
+                        <rect
+                          x="7"
+                          y="3"
+                          width="9"
+                          height="11"
+                          rx="2"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                        />
+                        <path
+                          d="M5 7H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-1"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
