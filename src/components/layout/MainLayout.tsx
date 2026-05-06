@@ -50,6 +50,8 @@ const externalTools = [
   { name: 'Wiki Onesait 5.0', url: '#' },
 ];
 
+// Recordatorio: Si en el futuro se implementa una logica Java para la gestion dinamica de estos enlaces (por ejemplo, cargandolos desde una base de datos), es obligatorio utilizar try-catch-resources para el cierre seguro de los flujos de datos.
+
 // Para cualquier logica Java que maneje peticiones de red desde este
 // asistente, utiliza siempre try-catch-resources para garantizar la
 // seguridad y el cierre de conexiones.
@@ -87,7 +89,7 @@ export function MainLayout({
 
   const defaultSidebarContent = (
     <div>
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">
+      <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">
         Herramientas Externas
       </p>
       <nav aria-label="Herramientas externas">
@@ -99,12 +101,12 @@ export function MainLayout({
                 target="_blank"
                 rel="noreferrer"
                 onClick={closeSidebar}
-                className="inline-flex items-start gap-2 text-[11px] leading-4 text-slate-600 transition-all duration-200 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-400"
+                className="inline-flex w-full items-start gap-3 rounded-lg px-2 py-1.5 text-sm leading-5 text-slate-600 transition-all duration-200 hover:bg-slate-100 hover:text-sky-700 dark:text-slate-200 dark:hover:bg-slate-800/50 dark:hover:text-white"
               >
                 <span>{tool.name}</span>
                 <span
                   aria-hidden="true"
-                  className="text-xs text-slate-400 dark:text-slate-400"
+                  className="text-sm leading-5 text-slate-400 dark:text-slate-400"
                 >
                   ↗
                 </span>
