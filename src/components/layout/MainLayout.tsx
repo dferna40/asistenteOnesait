@@ -91,7 +91,7 @@ export function MainLayout({
         Herramientas Externas
       </p>
       <nav aria-label="Herramientas externas">
-        <ul className="max-h-72 space-y-1 overflow-y-auto pr-1">
+        <ul className="app-scrollbar max-h-72 space-y-1 overflow-y-auto pr-1">
           {externalTools.map((tool) => (
             <li key={tool.name}>
               <a
@@ -117,12 +117,12 @@ export function MainLayout({
   );
 
   const mobileSidebarPanel = (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto">
       <div className="bg-slate-50/85 p-4 backdrop-blur supports-[backdrop-filter]:bg-slate-50/70 dark:bg-slate-900/80 dark:supports-[backdrop-filter]:bg-slate-900/70">
         <IdentityWidget />
       </div>
 
-      <div className="border-t border-slate-100 p-4 dark:border-slate-800">
+      <div className="app-scrollbar border-t border-slate-100 p-4 dark:border-slate-800">
         <div className="space-y-6">
           {defaultSidebarContent}
           {sidebarContent}
@@ -137,7 +137,7 @@ export function MainLayout({
         <IdentityWidget />
       </div>
 
-      <div className="border-t border-slate-100 p-4 dark:border-slate-800">
+      <div className="app-scrollbar border-t border-slate-100 p-4 dark:border-slate-800">
         <div className="space-y-6">
           {defaultSidebarContent}
           {sidebarContent}

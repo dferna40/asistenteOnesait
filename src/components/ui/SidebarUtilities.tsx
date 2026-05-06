@@ -108,7 +108,7 @@ export function SidebarUtilities({
             </h3>
           </div>
 
-          <div className="mt-3 space-y-4">
+          <div className="app-scrollbar mt-3 max-h-[28rem] space-y-4 overflow-y-auto pr-1">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-200">
