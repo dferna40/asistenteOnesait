@@ -36,8 +36,11 @@ const pdfMarkdownComponents = {
       {...props}
       style={{
         color: '#2563eb',
+        lineHeight: 1.5,
         textDecoration: 'underline',
         fontWeight: 600,
+        overflow: 'visible',
+        padding: '1px 0',
       }}
     />
   ),
@@ -59,6 +62,8 @@ const pdfMarkdownComponents = {
             color: '#0f172a',
             fontFamily: '"Courier New", monospace',
             fontSize: 9,
+            lineHeight: 1.5,
+            overflow: 'visible',
             padding: '1px 5px',
           }}
         >
@@ -71,7 +76,7 @@ const pdfMarkdownComponents = {
       <div
         className="pdf-avoid-break"
         style={{
-          backgroundColor: '#e5e7eb',
+          backgroundColor: '#dbe1e8',
           border: '1px solid #cbd5e1',
           borderRadius: 8,
           margin: '10px 0',
@@ -84,9 +89,10 @@ const pdfMarkdownComponents = {
             color: '#0f172a',
             fontFamily: '"Courier New", monospace',
             fontSize: 9,
-            lineHeight: 1.45,
+            lineHeight: 1.5,
             margin: 0,
             overflowX: 'auto',
+            overflowY: 'visible',
             padding: '10px 12px',
             pageBreakInside: 'avoid',
             whiteSpace: 'pre-wrap',
@@ -102,9 +108,12 @@ const pdfMarkdownComponents = {
       {...props}
       style={{
         color: '#0f172a',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 700,
+        lineHeight: 1.5,
         margin: '16px 0 8px',
+        overflow: 'visible',
+        padding: '4px 0',
       }}
     />
   ),
@@ -118,8 +127,13 @@ const pdfMarkdownComponents = {
         style={{
           color: '#0f172a',
           fontSize: 14,
+          borderBottom: '1px solid #e2e8f0',
           fontWeight: 700,
+          lineHeight: 1.5,
           margin: '16px 0 8px',
+          overflow: 'visible',
+          padding: '4px 0 4px',
+          paddingBottom: 4,
         }}
       />
     );
@@ -133,9 +147,14 @@ const pdfMarkdownComponents = {
         id={anchorId}
         style={{
           color: '#0f172a',
-          fontSize: 12,
+          borderBottom: '1px solid #e2e8f0',
+          fontSize: 13,
           fontWeight: 700,
+          lineHeight: 1.5,
           margin: '14px 0 6px',
+          overflow: 'visible',
+          padding: '3px 0',
+          paddingBottom: 3,
         }}
       />
     );
@@ -147,7 +166,10 @@ const pdfMarkdownComponents = {
         color: '#0f172a',
         fontSize: 11,
         fontWeight: 700,
+        lineHeight: 1.5,
         margin: '12px 0 5px',
+        overflow: 'visible',
+        padding: '2px 0',
       }}
     />
   ),
@@ -159,7 +181,7 @@ const pdfMarkdownComponents = {
         borderRadius: 10,
         display: 'block',
         margin: '12px auto',
-        maxHeight: '300px',
+        maxHeight: '250px',
         maxWidth: '100%',
         pageBreakInside: 'avoid',
       }}
@@ -173,6 +195,8 @@ const pdfMarkdownComponents = {
         fontSize: 10.5,
         lineHeight: 1.5,
         marginBottom: 4,
+        overflow: 'visible',
+        padding: '1px 0',
       }}
     />
   ),
@@ -187,11 +211,16 @@ const pdfMarkdownComponents = {
         fontSize: 10.5,
         lineHeight: 1.5,
         margin: '7px 0',
+        overflow: 'visible',
+        padding: '1px 0',
       }}
     />
   ),
   strong: (props: ComponentProps<'strong'>) => (
-    <strong {...props} style={{ color: '#0f172a', fontWeight: 700 }} />
+    <strong
+      {...props}
+      style={{ color: '#0f172a', fontWeight: 700, lineHeight: 1.5, overflow: 'visible' }}
+    />
   ),
   table: (props: ComponentProps<'table'>) => (
     <div
@@ -257,10 +286,12 @@ export function PrintTemplate({
       ref={containerRef}
       style={{
         backgroundColor: '#ffffff',
+        boxSizing: 'border-box',
         color: '#0f172a',
         fontFamily: 'Arial, Roboto, sans-serif',
-        padding: '24px 28px 28px',
-        width: '800px',
+        overflow: 'visible',
+        padding: '15mm',
+        width: '210mm',
       }}
     >
       <header
@@ -272,16 +303,21 @@ export function PrintTemplate({
           gap: 16,
           justifyContent: 'space-between',
           marginBottom: 16,
+          overflow: 'visible',
           paddingBottom: 12,
+          paddingTop: 4,
           pageBreakInside: 'avoid',
         }}
       >
         <h1
           style={{
             color: '#0f172a',
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: 700,
+            lineHeight: 1.5,
             margin: 0,
+            overflow: 'visible',
+            padding: '2px 0',
           }}
         >
           {entry.titulo}
@@ -289,21 +325,26 @@ export function PrintTemplate({
         <p
           style={{
             color: '#475569',
+            display: 'block',
             fontSize: 10,
             fontWeight: 700,
+            lineHeight: 1.5,
             letterSpacing: '0.14em',
             margin: 0,
+            overflow: 'visible',
+            padding: '2px 0',
             textAlign: 'right',
             textTransform: 'uppercase',
+            width: '100%',
             whiteSpace: 'nowrap',
           }}
         >
-          Asistente Onsite RGA
+          Onsite RGA
         </p>
       </header>
 
       {category?.description ? (
-        <p style={{ color: '#334155', fontSize: 10.5, lineHeight: 1.5, margin: '0 0 12px' }}>
+        <p style={{ color: '#334155', fontSize: 10.5, lineHeight: 1.5, margin: '0 0 12px', overflow: 'visible', padding: '1px 0' }}>
           {category.description}
         </p>
       ) : null}
@@ -325,7 +366,10 @@ export function PrintTemplate({
               color: '#0f172a',
               fontSize: 12,
               fontWeight: 700,
+              lineHeight: 1.5,
               margin: 0,
+              overflow: 'visible',
+              padding: '1px 0',
             }}
           >
             Indice
@@ -338,6 +382,8 @@ export function PrintTemplate({
                   fontSize: 10,
                   lineHeight: 1.4,
                   marginLeft: Math.max(0, (heading.depth - 2) * 8),
+                  overflow: 'visible',
+                  padding: '1px 0',
                 }}
               >
                 {heading.title}
@@ -367,7 +413,7 @@ export function PrintTemplate({
           </h2>
           <ol style={{ color: '#1e293b', margin: 0, paddingLeft: 18 }}>
             {entry.pasos.map((step) => (
-              <li key={step} style={{ fontSize: 10.5, lineHeight: 1.5, marginBottom: 4 }}>
+              <li key={step} style={{ fontSize: 10.5, lineHeight: 1.5, marginBottom: 4, overflow: 'visible', padding: '1px 0' }}>
                 {step}
               </li>
             ))}
@@ -377,7 +423,7 @@ export function PrintTemplate({
 
       {entry.comandos?.length ? (
         <section style={{ marginTop: 18 }}>
-          <h2 style={{ color: '#0f172a', fontSize: 13, fontWeight: 700, margin: '0 0 7px' }}>
+          <h2 style={{ color: '#0f172a', fontSize: 13, fontWeight: 700, lineHeight: 1.5, margin: '0 0 7px', overflow: 'visible', padding: '1px 0' }}>
             Parametros y comandos utiles
           </h2>
           <div style={{ display: 'grid', gap: 4 }}>
@@ -389,7 +435,7 @@ export function PrintTemplate({
                   alignItems: 'start',
                   display: 'grid',
                   gap: 6,
-                  gridTemplateColumns: '115px minmax(0, 1fr)',
+                  gridTemplateColumns: '50mm 130mm',
                   pageBreakInside: 'avoid',
                   padding: '2px 0',
                 }}
@@ -399,7 +445,10 @@ export function PrintTemplate({
                     color: '#0f172a',
                     fontSize: 9.5,
                     fontWeight: 700,
+                    lineHeight: 1.5,
                     margin: 0,
+                    overflow: 'visible',
+                    padding: '1px 0',
                   }}
                 >
                   {command.label}
@@ -407,12 +456,17 @@ export function PrintTemplate({
                 <code
                   style={{
                     backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
                     borderRadius: 5,
                     color: '#0f172a',
                     display: 'block',
                     fontFamily: '"Courier New", monospace',
                     fontSize: 9.5,
+                    height: 'auto',
+                    lineHeight: 1.5,
+                    overflow: 'visible',
                     padding: '4px 6px',
+                    width: '130mm',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
                   }}

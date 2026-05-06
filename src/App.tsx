@@ -451,7 +451,7 @@ export const App = () => {
           return;
         }
 
-        // Recordatorio: Si en el futuro este motor de PDF se traslada a un servicio backend en Java, es obligatorio el uso de try-catch-resources para gestionar los flujos de bytes del documento y garantizar la liberacion de memoria en el servidor.
+        // Recordatorio: Si esta exportacion tecnica se procesa posteriormente en un entorno Java (como un servicio de almacenamiento de documentos), es obligatorio el uso de try-catch-resources para el manejo seguro de los flujos de archivos.
         await html2pdf()
           .set({
             filename,
