@@ -57,11 +57,11 @@ const pdfMarkdownComponents = {
       return (
         <code
           style={{
-            backgroundColor: '#e2e8f0',
-            borderRadius: 4,
-            color: '#0f172a',
-            fontFamily: '"Courier New", monospace',
-            fontSize: 9,
+        backgroundColor: '#e2e8f0',
+        borderRadius: 4,
+        color: '#0f172a',
+        fontFamily: '"Courier New", monospace',
+        fontSize: '9pt',
             lineHeight: 1.6,
             overflow: 'visible',
             padding: '1px 5px 3px',
@@ -88,7 +88,7 @@ const pdfMarkdownComponents = {
           style={{
             color: '#f8fafc',
             fontFamily: '"Courier New", monospace',
-            fontSize: 9,
+            fontSize: '9pt',
             lineHeight: 1.6,
             margin: 0,
             overflowX: 'auto',
@@ -108,10 +108,10 @@ const pdfMarkdownComponents = {
       {...props}
       style={{
         color: '#0f172a',
-        fontSize: 18,
+        fontSize: '18pt',
         fontWeight: 700,
         lineHeight: 1.6,
-        margin: '16px 0 8px',
+        margin: '0 0 10mm',
         overflow: 'visible',
         padding: '2px 0 3px',
       }}
@@ -125,12 +125,12 @@ const pdfMarkdownComponents = {
         {...props}
         id={anchorId}
         style={{
-          color: '#0f172a',
-          fontSize: 13,
+        color: '#0f172a',
+        fontSize: 13,
           borderBottom: '1px solid #e2e8f0',
           fontWeight: 700,
           lineHeight: 1.6,
-          margin: '16px 0 8px',
+        margin: '16px 0 8px',
           overflow: 'visible',
           padding: '4px 0 3px',
           paddingBottom: 4,
@@ -146,8 +146,8 @@ const pdfMarkdownComponents = {
         {...props}
         id={anchorId}
         style={{
-          color: '#0f172a',
-          borderBottom: '1px solid #e2e8f0',
+        color: '#0f172a',
+        borderBottom: '1px solid #e2e8f0',
           fontSize: 13,
           fontWeight: 700,
           lineHeight: 1.6,
@@ -183,6 +183,7 @@ const pdfMarkdownComponents = {
         margin: '12px auto',
         maxHeight: '250px',
         maxWidth: '100%',
+        height: 'auto',
         pageBreakInside: 'avoid',
       }}
     />
@@ -192,7 +193,7 @@ const pdfMarkdownComponents = {
       {...props}
       style={{
         color: '#1e293b',
-        fontSize: 10.5,
+        fontSize: '11pt',
         lineHeight: 1.6,
         marginBottom: 4,
         overflow: 'visible',
@@ -208,7 +209,7 @@ const pdfMarkdownComponents = {
       {...props}
       style={{
         color: '#1e293b',
-        fontSize: 10.5,
+        fontSize: '11pt',
         lineHeight: 1.6,
         margin: '7px 0',
         overflow: 'visible',
@@ -297,6 +298,7 @@ export function PrintTemplate({
         boxSizing: 'border-box',
         color: '#0f172a',
         fontFamily: 'Arial, Roboto, sans-serif',
+        minHeight: '297mm',
         overflow: 'visible',
         padding: '15mm',
         width: '210mm',
@@ -305,22 +307,20 @@ export function PrintTemplate({
       <header
         className="pdf-avoid-break"
         style={{
-          borderBottom: '1px solid #cbd5e1',
           display: 'block',
-          marginBottom: 16,
+          marginBottom: 0,
           overflow: 'visible',
-          paddingBottom: 12,
-          paddingTop: 4,
+          padding: 0,
           pageBreakInside: 'avoid',
         }}
       >
         <h1
           style={{
             color: '#0f172a',
-            fontSize: 18,
+            fontSize: '18pt',
             fontWeight: 700,
             lineHeight: 1.6,
-            margin: 0,
+            margin: '0 0 10mm',
             overflow: 'visible',
             padding: '2px 0 3px',
           }}
@@ -333,7 +333,7 @@ export function PrintTemplate({
         <p
           style={{
             color: '#334155',
-            fontSize: 10.5,
+            fontSize: '11pt',
             lineHeight: 1.6,
             margin: '0 0 12px',
             overflow: 'visible',
@@ -421,62 +421,63 @@ export function PrintTemplate({
           <h2 style={{ color: '#0f172a', fontSize: 13, fontWeight: 700, lineHeight: 1.6, margin: '0 0 7px', overflow: 'visible', padding: '1px 0 3px' }}>
             Parametros y comandos utiles
           </h2>
-          <div style={{ display: 'grid', gap: '3mm' }}>
-            {entry.comandos.map((command, index) => (
-              <div
-                key={`${command.label}-${index}`}
-                className="pdf-avoid-break"
-                style={{
-                  alignItems: 'flex-start',
-                  display: 'flex',
-                  flexDirection: 'row',
-                  gap: '4mm',
-                  lineHeight: 1.6,
-                  overflow: 'visible',
-                  pageBreakInside: 'avoid',
-                  width: '180mm',
-                }}
-              >
-                <div
+          <table
+            style={{
+              borderCollapse: 'collapse',
+              tableLayout: 'fixed',
+              width: '100%',
+            }}
+          >
+            <colgroup>
+              <col style={{ width: '55mm' }} />
+              <col style={{ width: '125mm' }} />
+            </colgroup>
+            <tbody>
+              {entry.comandos.map((command, index) => (
+                <tr
+                  key={`${command.label}-${index}`}
+                  className="pdf-avoid-break"
                   style={{
-                    boxSizing: 'border-box',
-                    color: '#64748b',
-                    flex: '0 0 50mm',
-                    fontSize: 9,
-                    fontWeight: 700,
-                    lineHeight: 1.6,
-                    overflow: 'visible',
-                    paddingTop: 2,
-                    width: '50mm',
+                    pageBreakInside: 'avoid',
                   }}
                 >
-                  {command.label}
-                </div>
-                <div
-                  style={{
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 4,
-                    boxSizing: 'border-box',
-                    color: '#0f172a',
-                    flex: '0 0 130mm',
-                    fontFamily: '"Courier New", monospace',
-                    fontSize: 9,
-                    lineHeight: 1.6,
-                    minHeight: 'auto',
-                    overflow: 'visible',
-                    padding: '2mm',
-                    paddingTop: 'calc(2mm + 2px)',
-                    whiteSpace: 'pre-wrap',
-                    width: '130mm',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {command.value}
-                </div>
-              </div>
-            ))}
-          </div>
+                  <td
+                    style={{
+                      color: '#475569',
+                      fontSize: '10pt',
+                      fontWeight: 700,
+                      lineHeight: 1.6,
+                      padding: 4,
+                      verticalAlign: 'top',
+                      width: '55mm',
+                    }}
+                  >
+                    {command.label}
+                  </td>
+                  <td
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 4,
+                      boxSizing: 'border-box',
+                      color: '#0f172a',
+                      fontFamily: '"Courier New", monospace',
+                      fontSize: '10pt',
+                      lineHeight: 1.6,
+                      padding: 6,
+                      verticalAlign: 'top',
+                      whiteSpace: 'pre-wrap',
+                      width: '125mm',
+                      wordBreak: 'break-word',
+                      wordWrap: 'break-word',
+                    }}
+                  >
+                    {command.value}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       ) : null}
     </div>

@@ -451,12 +451,13 @@ export const App = () => {
           return;
         }
 
-        // Recordatorio: Para cualquier proceso de exportacion PDF gestionado desde un backend Java, es obligatorio el uso de try-catch-resources para el cierre seguro de los flujos de archivos y evitar fugas de memoria.
+        // Recordatorio: Para cualquier proceso de generación de estos PDFs en un entorno backend Java, es obligatorio utilizar try-catch-resources para el cierre seguro de los flujos de salida del documento y garantizar la integridad de los datos.
         await html2pdf()
           .set({
             filename,
             html2canvas: {
               backgroundColor: '#ffffff',
+              logging: false,
               scale: 3,
               useCORS: true,
             },
