@@ -3,6 +3,7 @@ import {
   getCategoryColorHex,
   getCategoryTheme,
 } from '../../constants/categoryColors';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import type { CategoryColorKey, KnowledgeEntry } from '../../types';
 
 interface ResultCardProps {
@@ -15,9 +16,6 @@ interface ResultCardProps {
   ) => void;
   onEditEntry?: (entry: KnowledgeEntry) => void;
 }
-
-const technicalTokenPattern =
-  /([A-Za-z]:\\[^\s\n]+|\/[a-z]+|[A-Z_]{2,}(?:\.[A-Z_]+)?|SELECT\s+[^.\n;]+;?)/g;
 
 const sensitiveLabelPattern = /\b(password|pass|clave)\b/i;
 
@@ -37,29 +35,9 @@ const copyToClipboard = async (text: string) => {
   document.body.removeChild(textarea);
 };
 
-const isTechnicalToken = (value: string) =>
-  /^[A-Za-z]:\\[^\s\n]+$/.test(value) ||
-  /^\/[a-z]+$/i.test(value) ||
-  /^[A-Z_]{2,}(?:\.[A-Z_]+)?$/.test(value) ||
-  /^SELECT\s+/i.test(value);
-
 const isSensitiveLabel = (label: string) => sensitiveLabelPattern.test(label);
 
 const maskValue = (value: string) => '*'.repeat(Math.max(value.length, 8));
-
-const renderTechnicalText = (text: string, keyPrefix: string) =>
-  text.split(technicalTokenPattern).map((part, index) =>
-    isTechnicalToken(part) ? (
-      <code
-        key={`${keyPrefix}-${index}`}
-        className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[13px] text-slate-800"
-      >
-        {part}
-      </code>
-    ) : (
-      <span key={`${keyPrefix}-${index}`}>{part}</span>
-    ),
-  );
 
 export function ResultCard({
   categoryColorKey = 'slate',
@@ -183,17 +161,17 @@ export function ResultCard({
         </div>
       </div>
 
-      <div className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-        {renderTechnicalText(entry.contenido, `${entry.id}-content`)}
+      <div className="mt-4 text-sm leading-6 text-slate-600">
+        <MarkdownRenderer content={entry.contenido} />
       </div>
 
       {entry.pasos?.length ? (
         <div className="mt-5">
           <h4 className="text-sm font-semibold text-slate-800">Pasos</h4>
           <ol className="mt-2 space-y-2 pl-5 text-sm leading-6 text-slate-600">
-            {entry.pasos.map((step, index) => (
+            {entry.pasos.map((step) => (
               <li key={step} className="list-decimal">
-                {renderTechnicalText(step, `${entry.id}-step-${index}`)}
+                {step}
               </li>
             ))}
           </ol>

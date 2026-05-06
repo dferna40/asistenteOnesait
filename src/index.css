@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .markdown-body details > summary::-webkit-details-marker {
+    display: none;
+  }
+}
+
 @layer utilities {
   @keyframes fade-in {
     from {

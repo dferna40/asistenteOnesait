@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
+import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
 import {
   categoryColorOptions,
@@ -70,6 +71,11 @@ interface CategoryFormState {
   color: CategoryColorKey;
   description: string;
   name: string;
+}
+
+interface ToolbarAction {
+  label: string;
+  onClick: () => void;
 }
 
 type ModalState =
@@ -237,7 +243,7 @@ const persistManualData = (manualData: ManualData) => {
     return;
   }
 
-  // Recordatorio: Si en el futuro se implementa una API en Java para persistir estas categorías dinámicas, es obligatorio usar try-catch-resources para el manejo de excepciones de entrada/salida de archivos.
+  // Recordatorio: Si en el futuro decides crear un servicio Java para automatizar este borrado de botones o gestión de datos, usa siempre try-catch-resources para el manejo de excepciones de recursos.
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(manualData));
 };
 
@@ -303,6 +309,34 @@ const buildCategoryFormState = (
   name: category?.name ?? '',
 });
 
+const updateContentSelection = (
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+  before: string,
+  after = '',
+  placeholder = '',
+) => {
+  if (!textarea) {
+    setValue(`${currentValue}${before}${placeholder}${after}`);
+    return;
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = currentValue.slice(start, end);
+  const nextText = selectedText || placeholder;
+  const nextValue = `${currentValue.slice(0, start)}${before}${nextText}${after}${currentValue.slice(end)}`;
+  setValue(nextValue);
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    const selectionStart = start + before.length;
+    const selectionEnd = selectionStart + nextText.length;
+    textarea.setSelectionRange(selectionStart, selectionEnd);
+  });
+};
+
 export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [manualData, setManualData] = useState<ManualData>(() =>
@@ -316,6 +350,7 @@ export const App = () => {
     null,
   );
   const [formError, setFormError] = useState('');
+  const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
 
   const categoryMap = useMemo(
     () =>
@@ -594,24 +629,82 @@ export const App = () => {
     : undefined;
   const isCreatingNewCategory =
     entryForm.categoria.trim().length > 0 && !activeEntryCategory;
+  const toolbarActions: ToolbarAction[] = [
+    {
+      label: '**Negrita**',
+      onClick: () =>
+        updateContentSelection(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          '**',
+          '**',
+          'texto en negrita',
+        ),
+    },
+    {
+      label: '> Código',
+      onClick: () =>
+        updateContentSelection(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          '```java\n',
+          '\n```',
+          '// codigo aqui',
+        ),
+    },
+    {
+      label: '![Imagen]()',
+      onClick: () =>
+        updateContentSelection(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          '![descripcion](',
+          ')',
+          '/images/nombre.png',
+        ),
+    },
+    {
+      label: 'Lista',
+      onClick: () =>
+        updateContentSelection(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          '- ',
+          '',
+          'Elemento de lista',
+        ),
+    },
+    {
+      label: 'Tabla',
+      onClick: () =>
+        updateContentSelection(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          '',
+          '',
+          '| Columna 1 | Columna 2 |\n| --- | --- |\n| Valor 1 | Valor 2 |',
+        ),
+    },
+  ];
 
   const headerActions = (
-    <>
-      <button
-        type="button"
-        onClick={() => openCreateEntryModal()}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
-      >
-        Gestion de conocimiento
-      </button>
-      <button
-        type="button"
-        onClick={handleExport}
-        className="rounded-xl border border-slate-200 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
-      >
-        Exportar Manual Actualizado
-      </button>
-    </>
+    <button
+      type="button"
+      onClick={handleExport}
+      className="rounded-xl border border-slate-200 bg-slate-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+    >
+      Exportar Manual Actualizado
+    </button>
   );
 
   return (
@@ -779,394 +872,505 @@ export const App = () => {
       </MainLayout>
 
       {modalState ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-900">
-                  {modalState.type === 'entry'
-                    ? modalState.mode === 'create'
-                      ? 'Gestion de conocimiento'
-                      : 'Editar ficha'
-                    : modalState.mode === 'create'
-                      ? 'Nueva sección'
-                      : 'Editar seccion'}
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {modalState.type === 'entry'
-                    ? 'Define categoria, contenido, pasos y comandos desde un unico formulario.'
-                    : modalState.mode === 'create'
-                      ? 'Crea una nueva categoria dinamica con nombre, color y descripcion para la Home.'
-                      : 'Actualiza el nombre, la descripcion y el color de la seccion.'}
-                </p>
+        <div className="fixed inset-0 z-50 bg-slate-950/60">
+          {modalState.type === 'entry' ? (
+            <div className="flex h-full flex-col bg-white">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {modalState.mode === 'create'
+                      ? 'Editor de Ficha'
+                      : 'Editar ficha'}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Editor enriquecido con Markdown, panel dividido y previsualización en tiempo real.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEntrySave}
+                    className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                  >
+                    Guardar cambios
+                  </button>
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={closeModal}
-                aria-label="Cerrar modal"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
-              {modalState.type === 'entry' ? (
-                <>
-                  <section className="space-y-4">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        Seccion principal
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Elige una categoria existente o escribe una nueva para
-                        crear un bloque dinamico en la Home.
-                      </p>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
-                        Categoria
-                        <input
-                          list="existing-categories"
-                          value={entryForm.categoria}
-                          onChange={(event) =>
-                            setEntryForm((current) => ({
-                              ...current,
-                              categoria: event.target.value,
-                            }))
-                          }
-                          disabled={entryForm.categoryLocked}
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                          placeholder="Ej. BBDD"
-                        />
-                        <datalist id="existing-categories">
-                          {manualData.categories.map((category) => (
-                            <option key={category.name} value={category.name} />
-                          ))}
-                        </datalist>
-                      </label>
-
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
-                        ID de la ficha
-                        <input
-                          value={entryForm.id}
-                          onChange={(event) =>
-                            setEntryForm((current) => ({
-                              ...current,
-                              id: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                          placeholder="Se genera automaticamente si lo dejas vacio"
-                        />
-                      </label>
-                    </div>
-
-                    {entryForm.categoryLocked && activeEntryCategory ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                        La nueva ficha se añadira dentro de la seccion{' '}
-                        <span className="font-semibold text-slate-900">
-                          {activeEntryCategory.name}
-                        </span>
-                        . Para cambiarla, vuelve a la Home y entra desde otra seccion.
+              <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-2">
+                <div className="min-h-0 overflow-y-auto border-r border-slate-200 bg-slate-50/60">
+                  <div className="space-y-6 p-5 sm:p-6">
+                    <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          Contexto de la ficha
+                        </p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Define seccion, metadatos y soporte operativo antes de redactar el documento.
+                        </p>
                       </div>
-                    ) : isCreatingNewCategory ? (
-                      <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_180px]">
+
+                      <div className="grid gap-4 md:grid-cols-2">
                         <label className="space-y-2 text-sm font-medium text-slate-700">
-                          Descripcion de la seccion
+                          Categoria
                           <input
-                            value={entryForm.categoryDescription}
+                            list="existing-categories"
+                            value={entryForm.categoria}
                             onChange={(event) =>
                               setEntryForm((current) => ({
                                 ...current,
-                                categoryDescription: event.target.value,
+                                categoria: event.target.value,
                               }))
                             }
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                            placeholder="Resumen corto para el bloque de la Home"
+                            disabled={entryForm.categoryLocked}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
+                            placeholder="Ej. BBDD"
+                          />
+                          <datalist id="existing-categories">
+                            {manualData.categories.map((category) => (
+                              <option key={category.name} value={category.name} />
+                            ))}
+                          </datalist>
+                        </label>
+
+                        <label className="space-y-2 text-sm font-medium text-slate-700">
+                          ID de la ficha
+                          <input
+                            value={entryForm.id}
+                            onChange={(event) =>
+                              setEntryForm((current) => ({
+                                ...current,
+                                id: event.target.value,
+                              }))
+                            }
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                            placeholder="Se genera automaticamente si lo dejas vacio"
                           />
                         </label>
 
                         <label className="space-y-2 text-sm font-medium text-slate-700">
-                          Color de la seccion
-                          <select
-                            value={entryForm.categoryColor}
+                          Titulo
+                          <input
+                            value={entryForm.titulo}
                             onChange={(event) =>
                               setEntryForm((current) => ({
                                 ...current,
-                                categoryColor: event.target.value as CategoryColorKey,
+                                titulo: event.target.value,
                               }))
                             }
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                          >
-                            {categoryColorOptions.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                          />
+                        </label>
+
+                        <label className="space-y-2 text-sm font-medium text-slate-700">
+                          Tags
+                          <input
+                            value={entryForm.tags}
+                            onChange={(event) =>
+                              setEntryForm((current) => ({
+                                ...current,
+                                tags: event.target.value,
+                              }))
+                            }
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                            placeholder="tag1, tag2, tag3"
+                          />
                         </label>
                       </div>
-                    ) : activeEntryCategory ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                        La ficha se guardara dentro de la seccion{' '}
-                        <span className="font-semibold text-slate-900">
-                          {activeEntryCategory.name}
-                        </span>
-                        , con la descripcion actual de la Home.
+
+                      {entryForm.categoryLocked && activeEntryCategory ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                          La nueva ficha se añadira dentro de la seccion{' '}
+                          <span className="font-semibold text-slate-900">
+                            {activeEntryCategory.name}
+                          </span>
+                          . Para cambiarla, vuelve a la Home y entra desde otra seccion.
+                        </div>
+                      ) : isCreatingNewCategory ? (
+                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_180px]">
+                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                            Descripcion de la seccion
+                            <input
+                              value={entryForm.categoryDescription}
+                              onChange={(event) =>
+                                setEntryForm((current) => ({
+                                  ...current,
+                                  categoryDescription: event.target.value,
+                                }))
+                              }
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                              placeholder="Resumen corto para el bloque de la Home"
+                            />
+                          </label>
+
+                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                            Color de la seccion
+                            <select
+                              value={entryForm.categoryColor}
+                              onChange={(event) =>
+                                setEntryForm((current) => ({
+                                  ...current,
+                                  categoryColor: event.target.value as CategoryColorKey,
+                                }))
+                              }
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                            >
+                              {categoryColorOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      ) : activeEntryCategory ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                          La ficha se guardara dentro de la seccion{' '}
+                          <span className="font-semibold text-slate-900">
+                            {activeEntryCategory.name}
+                          </span>
+                          , con la descripcion actual de la Home.
+                        </div>
+                      ) : null}
+                    </section>
+
+                    <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
+                        {toolbarActions.map((action) => (
+                          <button
+                            key={action.label}
+                            type="button"
+                            onClick={action.onClick}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-900">
+                            Documento Markdown
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Soporta codigo, tablas, acordeones por encabezado e imagenes locales en `/public/images/`
+                          </p>
+                        </div>
+                        <textarea
+                          ref={contentEditorRef}
+                          value={entryForm.contenido}
+                          onChange={(event) =>
+                            setEntryForm((current) => ({
+                              ...current,
+                              contenido: event.target.value,
+                            }))
+                          }
+                          className="min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none transition focus:border-sky-400"
+                          placeholder="# Titulo de seccion&#10;&#10;Escribe aqui tu documentacion en Markdown..."
+                        />
+                      </div>
+                    </section>
+
+                    <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <label className="block space-y-2 text-sm font-medium text-slate-700">
+                        Pasos
+                        <textarea
+                          value={entryForm.pasos}
+                          onChange={(event) =>
+                            setEntryForm((current) => ({
+                              ...current,
+                              pasos: event.target.value,
+                            }))
+                          }
+                          rows={5}
+                          className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                          placeholder="Un paso por linea"
+                        />
+                      </label>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-slate-700">
+                            Comandos y parametros
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEntryForm((current) => ({
+                                ...current,
+                                comandos: [
+                                  ...current.comandos,
+                                  { label: '', value: '' },
+                                ],
+                              }))
+                            }
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                          >
+                            Anadir fila
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {entryForm.comandos.map((command, index) => (
+                            <div
+                              key={`${index}-${command.label}`}
+                              className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[180px_minmax(0,1fr)_auto]"
+                            >
+                              <input
+                                value={command.label}
+                                onChange={(event) =>
+                                  setEntryForm((current) => ({
+                                    ...current,
+                                    comandos: current.comandos.map(
+                                      (currentCommand, commandIndex) =>
+                                        commandIndex === index
+                                          ? {
+                                              ...currentCommand,
+                                              label: event.target.value,
+                                            }
+                                          : currentCommand,
+                                    ),
+                                  }))
+                                }
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                placeholder="Etiqueta"
+                              />
+                              <input
+                                value={command.value}
+                                onChange={(event) =>
+                                  setEntryForm((current) => ({
+                                    ...current,
+                                    comandos: current.comandos.map(
+                                      (currentCommand, commandIndex) =>
+                                        commandIndex === index
+                                          ? {
+                                              ...currentCommand,
+                                              value: event.target.value,
+                                            }
+                                          : currentCommand,
+                                    ),
+                                  }))
+                                }
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                placeholder="Valor"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEntryForm((current) => ({
+                                    ...current,
+                                    comandos:
+                                      current.comandos.length === 1
+                                        ? [{ label: '', value: '' }]
+                                        : current.comandos.filter(
+                                            (_, commandIndex) =>
+                                              commandIndex !== index,
+                                          ),
+                                  }))
+                                }
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </section>
+
+                    {formError ? (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {formError}
                       </div>
                     ) : null}
-                  </section>
+                  </div>
+                </div>
 
-                  <section className="space-y-4">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        Subseccion
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Completa la ficha con su contenido operativo.
-                      </p>
+                <div className="min-h-0 overflow-y-auto bg-white">
+                  <div className="space-y-6 p-5 sm:p-6">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+                          {entryForm.categoria || 'Sin categoria'}
+                        </span>
+                        <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
+                          {entryForm.id || 'id-pendiente'}
+                        </span>
+                      </div>
+
+                      <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+                        {entryForm.titulo || 'Vista previa de la ficha'}
+                      </h2>
+
+                      <div className="mt-4 text-sm leading-6 text-slate-700">
+                        <MarkdownRenderer content={entryForm.contenido} />
+                      </div>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
-                        Titulo
-                        <input
-                          value={entryForm.titulo}
-                          onChange={(event) =>
-                            setEntryForm((current) => ({
-                              ...current,
-                              titulo: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                        />
-                      </label>
+                    {splitLines(entryForm.pasos).length ? (
+                      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Pasos
+                        </h3>
+                        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">
+                          {splitLines(entryForm.pasos).map((step) => (
+                            <li key={step}>{step}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
 
-                      <label className="space-y-2 text-sm font-medium text-slate-700">
-                        Tags
-                        <input
-                          value={entryForm.tags}
-                          onChange={(event) =>
-                            setEntryForm((current) => ({
-                              ...current,
-                              tags: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                          placeholder="tag1, tag2, tag3"
-                        />
-                      </label>
-                    </div>
+                    {entryForm.comandos.some(
+                      (command) => command.label.trim() || command.value.trim(),
+                    ) ? (
+                      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          Comandos y parametros
+                        </h3>
+                        <div className="mt-3 space-y-2">
+                          {entryForm.comandos
+                            .filter(
+                              (command) =>
+                                command.label.trim() || command.value.trim(),
+                            )
+                            .map((command, index) => (
+                              <div
+                                key={`${command.label}-${index}`}
+                                className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[140px_minmax(0,1fr)]"
+                              >
+                                <span className="text-xs font-semibold text-slate-700">
+                                  {command.label || 'Etiqueta'}
+                                </span>
+                                <code className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-mono text-xs text-slate-800">
+                                  {command.value || 'Valor'}
+                                </code>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center p-4">
+              <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      {modalState.mode === 'create'
+                        ? 'Nueva sección'
+                        : 'Editar seccion'}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Configura el nombre, color y descripcion del bloque principal de la Home.
+                    </p>
+                  </div>
 
-                    <label className="block space-y-2 text-sm font-medium text-slate-700">
-                      Contenido
-                      <textarea
-                        value={entryForm.contenido}
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    aria-label="Cerrar modal"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+                  <section className="grid gap-4 md:grid-cols-2">
+                    <label className="space-y-2 text-sm font-medium text-slate-700">
+                      Nombre de la seccion
+                      <input
+                        value={categoryForm?.name ?? ''}
                         onChange={(event) =>
-                          setEntryForm((current) => ({
-                            ...current,
-                            contenido: event.target.value,
-                          }))
+                          setCategoryForm((current) =>
+                            current
+                              ? { ...current, name: event.target.value }
+                              : current,
+                          )
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                      />
+                    </label>
+
+                    <label className="space-y-2 text-sm font-medium text-slate-700">
+                      Color
+                      <select
+                        value={categoryForm?.color ?? 'blue'}
+                        onChange={(event) =>
+                          setCategoryForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  color: event.target.value as CategoryColorKey,
+                                }
+                              : current,
+                          )
+                        }
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                      >
+                        {categoryColorOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
+                      Descripcion de la Home
+                      <textarea
+                        value={categoryForm?.description ?? ''}
+                        onChange={(event) =>
+                          setCategoryForm((current) =>
+                            current
+                              ? { ...current, description: event.target.value }
+                              : current,
+                          )
                         }
                         rows={4}
                         className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                       />
                     </label>
-
-                    <label className="block space-y-2 text-sm font-medium text-slate-700">
-                      Pasos
-                      <textarea
-                        value={entryForm.pasos}
-                        onChange={(event) =>
-                          setEntryForm((current) => ({
-                            ...current,
-                            pasos: event.target.value,
-                          }))
-                        }
-                        rows={5}
-                        className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                        placeholder="Un paso por linea"
-                      />
-                    </label>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-slate-700">
-                          Comandos y parametros
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setEntryForm((current) => ({
-                              ...current,
-                              comandos: [
-                                ...current.comandos,
-                                { label: '', value: '' },
-                              ],
-                            }))
-                          }
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
-                        >
-                          Anadir fila
-                        </button>
-                      </div>
-
-                      <div className="space-y-3">
-                        {entryForm.comandos.map((command, index) => (
-                          <div
-                            key={`${index}-${command.label}`}
-                            className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[180px_minmax(0,1fr)_auto]"
-                          >
-                            <input
-                              value={command.label}
-                              onChange={(event) =>
-                                setEntryForm((current) => ({
-                                  ...current,
-                                  comandos: current.comandos.map(
-                                    (currentCommand, commandIndex) =>
-                                      commandIndex === index
-                                        ? {
-                                            ...currentCommand,
-                                            label: event.target.value,
-                                          }
-                                        : currentCommand,
-                                  ),
-                                }))
-                              }
-                              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                              placeholder="Etiqueta"
-                            />
-                            <input
-                              value={command.value}
-                              onChange={(event) =>
-                                setEntryForm((current) => ({
-                                  ...current,
-                                  comandos: current.comandos.map(
-                                    (currentCommand, commandIndex) =>
-                                      commandIndex === index
-                                        ? {
-                                            ...currentCommand,
-                                            value: event.target.value,
-                                          }
-                                        : currentCommand,
-                                  ),
-                                }))
-                              }
-                              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                              placeholder="Valor"
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setEntryForm((current) => ({
-                                  ...current,
-                                  comandos:
-                                    current.comandos.length === 1
-                                      ? [{ label: '', value: '' }]
-                                      : current.comandos.filter(
-                                          (_, commandIndex) =>
-                                            commandIndex !== index,
-                                        ),
-                                }))
-                              }
-                              className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
-                            >
-                              Quitar
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </section>
-                </>
-              ) : categoryForm ? (
-                <section className="grid gap-4 md:grid-cols-2">
-                  <label className="space-y-2 text-sm font-medium text-slate-700">
-                    Nombre de la seccion
-                    <input
-                      value={categoryForm.name}
-                      onChange={(event) =>
-                        setCategoryForm((current) =>
-                          current
-                            ? { ...current, name: event.target.value }
-                            : current,
-                        )
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                    />
-                  </label>
 
-                  <label className="space-y-2 text-sm font-medium text-slate-700">
-                    Color
-                    <select
-                      value={categoryForm.color}
-                      onChange={(event) =>
-                        setCategoryForm((current) =>
-                          current
-                            ? {
-                                ...current,
-                                color: event.target.value as CategoryColorKey,
-                              }
-                            : current,
-                        )
-                      }
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                    >
-                      {categoryColorOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
-                    Descripcion de la Home
-                    <textarea
-                      value={categoryForm.description}
-                      onChange={(event) =>
-                        setCategoryForm((current) =>
-                          current
-                            ? { ...current, description: event.target.value }
-                            : current,
-                        )
-                      }
-                      rows={4}
-                      className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
-                    />
-                  </label>
-                </section>
-              ) : null}
-
-              {formError ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {formError}
+                  {formError ? (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {formError}
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-            </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 sm:px-6">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={
-                  modalState.type === 'entry' ? handleEntrySave : handleCategorySave
-                }
-                className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
-              >
-                Guardar cambios
-              </button>
+                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 sm:px-6">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCategorySave}
+                    className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                  >
+                    Guardar cambios
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       ) : null}
     </>
