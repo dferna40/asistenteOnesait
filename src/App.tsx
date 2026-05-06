@@ -956,10 +956,10 @@ export const App = () => {
                           <span className="inline-flex rounded-full border border-current/15 px-3 py-2 text-sm font-medium">
                             {category.name}
                           </span>
-                          <span className="mt-2 block text-[11px] leading-5 text-slate-500 dark:text-slate-400 sm:text-xs sm:leading-5">
+                          <span className="mt-2 block text-[11px] leading-5 text-slate-500 dark:text-slate-300 sm:text-xs sm:leading-5">
                             {category.description}
                           </span>
-                          <span className="mt-3 block text-[11px] font-semibold uppercase tracking-[0.16em] text-current/80">
+                          <span className="mt-3 block text-[11px] font-semibold uppercase tracking-[0.16em] text-current/80 dark:text-slate-100">
                             {entryCount} ficha{entryCount === 1 ? '' : 's'}
                           </span>
                         </button>
@@ -975,7 +975,7 @@ export const App = () => {
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="h-4 w-4"
+                            className="icon-neon h-4 w-4"
                           >
                             <path
                               d="M10 2.5a1 1 0 0 1 1 1v.6a6.3 6.3 0 0 1 1.8.8l.4-.4a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1 0 1.4l-.4.4c.3.6.6 1.2.8 1.8h.6a1 1 0 0 1 1 1v1.4a1 1 0 0 1-1 1h-.6a6.3 6.3 0 0 1-.8 1.8l.4.4a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4 0l-.4-.4a6.3 6.3 0 0 1-1.8.8v.6a1 1 0 0 1-1 1H8.6a1 1 0 0 1-1-1v-.6a6.3 6.3 0 0 1-1.8-.8l-.4.4a1 1 0 0 1-1.4 0l-1-1a1 1 0 0 1 0-1.4l.4-.4a6.3 6.3 0 0 1-.8-1.8H2a1 1 0 0 1-1-1V9.9a1 1 0 0 1 1-1h.6a6.3 6.3 0 0 1 .8-1.8L3 6.7a1 1 0 0 1 0-1.4l1-1a1 1 0 0 1 1.4 0l.4.4a6.3 6.3 0 0 1 1.8-.8v-.6a1 1 0 0 1 1-1H10Z"

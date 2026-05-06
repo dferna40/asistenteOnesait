@@ -28,22 +28,30 @@ export function SearchBar({
   return (
     <div className="relative w-full max-w-lg">
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition-all duration-200 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-100 dark:border-slate-800 dark:bg-slate-900 dark:focus-within:border-sky-400 dark:focus-within:ring-sky-500/10">
-        <span className="text-slate-400 dark:text-slate-500" aria-hidden="true">
-          ⌕
+        <span className="text-slate-500 dark:text-sky-300" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+            <circle cx="9" cy="9" r="5.5" stroke="currentColor" strokeWidth="1.6" />
+            <path
+              d="m13 13 4 4"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
         </span>
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setTimeout(() => setIsFocused(false), 100)}
-          className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+          className="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-400"
           placeholder={placeholder}
         />
       </div>
 
       {showPrefixMenu && filteredPrefixes.length > 0 ? (
         <div className="absolute mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
-          <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-300">
             Prefijos sugeridos
           </p>
           <ul className="space-y-1">
@@ -52,7 +60,7 @@ export function SearchBar({
                 <button
                   type="button"
                   onClick={() => onChange(`${prefix} `)}
-                  className="w-full rounded-lg px-2 py-1 text-left text-sm text-slate-700 transition-all duration-200 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="w-full rounded-lg px-2 py-1 text-left text-sm text-slate-800 transition-all duration-200 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800"
                 >
                   {prefix}
                 </button>

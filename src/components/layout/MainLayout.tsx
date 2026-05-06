@@ -87,7 +87,7 @@ export function MainLayout({
 
   const defaultSidebarContent = (
     <div>
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">
         Herramientas Externas
       </p>
       <nav aria-label="Herramientas externas">
@@ -99,7 +99,7 @@ export function MainLayout({
                 target="_blank"
                 rel="noreferrer"
                 onClick={closeSidebar}
-                className="inline-flex items-start gap-2 text-[11px] leading-4 text-slate-600 transition-all duration-200 hover:text-sky-700 dark:text-slate-300 dark:hover:text-sky-400"
+                className="inline-flex items-start gap-2 text-[11px] leading-4 text-slate-600 transition-all duration-200 hover:text-sky-700 dark:text-slate-200 dark:hover:text-sky-400"
               >
                 <span>{tool.name}</span>
                 <span

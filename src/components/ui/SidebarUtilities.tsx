@@ -103,7 +103,7 @@ export function SidebarUtilities({
       <div className="space-y-6">
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-200">
               DevTools
             </h3>
           </div>
@@ -111,13 +111,13 @@ export function SidebarUtilities({
           <div className="mt-3 space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-200">
                   JSON Formatter
                 </p>
                 <button
                   type="button"
                   onClick={() => setExpandedTool('json')}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:text-white"
                   title="Expandir JSON Formatter"
                   aria-label="Expandir JSON Formatter"
                 >
@@ -128,7 +128,7 @@ export function SidebarUtilities({
                 value={jsonInput}
                 onChange={(event) => setJsonInput(event.target.value)}
                 rows={5}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-slate-500"
                 placeholder='{"clave":"valor"}'
               />
               {jsonResult.error ? (
@@ -136,7 +136,7 @@ export function SidebarUtilities({
                   {jsonResult.error}
                 </p>
               ) : jsonResult.value ? (
-                <pre className="overflow-x-auto rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                <pre className="overflow-x-auto rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                   {jsonResult.value}
                 </pre>
               ) : null}
@@ -144,13 +144,13 @@ export function SidebarUtilities({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-200">
                   SQL Beautifier
                 </p>
                 <button
                   type="button"
                   onClick={() => setExpandedTool('sql')}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:text-white"
                   title="Expandir SQL Beautifier"
                   aria-label="Expandir SQL Beautifier"
                 >
@@ -161,11 +161,11 @@ export function SidebarUtilities({
                 value={sqlInput}
                 onChange={(event) => setSqlInput(event.target.value)}
                 rows={5}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-slate-500"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-slate-500"
                 placeholder="select * from tabla where id = 1"
               />
               {formattedSql ? (
-                <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                   {formattedSql}
                 </pre>
               ) : null}
@@ -184,7 +184,7 @@ export function SidebarUtilities({
             <h3
               className={`text-xs font-bold uppercase tracking-[0.2em] ${
                 trashHasItems
-                  ? 'text-red-500 dark:text-red-400'
+                  ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.45)] dark:text-red-400'
                   : 'text-slate-400 dark:text-slate-500'
               }`}
             >
@@ -193,7 +193,7 @@ export function SidebarUtilities({
             <span
               className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
                 trashHasItems
-                  ? 'bg-red-100 text-red-500 dark:bg-red-950/50 dark:text-red-400'
+                  ? 'bg-red-100 text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.4)] dark:bg-red-950/50 dark:text-red-400'
                   : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
               }`}
             >
@@ -224,7 +224,7 @@ export function SidebarUtilities({
                 </div>
               ))
             ) : (
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-slate-400 dark:text-slate-300">
                 No hay fichas borradas.
               </p>
             )}
@@ -263,7 +263,7 @@ export function SidebarUtilities({
                       ? setJsonInput(event.target.value)
                       : setSqlInput(event.target.value)
                   }
-                  className="h-full min-h-[320px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 font-mono text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                  className="h-full min-h-[320px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 font-mono text-sm text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
                   placeholder={
                     expandedTool === 'json'
                       ? '{"clave":"valor"}'
@@ -279,12 +279,12 @@ export function SidebarUtilities({
                       {jsonResult.error}
                     </div>
                   ) : (
-                    <pre className="h-full min-h-[320px] overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                    <pre className="h-full min-h-[320px] overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                       {jsonResult.value || 'La vista formateada aparecera aqui.'}
                     </pre>
                   )
                 ) : (
-                  <pre className="h-full min-h-[320px] overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                  <pre className="h-full min-h-[320px] overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
                     {formattedSql || 'La vista formateada aparecera aqui.'}
                   </pre>
                 )}

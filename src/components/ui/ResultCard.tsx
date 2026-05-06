@@ -77,6 +77,20 @@ const hexToRgba = (hex: string, alpha: number) => {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 };
 
+const getCommandValueTone = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (/^[A-Za-z]:\\|^\.\.?\\|^\//.test(trimmedValue) || /[\\/]/.test(trimmedValue)) {
+    return 'dark:text-sky-300';
+  }
+
+  if (/\d/.test(trimmedValue) || /^[A-Za-z0-9_.:-]+$/.test(trimmedValue)) {
+    return 'dark:text-emerald-400';
+  }
+
+  return 'dark:text-slate-100';
+};
+
 export function ResultCard({
   categoryColorKey = 'slate',
   entry,
@@ -96,6 +110,7 @@ export function ResultCard({
   const glowStyle = {
     '--card-glow': hexToRgba(categoryColor, 0.14),
     '--card-ring': hexToRgba(categoryColor, 0.22),
+    '--icon-glow': hexToRgba(categoryColor, 0.4),
   } as CSSProperties;
 
   // Recordatorio: Para cualquier logica Java que procese estos parametros de configuracion o acceso, es obligatorio el uso de try-catch-resources para la gestion de excepciones y cierre de flujos.
@@ -219,7 +234,7 @@ export function ResultCard({
                 aria-hidden="true"
                 viewBox="0 0 20 20"
                 fill="none"
-                className="h-4 w-4"
+                className="icon-neon h-4 w-4"
               >
                 <path
                   d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
@@ -268,16 +283,16 @@ export function ResultCard({
         </div>
       </div>
 
-      <div className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
+      <div className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-200">
         <MarkdownRenderer content={entry.contenido} />
       </div>
 
       {entry.pasos?.length ? (
         <div className="mt-5">
-          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
             Pasos
           </h4>
-          <ol className="mt-2 space-y-2 pl-5 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <ol className="mt-2 space-y-2 pl-5 text-sm leading-6 text-slate-600 dark:text-slate-200">
             {entry.pasos.map((step) => (
               <li key={step} className="list-decimal">
                 {step}
@@ -289,7 +304,7 @@ export function ResultCard({
 
       {entry.comandos?.length ? (
         <div className="mt-5">
-          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
             Comandos utiles
           </h4>
           <div className="mt-3 space-y-2">
@@ -308,7 +323,7 @@ export function ResultCard({
                   key={fieldKey}
                   className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white/90 p-2.5 dark:border-slate-700 dark:bg-slate-950/50 sm:grid-cols-[minmax(96px,120px)_minmax(0,1fr)_auto] sm:items-center"
                 >
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">
                     {command.label}
                   </span>
 
@@ -335,13 +350,15 @@ export function ResultCard({
                             [fieldKey]: event.target.value,
                           }))
                         }
-                        className="w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
+                        className={`w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400 ${getCommandValueTone(draftValue)}`}
                         aria-label={`Editar ${command.label}`}
                         autoFocus
                       />
                     ) : (
                       <div className="flex items-center gap-2">
-                        <span className="block overflow-x-auto whitespace-nowrap transition-all duration-200">
+                        <span
+                          className={`block overflow-x-auto whitespace-nowrap text-slate-800 transition-all duration-200 ${getCommandValueTone(displayedValue)}`}
+                        >
                           {displayedValue}
                         </span>
                       </div>
@@ -364,7 +381,7 @@ export function ResultCard({
                                 ? 'Comprobando'
                                 : 'Lanzar health check'
                         }
-                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white transition-colors dark:bg-slate-950 ${
+                          className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white transition-colors dark:bg-slate-950 ${
                           healthStatuses[command.label] === 'healthy'
                             ? 'border-emerald-200 text-emerald-600 dark:border-emerald-900/40 dark:text-emerald-400'
                             : healthStatuses[command.label] === 'error'
@@ -376,7 +393,7 @@ export function ResultCard({
                           aria-hidden="true"
                           viewBox="0 0 20 20"
                           fill="none"
-                          className={`h-4 w-4 ${
+                          className={`icon-neon h-4 w-4 ${
                             healthStatuses[command.label] === 'checking'
                               ? 'animate-spin'
                               : ''
@@ -406,7 +423,7 @@ export function ResultCard({
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="h-4 w-4"
+                            className="icon-neon h-4 w-4"
                           >
                             <path
                               d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"
@@ -428,7 +445,7 @@ export function ResultCard({
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="h-4 w-4"
+                            className="icon-neon h-4 w-4"
                           >
                             <path
                               d="M3 3l14 14"
@@ -463,7 +480,7 @@ export function ResultCard({
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="h-4 w-4"
+                            className="icon-neon h-4 w-4"
                           >
                             <path
                               d="m4 10 4 4 8-8"
@@ -486,7 +503,7 @@ export function ResultCard({
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="h-4 w-4"
+                            className="icon-neon h-4 w-4"
                           >
                             <path
                               d="M5 5l10 10M15 5 5 15"
@@ -510,7 +527,7 @@ export function ResultCard({
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="h-4 w-4"
+                            className="icon-neon h-4 w-4"
                           >
                             <path
                               d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
@@ -538,7 +555,7 @@ export function ResultCard({
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="h-4 w-4"
+                            className="icon-neon h-4 w-4"
                           >
                             <rect
                               x="7"

@@ -30,6 +30,11 @@
       0 0 0 1px var(--card-ring, rgb(148 163 184 / 0.18)),
       0 0 18px var(--card-glow, rgb(148 163 184 / 0.1));
   }
+
+  /* Recordatorio: Si se desarrolla una utilidad Java para verificar automaticamente el contraste de la interfaz o gestionar plantillas de CSS dinamicas, es obligatorio usar try-catch-resources para el manejo de excepciones de archivos de configuracion */
+  .dark .icon-neon {
+    filter: drop-shadow(0 0 5px var(--icon-glow, rgb(255 255 255 / 0.35)));
+  }
 }
 
 @layer utilities {
