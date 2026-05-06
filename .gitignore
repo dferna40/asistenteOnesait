@@ -1,0 +1,46 @@
+# Dependencias de Node
+node_modules/
+
+# Build de producción
+dist/
+dist-ssr/
+
+# Caché de Vite
+.vite/
+node_modules/.vite/
+
+# Archivos de entorno / secretos
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Caché
+.cache/
+.parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Cobertura de tests
+coverage/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# IDEs / editores
+.vscode/
+.idea/
+
+# Vercel / Netlify
+.vercel/
+.netlify/
