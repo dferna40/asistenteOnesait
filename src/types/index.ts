@@ -12,6 +12,13 @@ export interface CommandOption {
   value: string;
 }
 
+export interface CommandOverride {
+  label: string;
+  value: string;
+}
+
+export type CommandOverridesByEntry = Record<string, CommandOverride[]>;
+
 export interface KnowledgeEntry {
   id: string;
   titulo: string;

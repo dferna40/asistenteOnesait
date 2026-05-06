@@ -4,6 +4,11 @@ import type { KnowledgeEntry } from '../../types';
 
 interface ResultCardProps {
   entry: KnowledgeEntry;
+  onCommandSave: (
+    entryId: string,
+    commandLabel: string,
+    nextValue: string,
+  ) => void;
 }
 
 const technicalTokenPattern =
@@ -35,7 +40,7 @@ const isTechnicalToken = (value: string) =>
 
 const isSensitiveLabel = (label: string) => sensitiveLabelPattern.test(label);
 
-const maskValue = (value: string) => '•'.repeat(Math.max(value.length, 8));
+const maskValue = (value: string) => '*'.repeat(Math.max(value.length, 8));
 
 const renderTechnicalText = (text: string, keyPrefix: string) =>
   text.split(technicalTokenPattern).map((part, index) =>
@@ -51,8 +56,10 @@ const renderTechnicalText = (text: string, keyPrefix: string) =>
     ),
   );
 
-export function ResultCard({ entry }: ResultCardProps) {
+export function ResultCard({ entry, onCommandSave }: ResultCardProps) {
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
+  const [editingFields, setEditingFields] = useState<Record<string, boolean>>({});
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const categoryStyle = categoryThemes[entry.categoria];
   const categoryColor = categoryColors[entry.categoria];
 
@@ -63,6 +70,47 @@ export function ResultCard({ entry }: ResultCardProps) {
       ...current,
       [fieldKey]: !current[fieldKey],
     }));
+  };
+
+  const startEditingField = (fieldKey: string, currentValue: string) => {
+    setDraftValues((current) => ({
+      ...current,
+      [fieldKey]: currentValue,
+    }));
+    setEditingFields((current) => ({
+      ...current,
+      [fieldKey]: true,
+    }));
+  };
+
+  const cancelEditingField = (fieldKey: string) => {
+    setEditingFields((current) => ({
+      ...current,
+      [fieldKey]: false,
+    }));
+    setDraftValues((current) => {
+      const nextDraftValues = { ...current };
+      delete nextDraftValues[fieldKey];
+      return nextDraftValues;
+    });
+  };
+
+  const saveEditingField = (
+    fieldKey: string,
+    commandLabel: string,
+    currentValue: string,
+  ) => {
+    const nextValue = draftValues[fieldKey] ?? currentValue;
+    onCommandSave(entry.id, commandLabel, nextValue);
+    setEditingFields((current) => ({
+      ...current,
+      [fieldKey]: false,
+    }));
+    setDraftValues((current) => {
+      const nextDraftValues = { ...current };
+      delete nextDraftValues[fieldKey];
+      return nextDraftValues;
+    });
   };
 
   return (
@@ -118,6 +166,8 @@ export function ResultCard({ entry }: ResultCardProps) {
               const fieldKey = `${entry.id}-${command.label}-${index}`;
               const sensitive = isSensitiveLabel(command.label);
               const isHidden = sensitive && hiddenFields[fieldKey];
+              const isEditing = Boolean(editingFields[fieldKey]);
+              const draftValue = draftValues[fieldKey] ?? command.value;
               const displayedValue = isHidden
                 ? maskValue(command.value)
                 : command.value;
@@ -131,10 +181,38 @@ export function ResultCard({ entry }: ResultCardProps) {
                     {command.label}
                   </span>
 
-                  <div className="min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-800">
-                    <span className="block overflow-x-auto whitespace-nowrap">
-                      {displayedValue}
-                    </span>
+                  <div
+                    className={`min-w-0 rounded-lg border bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-800 transition-all duration-200 ${
+                      isEditing ? 'shadow-sm' : 'border-slate-200'
+                    }`}
+                    style={
+                      isEditing
+                        ? {
+                            borderColor: categoryColor,
+                            boxShadow: `0 0 0 1px ${categoryColor}33`,
+                          }
+                        : undefined
+                    }
+                  >
+                    {isEditing ? (
+                      <input
+                        type={sensitive && isHidden ? 'password' : 'text'}
+                        value={draftValue}
+                        onChange={(event) =>
+                          setDraftValues((current) => ({
+                            ...current,
+                            [fieldKey]: event.target.value,
+                          }))
+                        }
+                        className="w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400"
+                        aria-label={`Editar ${command.label}`}
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="block overflow-x-auto whitespace-nowrap transition-all duration-200">
+                        {displayedValue}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-end gap-1">
@@ -193,37 +271,118 @@ export function ResultCard({ entry }: ResultCardProps) {
                       </button>
                     ) : null}
 
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(command.value)}
-                      aria-label={`Copiar ${command.label}`}
-                      title={`Copiar ${command.label}`}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
-                    >
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        className="h-4 w-4"
-                      >
-                        <rect
-                          x="7"
-                          y="3"
-                          width="9"
-                          height="11"
-                          rx="2"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                        />
-                        <path
-                          d="M5 7H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-1"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
+                    {isEditing ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            saveEditingField(fieldKey, command.label, command.value)
+                          }
+                          aria-label={`Guardar ${command.label}`}
+                          title={`Guardar ${command.label}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            className="h-4 w-4"
+                          >
+                            <path
+                              d="m4 10 4 4 8-8"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => cancelEditingField(fieldKey)}
+                          aria-label={`Cancelar edicion de ${command.label}`}
+                          title={`Cancelar edicion de ${command.label}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            className="h-4 w-4"
+                          >
+                            <path
+                              d="M5 5l10 10M15 5 5 15"
+                              stroke="currentColor"
+                              strokeWidth="1.7"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEditingField(fieldKey, command.value)}
+                          aria-label={`Editar ${command.label}`}
+                          title={`Editar ${command.label}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            className="h-4 w-4"
+                          >
+                            <path
+                              d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d="m11.5 6 2.5 2.5"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(command.value)}
+                          aria-label={`Copiar ${command.label}`}
+                          title={`Copiar ${command.label}`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            className="h-4 w-4"
+                          >
+                            <rect
+                              x="7"
+                              y="3"
+                              width="9"
+                              height="11"
+                              rx="2"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                            />
+                            <path
+                              d="M5 7H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-1"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               );

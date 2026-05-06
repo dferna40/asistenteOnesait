@@ -1,14 +1,70 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { ResultCard } from './components/ui/ResultCard';
 import { categoryThemes } from './constants/categoryColors';
 import manualEntries from './data/manual.json';
 import { useSearch } from './hooks/useSearch';
-import type { KnowledgeCategory, KnowledgeEntry } from './types';
+import type {
+  CommandOption,
+  CommandOverridesByEntry,
+  KnowledgeCategory,
+  KnowledgeEntry,
+} from './types';
+
+const STORAGE_KEY = 'result-card-command-overrides';
+
+const baseEntries = manualEntries as KnowledgeEntry[];
+
+const applyCommandOverrides = (
+  entries: KnowledgeEntry[],
+  overrides: CommandOverridesByEntry,
+) =>
+  entries.map((entry) => {
+    const entryOverrides = overrides[entry.id];
+
+    if (!entryOverrides?.length || !entry.comandos?.length) {
+      return entry;
+    }
+
+    const overrideMap = new Map(
+      entryOverrides.map((commandOverride) => [
+        commandOverride.label,
+        commandOverride.value,
+      ]),
+    );
+
+    return {
+      ...entry,
+      comandos: entry.comandos.map((command) => ({
+        ...command,
+        value: overrideMap.get(command.label) ?? command.value,
+      })),
+    };
+  });
+
+const readStoredOverrides = (): CommandOverridesByEntry => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(STORAGE_KEY);
+    if (!rawValue) {
+      return {};
+    }
+
+    const parsedValue = JSON.parse(rawValue) as CommandOverridesByEntry;
+    return parsedValue ?? {};
+  } catch {
+    return {};
+  }
+};
 
 export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const entries = manualEntries as KnowledgeEntry[];
+  const [entries, setEntries] = useState<KnowledgeEntry[]>(() =>
+    applyCommandOverrides(baseEntries, readStoredOverrides()),
+  );
   const homeCategories: KnowledgeCategory[] = [
     'Entorno',
     'Accesos',
@@ -42,6 +98,84 @@ export const App = () => {
     Seguros: 'Seguros',
   };
 
+  useEffect(() => {
+    const storedOverrides = readStoredOverrides();
+    setEntries(applyCommandOverrides(baseEntries, storedOverrides));
+  }, []);
+
+  const handleCommandSave = (
+    entryId: string,
+    commandLabel: string,
+    nextValue: string,
+  ) => {
+    setEntries((currentEntries) => {
+      const nextEntries = currentEntries.map((entry) => {
+        if (entry.id !== entryId || !entry.comandos?.length) {
+          return entry;
+        }
+
+        const nextCommands: CommandOption[] = entry.comandos.map((command) =>
+          command.label === commandLabel
+            ? { ...command, value: nextValue }
+            : command,
+        );
+
+        return {
+          ...entry,
+          comandos: nextCommands,
+        };
+      });
+
+      const nextOverrides = nextEntries.reduce<CommandOverridesByEntry>(
+        (accumulator, entry) => {
+          if (!entry.comandos?.length) {
+            return accumulator;
+          }
+
+          const baseEntry = baseEntries.find(
+            (manualEntry) => manualEntry.id === entry.id,
+          );
+
+          if (!baseEntry?.comandos?.length) {
+            return accumulator;
+          }
+
+          const changedCommands = entry.comandos.reduce<CommandOption[]>(
+            (commandAccumulator, command) => {
+              const baseCommand = baseEntry.comandos?.find(
+                (manualCommand) => manualCommand.label === command.label,
+              );
+
+              if (!baseCommand || baseCommand.value === command.value) {
+                return commandAccumulator;
+              }
+
+              commandAccumulator.push({
+                label: command.label,
+                value: command.value,
+              });
+
+              return commandAccumulator;
+            },
+            [],
+          );
+
+          if (changedCommands.length) {
+            accumulator[entry.id] = changedCommands;
+          }
+
+          return accumulator;
+        },
+        {},
+      );
+
+      // Para cualquier servicio Java posterior que sincronice estos cambios con un servidor, implementar siempre try-catch-resources para el manejo de excepciones de E/S.
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextOverrides));
+
+      return nextEntries;
+    });
+  };
+
   return (
     <MainLayout
       searchTerm={searchTerm}
@@ -64,7 +198,11 @@ export const App = () => {
             {results.length ? (
               <div className="grid gap-4">
                 {results.map((entry) => (
-                  <ResultCard key={entry.id} entry={entry} />
+                  <ResultCard
+                    key={entry.id}
+                    entry={entry}
+                    onCommandSave={handleCommandSave}
+                  />
                 ))}
               </div>
             ) : (
