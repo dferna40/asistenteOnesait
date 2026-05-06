@@ -50,6 +50,15 @@ const isHealthCheckLabel = (label: string) => healthLabelPattern.test(label);
 const isSensitiveLabel = (label: string) => sensitiveLabelPattern.test(label);
 
 const maskValue = (value: string) => '*'.repeat(Math.max(value.length, 8));
+const buildCollapsedPreview = (content: string) =>
+  content
+    .replace(/```[\s\S]*?```/g, ' [codigo] ')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' [imagen] ')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[>*_~`|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const formatUpdatedAt = (value?: string) => {
   if (!value) {
@@ -122,6 +131,7 @@ export function ResultCard({
   onTogglePin,
   pdfIsGenerating = false,
 }: ResultCardProps) {
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
   const [editingFields, setEditingFields] = useState<Record<string, boolean>>({});
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
@@ -132,6 +142,11 @@ export function ResultCard({
   const categoryStyle = getCategoryTheme(categoryColorKey);
   const categoryColor = getCategoryColorHex(categoryColorKey);
   const formattedUpdatedAt = formatUpdatedAt(entry.updatedAt);
+  const collapsedPreview = buildCollapsedPreview(entry.contenido);
+  const previewText =
+    collapsedPreview.length > 180
+      ? `${collapsedPreview.slice(0, 180).trim()}...`
+      : collapsedPreview;
   const glowStyle = {
     '--card-glow': hexToRgba(categoryColor, 0.14),
     '--card-ring': hexToRgba(categoryColor, 0.22),
@@ -375,318 +390,374 @@ export function ResultCard({
             </button>
           ) : null}
 
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((current) => !current)}
+            aria-label={
+              isCollapsed
+                ? `Expandir ficha ${entry.titulo}`
+                : `Colapsar ficha ${entry.titulo}`
+            }
+            title={
+              isCollapsed
+                ? `Expandir ficha ${entry.titulo}`
+                : `Colapsar ficha ${entry.titulo}`
+            }
+            className={`${actionButtonBaseClass} text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100`}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              className={actionIconClass}
+            >
+              {isCollapsed ? (
+                <path
+                  d="M5 10h10M10 5v10"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              ) : (
+                <path
+                  d="M5 10h10"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              )}
+            </svg>
+          </button>
+
           <span className="w-fit rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
             {entry.id}
           </span>
         </div>
       </div>
 
-      <div className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-200">
-        <MarkdownRenderer content={entry.contenido} />
-      </div>
-
-      {entry.pasos?.length ? (
-        <div className="mt-5">
-          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Pasos
-          </h4>
-          <ol className="mt-2 space-y-2 pl-5 text-sm leading-6 text-slate-600 dark:text-slate-200">
-            {entry.pasos.map((step) => (
-              <li key={step} className="list-decimal">
-                {step}
-              </li>
-            ))}
-          </ol>
-        </div>
-      ) : null}
-
-      {entry.comandos?.length ? (
-        <div className="mt-5">
-          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Comandos utiles
-          </h4>
-          <div className="mt-3 space-y-2">
-            {entry.comandos.map((command, index) => {
-              const fieldKey = `${entry.id}-${command.label}-${index}`;
-              const sensitive = isSensitiveLabel(command.label);
-              const isHidden = sensitive && hiddenFields[fieldKey];
-              const isEditing = Boolean(editingFields[fieldKey]);
-              const draftValue = draftValues[fieldKey] ?? command.value;
-              const displayedValue = isHidden
-                ? maskValue(command.value)
-                : command.value;
-
-              return (
-                <div
-                  key={fieldKey}
-                  className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white/90 p-2.5 dark:border-slate-700 dark:bg-slate-950/50 sm:grid-cols-[minmax(96px,120px)_minmax(0,1fr)_auto] sm:items-center"
-                >
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">
-                    {command.label}
-                  </span>
-
-                  <div
-                    className={`min-w-0 rounded-lg border bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-800 transition-all duration-200 dark:bg-slate-900 dark:text-slate-100 ${
-                      isEditing ? 'shadow-sm' : 'border-slate-200 dark:border-slate-700'
-                    }`}
-                    style={
-                      isEditing
-                        ? {
-                            borderColor: categoryColor,
-                            boxShadow: `0 0 0 1px ${categoryColor}33, 0 0 0 4px ${hexToRgba(categoryColor, 0.14)}`,
-                          }
-                        : undefined
-                    }
-                  >
-                    {isEditing ? (
-                      <input
-                        type={sensitive && isHidden ? 'password' : 'text'}
-                        value={draftValue}
-                        onChange={(event) =>
-                          setDraftValues((current) => ({
-                            ...current,
-                            [fieldKey]: event.target.value,
-                          }))
-                        }
-                        className={`w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400 ${getCommandValueTone(draftValue)}`}
-                        aria-label={`Editar ${command.label}`}
-                        autoFocus
-                      />
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`block overflow-x-auto whitespace-nowrap text-slate-800 transition-all duration-200 ${getCommandValueTone(displayedValue)}`}
-                        >
-                          {displayedValue}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-end gap-1">
-                    {entry.categoria === 'Entorno' &&
-                    isHealthCheckLabel(command.label) ? (
-                      <button
-                        type="button"
-                        onClick={() => runHealthCheck(command.label, command.value)}
-                        aria-label={`Comprobar ${command.label}`}
-                        title={
-                          healthStatuses[command.label] === 'healthy'
-                            ? 'Activo'
-                            : healthStatuses[command.label] === 'error'
-                              ? 'Inaccesible'
-                              : healthStatuses[command.label] === 'checking'
-                                ? 'Comprobando'
-                                : 'Lanzar health check'
-                        }
-                          className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white transition-colors dark:bg-slate-950 ${
-                          healthStatuses[command.label] === 'healthy'
-                            ? 'border-emerald-200 text-emerald-600 dark:border-emerald-900/40 dark:text-emerald-400'
-                            : healthStatuses[command.label] === 'error'
-                              ? 'border-red-200 text-red-600 dark:border-red-900/40 dark:text-red-400'
-                              : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        <svg
-                          aria-hidden="true"
-                          viewBox="0 0 20 20"
-                          fill="none"
-                          className={`${actionIconClass} ${
-                            healthStatuses[command.label] === 'checking'
-                              ? 'animate-spin'
-                              : ''
-                          }`}
-                        >
-                          <path
-                            d="M16 10a6 6 0 1 1-1.3-3.8M16 4v4h-4"
-                            stroke="currentColor"
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </button>
-                    ) : null}
-
-                    {sensitive ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleFieldVisibility(fieldKey)}
-                        aria-label={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
-                        title={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
-                        className={`${actionButtonBaseClass} text-sky-500 hover:border-sky-300 hover:text-sky-600 dark:text-slate-200 dark:hover:border-sky-500/50 dark:hover:text-white`}
-                      >
-                        {isHidden ? (
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            className={actionIconClass}
-                          >
-                            <path
-                              d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                            <circle
-                              cx="10"
-                              cy="10"
-                              r="2.5"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                            />
-                          </svg>
-                        ) : (
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            className={actionIconClass}
-                          >
-                            <path
-                              d="M3 3l14 14"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                            />
-                            <path
-                              d="M8.9 5.4A9.4 9.4 0 0 1 10 5c5 0 8 5 8 5a14.3 14.3 0 0 1-2.5 2.9M11.4 11.5A2.5 2.5 0 0 1 8.5 8.6M5.1 7.1A14.5 14.5 0 0 0 2 10s3 5 8 5c1.2 0 2.3-.3 3.3-.8"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    ) : null}
-
-                    {isEditing ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            saveEditingField(fieldKey, command.label, command.value)
-                          }
-                          aria-label={`Guardar ${command.label}`}
-                          title={`Guardar ${command.label}`}
-                          className={`${actionButtonBaseClass} text-emerald-500 hover:border-emerald-300 hover:text-emerald-600 dark:text-emerald-400 dark:hover:border-emerald-500/50 dark:hover:text-emerald-300`}
-                        >
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            className={actionIconClass}
-                          >
-                            <path
-                              d="m4 10 4 4 8-8"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => cancelEditingField(fieldKey)}
-                          aria-label={`Cancelar edicion de ${command.label}`}
-                          title={`Cancelar edicion de ${command.label}`}
-                          className={`${actionButtonBaseClass} text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
-                        >
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            className={actionIconClass}
-                          >
-                            <path
-                              d="M5 5l10 10M15 5 5 15"
-                              stroke="currentColor"
-                              strokeWidth="1.7"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => startEditingField(fieldKey, command.value)}
-                          aria-label={`Editar ${command.label}`}
-                          title={`Editar ${command.label}`}
-                          className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
-                        >
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            className={actionIconClass}
-                          >
-                            <path
-                              d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinejoin="round"
-                            />
-                            <path
-                              d="m11.5 6 2.5 2.5"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                            />
-                          </svg>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(command.value)}
-                          aria-label={`Copiar ${command.label}`}
-                          title={`Copiar ${command.label}`}
-                          className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
-                        >
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            className={actionIconClass}
-                          >
-                            <rect
-                              x="7"
-                              y="3"
-                              width="9"
-                              height="11"
-                              rx="2"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                            />
-                            <path
-                              d="M5 7H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-1"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+      {isCollapsed ? (
+        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-300">
+          <p className="line-clamp-3 leading-6">
+            {previewText || 'Ficha colapsada. Pulsa el icono para volver a verla completa.'}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+            {entry.pasos?.length ? <span>{entry.pasos.length} paso{entry.pasos.length === 1 ? '' : 's'}</span> : null}
+            {entry.comandos?.length ? (
+              <span>{entry.comandos.length} comando{entry.comandos.length === 1 ? '' : 's'}</span>
+            ) : null}
           </div>
         </div>
       ) : null}
+      {!isCollapsed ? (
+        <>
+          <div className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-200">
+            <MarkdownRenderer content={entry.contenido} />
+          </div>
 
-      {formattedUpdatedAt ? (
-        <p className="mt-5 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500">
-          Actualizado el: {formattedUpdatedAt}
-        </p>
+          {entry.pasos?.length ? (
+            <div className="mt-5">
+              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                Pasos
+              </h4>
+              <ol className="mt-2 space-y-2 pl-5 text-sm leading-6 text-slate-600 dark:text-slate-200">
+                {entry.pasos.map((step) => (
+                  <li key={step} className="list-decimal">
+                    {step}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+
+          {entry.comandos?.length ? (
+            <div className="mt-5">
+              <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                Comandos utiles
+              </h4>
+              <div className="mt-3 space-y-2">
+                {entry.comandos.map((command, index) => {
+                  const fieldKey = `${entry.id}-${command.label}-${index}`;
+                  const sensitive = isSensitiveLabel(command.label);
+                  const isHidden = sensitive && hiddenFields[fieldKey];
+                  const isEditing = Boolean(editingFields[fieldKey]);
+                  const draftValue = draftValues[fieldKey] ?? command.value;
+                  const displayedValue = isHidden
+                    ? maskValue(command.value)
+                    : command.value;
+
+                  return (
+                    <div
+                      key={fieldKey}
+                      className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white/90 p-2.5 dark:border-slate-700 dark:bg-slate-950/50 sm:grid-cols-[minmax(96px,120px)_minmax(0,1fr)_auto] sm:items-center"
+                    >
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">
+                        {command.label}
+                      </span>
+
+                      <div
+                        className={`min-w-0 rounded-lg border bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-800 transition-all duration-200 dark:bg-slate-900 dark:text-slate-100 ${
+                          isEditing ? 'shadow-sm' : 'border-slate-200 dark:border-slate-700'
+                        }`}
+                        style={
+                          isEditing
+                            ? {
+                                borderColor: categoryColor,
+                                boxShadow: `0 0 0 1px ${categoryColor}33, 0 0 0 4px ${hexToRgba(categoryColor, 0.14)}`,
+                              }
+                            : undefined
+                        }
+                      >
+                        {isEditing ? (
+                          <input
+                            type={sensitive && isHidden ? 'password' : 'text'}
+                            value={draftValue}
+                            onChange={(event) =>
+                              setDraftValues((current) => ({
+                                ...current,
+                                [fieldKey]: event.target.value,
+                              }))
+                            }
+                            className={`w-full bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400 ${getCommandValueTone(draftValue)}`}
+                            aria-label={`Editar ${command.label}`}
+                            autoFocus
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`block overflow-x-auto whitespace-nowrap text-slate-800 transition-all duration-200 ${getCommandValueTone(displayedValue)}`}
+                            >
+                              {displayedValue}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-end gap-1">
+                        {entry.categoria === 'Entorno' &&
+                        isHealthCheckLabel(command.label) ? (
+                          <button
+                            type="button"
+                            onClick={() => runHealthCheck(command.label, command.value)}
+                            aria-label={`Comprobar ${command.label}`}
+                            title={
+                              healthStatuses[command.label] === 'healthy'
+                                ? 'Activo'
+                                : healthStatuses[command.label] === 'error'
+                                  ? 'Inaccesible'
+                                  : healthStatuses[command.label] === 'checking'
+                                    ? 'Comprobando'
+                                    : 'Lanzar health check'
+                            }
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white transition-colors dark:bg-slate-950 ${
+                              healthStatuses[command.label] === 'healthy'
+                                ? 'border-emerald-200 text-emerald-600 dark:border-emerald-900/40 dark:text-emerald-400'
+                                : healthStatuses[command.label] === 'error'
+                                  ? 'border-red-200 text-red-600 dark:border-red-900/40 dark:text-red-400'
+                                  : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white'
+                            }`}
+                          >
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              className={`${actionIconClass} ${
+                                healthStatuses[command.label] === 'checking'
+                                  ? 'animate-spin'
+                                  : ''
+                              }`}
+                            >
+                              <path
+                                d="M16 10a6 6 0 1 1-1.3-3.8M16 4v4h-4"
+                                stroke="currentColor"
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        ) : null}
+
+                        {sensitive ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleFieldVisibility(fieldKey)}
+                            aria-label={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
+                            title={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
+                            className={`${actionButtonBaseClass} text-sky-500 hover:border-sky-300 hover:text-sky-600 dark:text-slate-200 dark:hover:border-sky-500/50 dark:hover:text-white`}
+                          >
+                            {isHidden ? (
+                              <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                className={actionIconClass}
+                              >
+                                <path
+                                  d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <circle
+                                  cx="10"
+                                  cy="10"
+                                  r="2.5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                />
+                              </svg>
+                            ) : (
+                              <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                className={actionIconClass}
+                              >
+                                <path
+                                  d="M3 3l14 14"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                />
+                                <path
+                                  d="M8.9 5.4A9.4 9.4 0 0 1 10 5c5 0 8 5 8 5a14.3 14.3 0 0 1-2.5 2.9M11.4 11.5A2.5 2.5 0 0 1 8.5 8.6M5.1 7.1A14.5 14.5 0 0 0 2 10s3 5 8 5c1.2 0 2.3-.3 3.3-.8"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        ) : null}
+
+                        {isEditing ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                saveEditingField(fieldKey, command.label, command.value)
+                              }
+                              aria-label={`Guardar ${command.label}`}
+                              title={`Guardar ${command.label}`}
+                              className={`${actionButtonBaseClass} text-emerald-500 hover:border-emerald-300 hover:text-emerald-600 dark:text-emerald-400 dark:hover:border-emerald-500/50 dark:hover:text-emerald-300`}
+                            >
+                              <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                className={actionIconClass}
+                              >
+                                <path
+                                  d="m4 10 4 4 8-8"
+                                  stroke="currentColor"
+                                  strokeWidth="1.7"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => cancelEditingField(fieldKey)}
+                              aria-label={`Cancelar edicion de ${command.label}`}
+                              title={`Cancelar edicion de ${command.label}`}
+                              className={`${actionButtonBaseClass} text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
+                            >
+                              <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                className={actionIconClass}
+                              >
+                                <path
+                                  d="M5 5l10 10M15 5 5 15"
+                                  stroke="currentColor"
+                                  strokeWidth="1.7"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startEditingField(fieldKey, command.value)}
+                              aria-label={`Editar ${command.label}`}
+                              title={`Editar ${command.label}`}
+                              className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
+                            >
+                              <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                className={actionIconClass}
+                              >
+                                <path
+                                  d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d="m11.5 6 2.5 2.5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(command.value)}
+                              aria-label={`Copiar ${command.label}`}
+                              title={`Copiar ${command.label}`}
+                              className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
+                            >
+                              <svg
+                                aria-hidden="true"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                                className={actionIconClass}
+                              >
+                                <rect
+                                  x="7"
+                                  y="3"
+                                  width="9"
+                                  height="11"
+                                  rx="2"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                />
+                                <path
+                                  d="M5 7H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-1"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {formattedUpdatedAt ? (
+            <p className="mt-5 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500">
+              Actualizado el: {formattedUpdatedAt}
+            </p>
+          ) : null}
+        </>
       ) : null}
     </article>
   );
