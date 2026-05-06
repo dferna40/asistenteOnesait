@@ -254,11 +254,11 @@ const pdfMarkdownComponents = {
       style={{
         borderTop: '1px solid #e2e8f0',
         color: '#1e293b',
-          fontSize: 10,
-          padding: '7px 9px',
-          lineHeight: 1.6,
-          verticalAlign: 'top',
-        }}
+        fontSize: 10,
+        lineHeight: 1.6,
+        padding: '2px 9px 7px',
+        verticalAlign: 'top',
+      }}
     />
   ),
   th: (props: ComponentProps<'th'>) => (
@@ -271,7 +271,7 @@ const pdfMarkdownComponents = {
         fontWeight: 700,
         lineHeight: 1.6,
         letterSpacing: '0.08em',
-        padding: '7px 9px',
+        padding: '2px 9px 7px',
         textAlign: 'left',
         textTransform: 'uppercase',
       }}
@@ -422,56 +422,75 @@ export function PrintTemplate({
           <h2 style={{ color: '#0f172a', fontSize: 13, fontWeight: 700, lineHeight: 1.6, margin: '0 0 7px', overflow: 'visible', padding: '1px 0 3px' }}>
             Parametros y comandos utiles
           </h2>
-          <div style={{ display: 'grid', gap: 4 }}>
-            {entry.comandos.map((command, index) => (
-              <div
-                key={`${command.label}-${index}`}
-                className="pdf-avoid-break"
-                style={{
-                  alignItems: 'start',
-                  display: 'grid',
-                  gap: 6,
-                  gridTemplateColumns: '50mm 130mm',
-                  pageBreakInside: 'avoid',
-                  padding: '2px 0',
-                }}
-              >
-                <p
-                  style={{
-                    color: '#0f172a',
-                    fontSize: 9.5,
-                    fontWeight: 700,
-                    lineHeight: 1.6,
-                    margin: 0,
-                    overflow: 'visible',
-                    padding: '1px 0 3px',
-                  }}
+          <table
+            style={{
+              borderCollapse: 'separate',
+              borderSpacing: '0 4px',
+              lineHeight: 1.6,
+              tableLayout: 'fixed',
+              width: '100%',
+            }}
+          >
+            <colgroup>
+              <col style={{ width: '45mm' }} />
+              <col style={{ width: '135mm' }} />
+            </colgroup>
+            <tbody>
+              {entry.comandos.map((command, index) => (
+                <tr
+                  key={`${command.label}-${index}`}
+                  className="pdf-avoid-break"
+                  style={{ pageBreakInside: 'avoid' }}
                 >
-                  {command.label}
-                </p>
-                <code
-                  style={{
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 5,
-                    color: '#0f172a',
-                    display: 'block',
-                    fontFamily: '"Courier New", monospace',
-                    fontSize: 9.5,
-                    height: 'auto',
-                    lineHeight: 1.6,
-                    overflow: 'visible',
-                    padding: '4px 6px 3px',
-                    width: '130mm',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}
-                >
-                  {command.value}
-                </code>
-              </div>
-            ))}
-          </div>
+                  <td
+                    style={{
+                      color: '#0f172a',
+                      fontSize: 9.5,
+                      fontWeight: 700,
+                      lineHeight: 1.6,
+                      margin: 0,
+                      overflow: 'visible',
+                      padding: '2px 10px 3px 0',
+                      verticalAlign: 'top',
+                      width: '45mm',
+                    }}
+                  >
+                    {command.label}
+                  </td>
+                  <td
+                    style={{
+                      overflow: 'visible',
+                      padding: '2px 0 3px',
+                      verticalAlign: 'top',
+                      width: '135mm',
+                    }}
+                  >
+                    <code
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 5,
+                        boxSizing: 'border-box',
+                        color: '#0f172a',
+                        display: 'block',
+                        fontFamily: '"Courier New", monospace',
+                        fontSize: 9.5,
+                        height: 'auto',
+                        lineHeight: 1.6,
+                        overflow: 'visible',
+                        padding: '3mm',
+                        whiteSpace: 'pre-wrap',
+                        width: '135mm',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      {command.value}
+                    </code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       ) : null}
     </div>

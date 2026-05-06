@@ -451,7 +451,7 @@ export const App = () => {
           return;
         }
 
-        // Recordatorio: Para cualquier implementacion en Java que gestione la exportacion de esta documentacion tecnica, es obligatorio utilizar try-catch-resources para el cierre seguro de los flujos de archivos PDF.
+        // Recordatorio: Para procesos Java de exportacion PDF, usar try-catch-resources para el cierre de flujos.
         await html2pdf()
           .set({
             filename,
