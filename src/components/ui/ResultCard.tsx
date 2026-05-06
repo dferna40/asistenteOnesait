@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import {
   getCategoryColorHex,
   getCategoryTheme,
@@ -59,6 +60,23 @@ const normalizeHealthTarget = (value: string) => {
   return null;
 };
 
+const hexToRgba = (hex: string, alpha: number) => {
+  const normalizedHex = hex.replace('#', '');
+  const expandedHex =
+    normalizedHex.length === 3
+      ? normalizedHex
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : normalizedHex;
+
+  const red = Number.parseInt(expandedHex.slice(0, 2), 16);
+  const green = Number.parseInt(expandedHex.slice(2, 4), 16);
+  const blue = Number.parseInt(expandedHex.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+};
+
 export function ResultCard({
   categoryColorKey = 'slate',
   entry,
@@ -69,13 +87,18 @@ export function ResultCard({
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
   const [editingFields, setEditingFields] = useState<Record<string, boolean>>({});
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
-  const categoryStyle = getCategoryTheme(categoryColorKey);
-  const categoryColor = getCategoryColorHex(categoryColorKey);
   const [healthStatuses, setHealthStatuses] = useState<
     Record<string, 'checking' | 'healthy' | 'error'>
   >({});
 
-  // Recordatorio: Para cualquier lógica Java que procese estos parámetros de configuración o acceso, es obligatorio el uso de try-catch-resources para la gestión de excepciones y cierre de flujos.
+  const categoryStyle = getCategoryTheme(categoryColorKey);
+  const categoryColor = getCategoryColorHex(categoryColorKey);
+  const glowStyle = {
+    '--card-glow': hexToRgba(categoryColor, 0.14),
+    '--card-ring': hexToRgba(categoryColor, 0.22),
+  } as CSSProperties;
+
+  // Recordatorio: Para cualquier logica Java que procese estos parametros de configuracion o acceso, es obligatorio el uso de try-catch-resources para la gestion de excepciones y cierre de flujos.
 
   const runHealthCheck = async (commandLabel: string, commandValue: string) => {
     const targetUrl = normalizeHealthTarget(commandValue);
@@ -161,12 +184,13 @@ export function ResultCard({
 
   return (
     <article
-      className={`w-full rounded-2xl border border-slate-100 border-l-4 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5 ${categoryStyle.cardAccent}`}
+      className={`neon-card w-full rounded-2xl border border-slate-100 border-l-4 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5 ${categoryStyle.cardAccent}`}
       data-category-color={categoryColor}
+      style={glowStyle}
     >
       {entry.categoria === 'UML' ? (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200">
-          ⚠️ PROTOCOLO CRÍTICO: ¿Has hecho el LOCK en SVN?
+          PROTOCOLO CRITICO: Has hecho el LOCK en SVN?
         </div>
       ) : null}
 
@@ -189,7 +213,7 @@ export function ResultCard({
               onClick={() => onEditEntry(entry)}
               aria-label={`Editar ficha ${entry.titulo}`}
               title={`Editar ficha ${entry.titulo}`}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
             >
               <svg
                 aria-hidden="true"
@@ -219,7 +243,7 @@ export function ResultCard({
               onClick={() => onDeleteEntry(entry.id)}
               aria-label={`Mover a papelera ${entry.titulo}`}
               title={`Mover a papelera ${entry.titulo}`}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-red-300 hover:text-red-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-red-300 hover:text-red-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-red-500/50 dark:hover:bg-slate-900 dark:hover:text-red-300"
             >
               <svg
                 aria-hidden="true"
@@ -250,7 +274,9 @@ export function ResultCard({
 
       {entry.pasos?.length ? (
         <div className="mt-5">
-          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Pasos</h4>
+          <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+            Pasos
+          </h4>
           <ol className="mt-2 space-y-2 pl-5 text-sm leading-6 text-slate-600 dark:text-slate-300">
             {entry.pasos.map((step) => (
               <li key={step} className="list-decimal">
@@ -294,7 +320,7 @@ export function ResultCard({
                       isEditing
                         ? {
                             borderColor: categoryColor,
-                            boxShadow: `0 0 0 1px ${categoryColor}33`,
+                            boxShadow: `0 0 0 1px ${categoryColor}33, 0 0 0 4px ${hexToRgba(categoryColor, 0.14)}`,
                           }
                         : undefined
                     }
@@ -343,7 +369,7 @@ export function ResultCard({
                             ? 'border-emerald-200 text-emerald-600 dark:border-emerald-900/40 dark:text-emerald-400'
                             : healthStatuses[command.label] === 'error'
                               ? 'border-red-200 text-red-600 dark:border-red-900/40 dark:text-red-400'
-                              : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-300'
+                              : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white'
                         }`}
                       >
                         <svg
@@ -373,7 +399,7 @@ export function ResultCard({
                         onClick={() => toggleFieldVisibility(fieldKey)}
                         aria-label={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
                         title={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
                       >
                         {isHidden ? (
                           <svg
@@ -431,7 +457,7 @@ export function ResultCard({
                           }
                           aria-label={`Guardar ${command.label}`}
                           title={`Guardar ${command.label}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
                         >
                           <svg
                             aria-hidden="true"
@@ -454,7 +480,7 @@ export function ResultCard({
                           onClick={() => cancelEditingField(fieldKey)}
                           aria-label={`Cancelar edicion de ${command.label}`}
                           title={`Cancelar edicion de ${command.label}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
                         >
                           <svg
                             aria-hidden="true"
@@ -478,7 +504,7 @@ export function ResultCard({
                           onClick={() => startEditingField(fieldKey, command.value)}
                           aria-label={`Editar ${command.label}`}
                           title={`Editar ${command.label}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
                         >
                           <svg
                             aria-hidden="true"
@@ -506,7 +532,7 @@ export function ResultCard({
                           onClick={() => copyToClipboard(command.value)}
                           aria-label={`Copiar ${command.label}`}
                           title={`Copiar ${command.label}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
                         >
                           <svg
                             aria-hidden="true"

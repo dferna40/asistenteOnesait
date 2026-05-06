@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
 import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
 import { SidebarUtilities } from './components/ui/SidebarUtilities';
 import {
   categoryColorOptions,
+  getCategoryColorHex,
   getCategoryTheme,
 } from './constants/categoryColors';
 import manualEntries from './data/manual.json';
@@ -270,6 +272,34 @@ const splitLines = (value: string) =>
     .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const normalizedHex = hex.replace('#', '');
+  const expandedHex =
+    normalizedHex.length === 3
+      ? normalizedHex
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : normalizedHex;
+
+  const red = Number.parseInt(expandedHex.slice(0, 2), 16);
+  const green = Number.parseInt(expandedHex.slice(2, 4), 16);
+  const blue = Number.parseInt(expandedHex.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+};
+
+const buildThemeVars = (colorKey: CategoryColorKey): CSSProperties => {
+  const hex = getCategoryColorHex(colorKey);
+
+  return {
+    '--card-glow': hexToRgba(hex, 0.14),
+    '--card-ring': hexToRgba(hex, 0.22),
+    '--field-focus': hex,
+    '--field-focus-glow': hexToRgba(hex, 0.16),
+  } as CSSProperties;
+};
 
 const slugify = (value: string) =>
   value
@@ -702,6 +732,13 @@ export const App = () => {
     : undefined;
   const isCreatingNewCategory =
     entryForm.categoria.trim().length > 0 && !activeEntryCategory;
+  const entryEditorColorKey = (
+    entryForm.categoryColor ||
+    activeEntryCategory?.color ||
+    'blue'
+  ) as CategoryColorKey;
+  const entryThemeVars = buildThemeVars(entryEditorColorKey);
+  const categoryThemeVars = buildThemeVars(categoryForm?.color ?? 'blue');
   const toolbarActions: ToolbarAction[] = [
     {
       label: '**Negrita**',
@@ -852,11 +889,11 @@ export const App = () => {
                   })}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center shadow-sm sm:px-6 sm:py-10">
-                  <h3 className="text-lg font-semibold text-slate-900">
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:px-6 sm:py-10">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                     No hemos encontrado resultados
                   </h3>
-                  <p className="mt-2 text-sm text-slate-600">
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                     Prueba con otra palabra clave, una categoria o usa prefijos
                     como <code>/env</code> o <code>/cmd</code>.
                   </p>
@@ -864,7 +901,7 @@ export const App = () => {
               )}
             </>
           ) : (
-            <div className="animate-fade-in rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+            <div className="animate-fade-in rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
@@ -879,7 +916,7 @@ export const App = () => {
                 <button
                   type="button"
                   onClick={openCreateCategoryModal}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 dark:hover:text-white"
                 >
                   Nueva Sección
                 </button>
@@ -907,7 +944,8 @@ export const App = () => {
                   return (
                     <div
                       key={category.name}
-                      className={`rounded-2xl border p-4 transition-all duration-200 ${theme.chip}`}
+                      className={`neon-card rounded-2xl border p-4 transition-all duration-200 ${theme.chip}`}
+                      style={buildThemeVars(category.color)}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <button
@@ -918,7 +956,7 @@ export const App = () => {
                           <span className="inline-flex rounded-full border border-current/15 px-3 py-2 text-sm font-medium">
                             {category.name}
                           </span>
-                          <span className="mt-2 block text-[11px] leading-5 text-slate-500 sm:text-xs sm:leading-5">
+                          <span className="mt-2 block text-[11px] leading-5 text-slate-500 dark:text-slate-400 sm:text-xs sm:leading-5">
                             {category.description}
                           </span>
                           <span className="mt-3 block text-[11px] font-semibold uppercase tracking-[0.16em] text-current/80">
@@ -931,7 +969,7 @@ export const App = () => {
                           onClick={() => openCategoryModal(category.name)}
                           aria-label={`Editar seccion ${category.name}`}
                           title={`Editar seccion ${category.name}`}
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white"
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900"
                         >
                           <svg
                             aria-hidden="true"
@@ -965,17 +1003,17 @@ export const App = () => {
       </MainLayout>
 
       {modalState ? (
-        <div className="fixed inset-0 z-50 bg-slate-950/60">
+        <div className="fixed inset-0 z-50 bg-slate-950/70">
           {modalState.type === 'entry' ? (
-            <div className="flex h-full flex-col bg-white">
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
+            <div className="flex h-full flex-col bg-white dark:bg-slate-900" style={entryThemeVars}>
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-6">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                     {modalState.mode === 'create'
                       ? 'Editor de Ficha'
                       : 'Editar ficha'}
                   </h3>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     Editor enriquecido con Markdown, panel dividido y previsualización en tiempo real.
                   </p>
                 </div>
@@ -984,14 +1022,14 @@ export const App = () => {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
                     onClick={handleEntrySave}
-                    className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                    className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:border-slate-700 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
                   >
                     Guardar cambios
                   </button>
@@ -999,9 +1037,9 @@ export const App = () => {
               </div>
 
               <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-2">
-                <div className="min-h-0 overflow-y-auto border-r border-slate-200 bg-slate-50/60">
+                <div className="min-h-0 overflow-y-auto border-r border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-950/70">
                   <div className="space-y-6 p-5 sm:p-6">
-                    <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <section className="neon-card space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
                       <div>
                         <p className="text-sm font-semibold text-slate-900">
                           Contexto de la ficha
@@ -1012,7 +1050,7 @@ export const App = () => {
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2">
-                        <label className="space-y-2 text-sm font-medium text-slate-700">
+                        <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                           Categoria
                           <input
                             list="existing-categories"
@@ -1024,7 +1062,7 @@ export const App = () => {
                               }))
                             }
                             disabled={entryForm.categoryLocked}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400 disabled:bg-slate-100 disabled:text-slate-500"
+                            className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white disabled:bg-slate-100 disabled:text-slate-500 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
                             placeholder="Ej. BBDD"
                           />
                           <datalist id="existing-categories">
@@ -1034,7 +1072,7 @@ export const App = () => {
                           </datalist>
                         </label>
 
-                        <label className="space-y-2 text-sm font-medium text-slate-700">
+                        <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                           ID de la ficha
                           <input
                             value={entryForm.id}
@@ -1044,12 +1082,12 @@ export const App = () => {
                                 id: event.target.value,
                               }))
                             }
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                            className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                             placeholder="Se genera automaticamente si lo dejas vacio"
                           />
                         </label>
 
-                        <label className="space-y-2 text-sm font-medium text-slate-700">
+                        <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                           Titulo
                           <input
                             value={entryForm.titulo}
@@ -1059,11 +1097,11 @@ export const App = () => {
                                 titulo: event.target.value,
                               }))
                             }
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                            className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                           />
                         </label>
 
-                        <label className="space-y-2 text-sm font-medium text-slate-700">
+                        <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                           Tags
                           <input
                             value={entryForm.tags}
@@ -1073,14 +1111,14 @@ export const App = () => {
                                 tags: event.target.value,
                               }))
                             }
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                            className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                             placeholder="tag1, tag2, tag3"
                           />
                         </label>
                       </div>
 
                       {entryForm.categoryLocked && activeEntryCategory ? (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
                           La nueva ficha se añadira dentro de la seccion{' '}
                           <span className="font-semibold text-slate-900">
                             {activeEntryCategory.name}
@@ -1088,8 +1126,8 @@ export const App = () => {
                           . Para cambiarla, vuelve a la Home y entra desde otra seccion.
                         </div>
                       ) : isCreatingNewCategory ? (
-                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_180px]">
-                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[minmax(0,1fr)_180px]">
+                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                             Descripcion de la seccion
                             <input
                               value={entryForm.categoryDescription}
@@ -1099,12 +1137,12 @@ export const App = () => {
                                   categoryDescription: event.target.value,
                                 }))
                               }
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                               placeholder="Resumen corto para el bloque de la Home"
                             />
                           </label>
 
-                          <label className="space-y-2 text-sm font-medium text-slate-700">
+                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                             Color de la seccion
                             <select
                               value={entryForm.categoryColor}
@@ -1114,7 +1152,7 @@ export const App = () => {
                                   categoryColor: event.target.value as CategoryColorKey,
                                 }))
                               }
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                             >
                               {categoryColorOptions.map((option) => (
                                 <option key={option.value} value={option.value}>
@@ -1125,7 +1163,7 @@ export const App = () => {
                           </label>
                         </div>
                       ) : activeEntryCategory ? (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
                           La ficha se guardara dentro de la seccion{' '}
                           <span className="font-semibold text-slate-900">
                             {activeEntryCategory.name}
@@ -1135,14 +1173,14 @@ export const App = () => {
                       ) : null}
                     </section>
 
-                    <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <section className="neon-card space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
                       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
                         {toolbarActions.map((action) => (
                           <button
                             key={action.label}
                             type="button"
                             onClick={action.onClick}
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
                           >
                             {action.label}
                           </button>
@@ -1151,10 +1189,10 @@ export const App = () => {
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold text-slate-900">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             Documento Markdown
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-slate-400 dark:text-slate-500">
                             Soporta codigo, tablas, acordeones por encabezado e imagenes locales en `/public/images/`
                           </p>
                         </div>
@@ -1167,14 +1205,14 @@ export const App = () => {
                               contenido: event.target.value,
                             }))
                           }
-                          className="min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none transition focus:border-sky-400"
+                          className="themed-field min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                           placeholder="# Titulo de seccion&#10;&#10;Escribe aqui tu documentacion en Markdown..."
                         />
                       </div>
                     </section>
 
-                    <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                      <label className="block space-y-2 text-sm font-medium text-slate-700">
+                    <section className="neon-card space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                      <label className="block space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                         Pasos
                         <textarea
                           value={entryForm.pasos}
@@ -1185,14 +1223,14 @@ export const App = () => {
                             }))
                           }
                           rows={5}
-                          className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                          className="themed-field w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                           placeholder="Un paso por linea"
                         />
                       </label>
 
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium text-slate-700">
+                          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                             Comandos y parametros
                           </p>
                           <button
@@ -1206,7 +1244,7 @@ export const App = () => {
                                 ],
                               }))
                             }
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
                           >
                             Anadir fila
                           </button>
@@ -1216,7 +1254,7 @@ export const App = () => {
                           {entryForm.comandos.map((command, index) => (
                             <div
                               key={`${index}-${command.label}`}
-                              className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-[180px_minmax(0,1fr)_auto]"
+                              className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[180px_minmax(0,1fr)_auto]"
                             >
                               <input
                                 value={command.label}
@@ -1234,7 +1272,7 @@ export const App = () => {
                                     ),
                                   }))
                                 }
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                className="themed-field rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                                 placeholder="Etiqueta"
                               />
                               <input
@@ -1253,7 +1291,7 @@ export const App = () => {
                                     ),
                                   }))
                                 }
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                                className="themed-field rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                                 placeholder="Valor"
                               />
                               <button
@@ -1270,7 +1308,7 @@ export const App = () => {
                                           ),
                                   }))
                                 }
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
                               >
                                 Quitar
                               </button>
@@ -1288,33 +1326,33 @@ export const App = () => {
                   </div>
                 </div>
 
-                <div className="min-h-0 overflow-y-auto bg-white">
+                <div className="min-h-0 overflow-y-auto bg-white dark:bg-slate-900">
                   <div className="space-y-6 p-5 sm:p-6">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="neon-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
                       <div className="flex flex-wrap items-center gap-3">
-                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
+                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
                           {entryForm.categoria || 'Sin categoria'}
                         </span>
-                        <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500">
+                        <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
                           {entryForm.id || 'id-pendiente'}
                         </span>
                       </div>
 
-                      <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900">
+                      <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                         {entryForm.titulo || 'Vista previa de la ficha'}
                       </h2>
 
-                      <div className="mt-4 text-sm leading-6 text-slate-700">
+                      <div className="mt-4 text-sm leading-6 text-slate-700 dark:text-slate-300">
                         <MarkdownRenderer content={entryForm.contenido} />
                       </div>
                     </div>
 
                     {splitLines(entryForm.pasos).length ? (
-                      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-sm font-semibold text-slate-900">
+                      <div className="neon-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                           Pasos
                         </h3>
-                        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700">
+                        <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-300">
                           {splitLines(entryForm.pasos).map((step) => (
                             <li key={step}>{step}</li>
                           ))}
@@ -1325,8 +1363,8 @@ export const App = () => {
                     {entryForm.comandos.some(
                       (command) => command.label.trim() || command.value.trim(),
                     ) ? (
-                      <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 className="text-sm font-semibold text-slate-900">
+                      <div className="neon-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                           Comandos y parametros
                         </h3>
                         <div className="mt-3 space-y-2">
@@ -1340,10 +1378,10 @@ export const App = () => {
                                 key={`${command.label}-${index}`}
                                 className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[140px_minmax(0,1fr)]"
                               >
-                                <span className="text-xs font-semibold text-slate-700">
+                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                                   {command.label || 'Etiqueta'}
                                 </span>
-                                <code className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-mono text-xs text-slate-800">
+                                <code className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-mono text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
                                   {command.value || 'Valor'}
                                 </code>
                               </div>
@@ -1357,15 +1395,15 @@ export const App = () => {
             </div>
           ) : (
             <div className="flex h-full items-center justify-center p-4">
-              <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
-                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6">
+              <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900" style={categoryThemeVars}>
+                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                       {modalState.mode === 'create'
                         ? 'Nueva sección'
                         : 'Editar seccion'}
                     </h3>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       Configura el nombre, color y descripcion del bloque principal de la Home.
                     </p>
                   </div>
@@ -1374,7 +1412,7 @@ export const App = () => {
                     type="button"
                     onClick={closeModal}
                     aria-label="Cerrar modal"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
                   >
                     ×
                   </button>
@@ -1382,7 +1420,7 @@ export const App = () => {
 
                 <div className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
                   <section className="grid gap-4 md:grid-cols-2">
-                    <label className="space-y-2 text-sm font-medium text-slate-700">
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                       Nombre de la seccion
                       <input
                         value={categoryForm?.name ?? ''}
@@ -1393,11 +1431,11 @@ export const App = () => {
                               : current,
                           )
                         }
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                       />
                     </label>
 
-                    <label className="space-y-2 text-sm font-medium text-slate-700">
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                       Color
                       <select
                         value={categoryForm?.color ?? 'blue'}
@@ -1411,7 +1449,7 @@ export const App = () => {
                               : current,
                           )
                         }
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                       >
                         {categoryColorOptions.map((option) => (
                           <option key={option.value} value={option.value}>
@@ -1421,7 +1459,7 @@ export const App = () => {
                       </select>
                     </label>
 
-                    <label className="space-y-2 text-sm font-medium text-slate-700 md:col-span-2">
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
                       Descripcion de la Home
                       <textarea
                         value={categoryForm?.description ?? ''}
@@ -1433,7 +1471,7 @@ export const App = () => {
                           )
                         }
                         rows={4}
-                        className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400"
+                        className="themed-field w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
                       />
                     </label>
                   </section>
@@ -1445,18 +1483,18 @@ export const App = () => {
                   ) : null}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 sm:px-6">
+                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900"
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
                     onClick={handleCategorySave}
-                    className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                    className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:border-slate-700 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
                   >
                     Guardar cambios
                   </button>

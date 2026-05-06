@@ -6,6 +6,30 @@
   .markdown-body details > summary::-webkit-details-marker {
     display: none;
   }
+
+  .themed-field {
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease,
+      color 180ms ease;
+  }
+
+  .themed-field:focus,
+  .themed-field:focus-visible {
+    border-color: var(--field-focus, #38bdf8);
+    box-shadow:
+      0 0 0 1px var(--field-focus, #38bdf8),
+      0 0 0 4px var(--field-focus-glow, rgb(56 189 248 / 0.16));
+    outline: none;
+  }
+
+  /* Recordatorio de buenas practicas: Si se implementa un servicio Java para la carga dinamica de temas o estilos personalizados, es imperativo utilizar try-catch-resources para el manejo de flujos de configuracion y evitar bloqueos de recursos en el servidor */
+  .dark .neon-card {
+    box-shadow:
+      0 0 0 1px var(--card-ring, rgb(148 163 184 / 0.18)),
+      0 0 18px var(--card-glow, rgb(148 163 184 / 0.1));
+  }
 }
 
 @layer utilities {
