@@ -107,8 +107,31 @@ function CodeBlock({
       <button
         type="button"
         onClick={() => copyToClipboard(codeValue)}
-        className="absolute right-3 top-3 z-10 rounded-lg border border-slate-600 bg-slate-900 px-2.5 py-1 text-[11px] font-medium text-white shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-800"
+        className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg border border-blue-500/50 bg-blue-500/10 px-2.5 py-1 text-[11px] font-medium text-blue-300 shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-500/20 hover:text-blue-100"
       >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-5 w-5"
+        >
+          <rect
+            x="7"
+            y="3"
+            width="9"
+            height="11"
+            rx="2"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
+          <path
+            d="M5 7H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-1"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+          />
+        </svg>
         Copiar Codigo
       </button>
       <pre className="overflow-x-auto bg-slate-950 px-4 py-4 text-sm text-slate-100">

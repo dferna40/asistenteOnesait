@@ -18,11 +18,17 @@ interface ResultCardProps {
   onDeleteEntry?: (entryId: string) => void;
   onEditEntry?: (entry: KnowledgeEntry) => void;
   onExportPdf?: (entry: KnowledgeEntry) => void;
+  onTogglePin?: (entryId: string) => void;
   pdfIsGenerating?: boolean;
 }
 
 const healthLabelPattern = /\b(url|endpoint|host)\b/i;
 const sensitiveLabelPattern = /\b(password|pass|clave)\b/i;
+
+// Recordatorio: Para cualquier proceso en Java que gestione la configuración de estos iconos o estados de usuario, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
+const actionButtonBaseClass =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white transition-colors dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900';
+const actionIconClass = 'icon-neon h-5 w-5';
 
 const copyToClipboard = async (text: string) => {
   if (navigator.clipboard?.writeText) {
@@ -44,6 +50,19 @@ const isHealthCheckLabel = (label: string) => healthLabelPattern.test(label);
 const isSensitiveLabel = (label: string) => sensitiveLabelPattern.test(label);
 
 const maskValue = (value: string) => '*'.repeat(Math.max(value.length, 8));
+
+const formatUpdatedAt = (value?: string) => {
+  if (!value) {
+    return '';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat('es-ES').format(date);
+};
 
 const normalizeHealthTarget = (value: string) => {
   const trimmedValue = value.trim();
@@ -100,6 +119,7 @@ export function ResultCard({
   onDeleteEntry,
   onEditEntry,
   onExportPdf,
+  onTogglePin,
   pdfIsGenerating = false,
 }: ResultCardProps) {
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
@@ -111,6 +131,7 @@ export function ResultCard({
 
   const categoryStyle = getCategoryTheme(categoryColorKey);
   const categoryColor = getCategoryColorHex(categoryColorKey);
+  const formattedUpdatedAt = formatUpdatedAt(entry.updatedAt);
   const glowStyle = {
     '--card-glow': hexToRgba(categoryColor, 0.14),
     '--card-ring': hexToRgba(categoryColor, 0.22),
@@ -226,19 +247,56 @@ export function ResultCard({
         </div>
 
         <div className="flex items-center gap-2 self-start">
+          {onTogglePin ? (
+            <button
+              type="button"
+              onClick={() => onTogglePin(entry.id)}
+              aria-label={
+                entry.isPinned
+                  ? `Desanclar ficha ${entry.titulo}`
+                  : `Anclar ficha ${entry.titulo}`
+              }
+              title={
+                entry.isPinned
+                  ? `Desanclar ficha ${entry.titulo}`
+                  : `Anclar ficha ${entry.titulo}`
+              }
+              className={`${actionButtonBaseClass} ${
+                entry.isPinned
+                  ? 'text-amber-400 hover:border-amber-300 hover:text-amber-500 dark:text-amber-400 dark:hover:border-amber-400/50 dark:hover:text-amber-300'
+                  : 'text-slate-400 hover:border-amber-300 hover:text-amber-500 dark:text-slate-400 dark:hover:border-amber-400/50 dark:hover:text-amber-300'
+              }`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill={entry.isPinned ? 'currentColor' : 'none'}
+                className={actionIconClass}
+              >
+                <path
+                  d="m10 2.7 2.2 4.5 5 .7-3.6 3.5.8 5-4.4-2.4-4.4 2.4.8-5L2.8 7.9l5-.7L10 2.7Z"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.4"
+                />
+              </svg>
+            </button>
+          ) : null}
+
           {onExportPdf ? (
             <button
               type="button"
               onClick={() => onExportPdf(entry)}
               aria-label={`Exportar PDF de ${entry.titulo}`}
               title={`Exportar PDF de ${entry.titulo}`}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
+              className={`${actionButtonBaseClass} text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200`}
             >
               <svg
                 aria-hidden="true"
                 viewBox="0 0 20 20"
                 fill="none"
-                className={`icon-neon h-4 w-4 ${pdfIsGenerating ? 'animate-pulse' : ''}`}
+                className={`${actionIconClass} ${pdfIsGenerating ? 'animate-pulse' : ''}`}
               >
                 <path
                   d="M6 2.5h5.5L16 7v9.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"
@@ -268,13 +326,13 @@ export function ResultCard({
               onClick={() => onEditEntry(entry)}
               aria-label={`Editar ficha ${entry.titulo}`}
               title={`Editar ficha ${entry.titulo}`}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
+              className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
             >
               <svg
                 aria-hidden="true"
                 viewBox="0 0 20 20"
                 fill="none"
-                className="icon-neon h-4 w-4"
+                className={actionIconClass}
               >
                 <path
                   d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
@@ -298,13 +356,13 @@ export function ResultCard({
               onClick={() => onDeleteEntry(entry.id)}
               aria-label={`Mover a papelera ${entry.titulo}`}
               title={`Mover a papelera ${entry.titulo}`}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-red-300 hover:text-red-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-red-500/50 dark:hover:bg-slate-900 dark:hover:text-red-300"
+              className={`${actionButtonBaseClass} text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
             >
               <svg
                 aria-hidden="true"
                 viewBox="0 0 20 20"
                 fill="none"
-                className="h-4 w-4"
+                className="h-5 w-5"
               >
                 <path
                   d="M4.5 6h11M8 3.5h4m-6 2.5.6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-9"
@@ -433,7 +491,7 @@ export function ResultCard({
                           aria-hidden="true"
                           viewBox="0 0 20 20"
                           fill="none"
-                          className={`icon-neon h-4 w-4 ${
+                          className={`${actionIconClass} ${
                             healthStatuses[command.label] === 'checking'
                               ? 'animate-spin'
                               : ''
@@ -456,14 +514,14 @@ export function ResultCard({
                         onClick={() => toggleFieldVisibility(fieldKey)}
                         aria-label={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
                         title={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
+                        className={`${actionButtonBaseClass} text-sky-500 hover:border-sky-300 hover:text-sky-600 dark:text-slate-200 dark:hover:border-sky-500/50 dark:hover:text-white`}
                       >
                         {isHidden ? (
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="icon-neon h-4 w-4"
+                            className={actionIconClass}
                           >
                             <path
                               d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"
@@ -485,7 +543,7 @@ export function ResultCard({
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="icon-neon h-4 w-4"
+                            className={actionIconClass}
                           >
                             <path
                               d="M3 3l14 14"
@@ -514,13 +572,13 @@ export function ResultCard({
                           }
                           aria-label={`Guardar ${command.label}`}
                           title={`Guardar ${command.label}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
+                          className={`${actionButtonBaseClass} text-emerald-500 hover:border-emerald-300 hover:text-emerald-600 dark:text-emerald-400 dark:hover:border-emerald-500/50 dark:hover:text-emerald-300`}
                         >
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="icon-neon h-4 w-4"
+                            className={actionIconClass}
                           >
                             <path
                               d="m4 10 4 4 8-8"
@@ -537,13 +595,13 @@ export function ResultCard({
                           onClick={() => cancelEditingField(fieldKey)}
                           aria-label={`Cancelar edicion de ${command.label}`}
                           title={`Cancelar edicion de ${command.label}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
+                          className={`${actionButtonBaseClass} text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
                         >
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="icon-neon h-4 w-4"
+                            className={actionIconClass}
                           >
                             <path
                               d="M5 5l10 10M15 5 5 15"
@@ -561,13 +619,13 @@ export function ResultCard({
                           onClick={() => startEditingField(fieldKey, command.value)}
                           aria-label={`Editar ${command.label}`}
                           title={`Editar ${command.label}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
+                          className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
                         >
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="icon-neon h-4 w-4"
+                            className={actionIconClass}
                           >
                             <path
                               d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
@@ -589,13 +647,13 @@ export function ResultCard({
                           onClick={() => copyToClipboard(command.value)}
                           aria-label={`Copiar ${command.label}`}
                           title={`Copiar ${command.label}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
+                          className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
                         >
                           <svg
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="icon-neon h-4 w-4"
+                            className={actionIconClass}
                           >
                             <rect
                               x="7"
@@ -623,6 +681,12 @@ export function ResultCard({
             })}
           </div>
         </div>
+      ) : null}
+
+      {formattedUpdatedAt ? (
+        <p className="mt-5 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-500">
+          Actualizado el: {formattedUpdatedAt}
+        </p>
       ) : null}
     </article>
   );

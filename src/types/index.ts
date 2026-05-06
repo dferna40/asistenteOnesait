@@ -46,7 +46,9 @@ export interface KnowledgeEntry {
   titulo: string;
   categoria: KnowledgeCategory;
   contenido: string;
+  isPinned?: boolean;
   pasos?: string[];
   comandos?: CommandOption[];
   tags: string[];
+  updatedAt?: string;
 }

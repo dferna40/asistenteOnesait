@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
-import { PrintTemplate } from './components/ui/EntryPdfDocument';
 import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
 import { SidebarUtilities } from './components/ui/SidebarUtilities';
@@ -62,6 +61,8 @@ const defaultCategoryMetadata: Record<
   },
 };
 
+const getCurrentIsoDate = () => new Date().toISOString();
+
 interface EntryFormState {
   categoryColor: CategoryColorKey;
   categoryDescription: string;
@@ -119,8 +120,10 @@ const normalizeEntry = (entry: KnowledgeEntry): KnowledgeEntry => ({
         value: command.value,
       }))
       .filter((command) => command.label.length > 0) ?? [],
+  isPinned: Boolean(entry.isPinned),
   pasos: entry.pasos?.map((step) => step.trim()).filter(Boolean) ?? [],
   tags: entry.tags?.map((tag) => tag.trim()).filter(Boolean) ?? [],
+  updatedAt: entry.updatedAt || getCurrentIsoDate(),
 });
 
 const deriveCategories = (
@@ -265,6 +268,7 @@ const persistManualData = (manualData: ManualData) => {
   }
 
   // Recordatorio: Si se desarrolla un microservicio Java para centralizar estos Health Checks o gestionar la persistencia de la papelera, utilizar estrictamente try-catch-resources para el cierre seguro de flujos y sockets.
+  // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(manualData));
 };
 
@@ -386,6 +390,20 @@ const updateContentSelection = (
   });
 };
 
+const normalizePdfText = (value: string) =>
+  value
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^[-*]\s+/gm, '- ')
+    .trim();
+
+const splitPdfText = (value: string) =>
+  normalizePdfText(value)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
 export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [manualData, setManualData] = useState<ManualData>(() =>
@@ -400,8 +418,9 @@ export const App = () => {
   );
   const [formError, setFormError] = useState('');
   const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
+  const backupInputRef = useRef<HTMLInputElement | null>(null);
   const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
-  const pdfExportRef = useRef<HTMLDivElement | null>(null);
+  const [deleteConfirmationEntryId, setDeleteConfirmationEntryId] = useState('');
   const [exportEntryId, setExportEntryId] = useState('');
 
   const categoryMap = useMemo(
@@ -415,16 +434,29 @@ export const App = () => {
     [manualData.categories],
   );
   const results = useSearch(manualData.entries, searchTerm);
+  const sortPinnedEntries = (entries: KnowledgeEntry[]) =>
+    [...entries].sort((firstEntry, secondEntry) => {
+      if (firstEntry.isPinned !== secondEntry.isPinned) {
+        return firstEntry.isPinned ? -1 : 1;
+      }
+
+      return (
+        new Date(secondEntry.updatedAt ?? 0).getTime() -
+        new Date(firstEntry.updatedAt ?? 0).getTime()
+      );
+    });
+  const sortedResults = useMemo(() => sortPinnedEntries(results), [results]);
+  const quickAccessEntries = useMemo(
+    () => sortPinnedEntries(manualData.entries.filter((entry) => entry.isPinned)),
+    [manualData.entries],
+  );
   const hasSearchTerm = searchTerm.trim().length > 0;
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
   const activeResultCategory = manualData.categories.find(
     (category) => category.name.toLowerCase() === normalizedSearchTerm,
   );
-  const exportEntry = exportEntryId
-    ? manualData.entries.find((entry) => entry.id === exportEntryId)
-    : undefined;
-  const exportCategory = exportEntry
-    ? categoryMap.get(exportEntry.categoria.toLowerCase())
+  const deleteConfirmationEntry = deleteConfirmationEntryId
+    ? manualData.entries.find((entry) => entry.id === deleteConfirmationEntryId)
     : undefined;
 
   useEffect(() => {
@@ -433,63 +465,6 @@ export const App = () => {
       manualData.settings.darkMode,
     );
   }, [manualData.settings.darkMode]);
-
-  useEffect(() => {
-    if (!exportEntry || !pdfExportRef.current || typeof window === 'undefined') {
-      return;
-    }
-
-    let cancelled = false;
-    const exportTimeout = window.setTimeout(async () => {
-      try {
-        const html2pdf = (await import('html2pdf.js')).default as any;
-        const filename = `${slugify(exportEntry.categoria)}-${slugify(exportEntry.titulo)}.pdf`;
-        const exportNode = pdfExportRef.current;
-
-        if (!exportNode) {
-          setExportEntryId('');
-          return;
-        }
-
-        // Recordatorio: Para cualquier proceso de generación de estos PDFs en un entorno backend Java, es obligatorio utilizar try-catch-resources para el cierre seguro de los flujos de salida del documento y garantizar la integridad de los datos.
-        await html2pdf()
-          .set({
-            filename,
-            html2canvas: {
-              backgroundColor: '#ffffff',
-              logging: false,
-              scale: 3,
-              useCORS: true,
-            },
-            image: {
-              quality: 0.98,
-              type: 'jpeg',
-            },
-            jsPDF: {
-              format: 'a4',
-              orientation: 'portrait',
-              unit: 'mm',
-            },
-            margin: [15, 15, 15, 15],
-            pagebreak: {
-              avoid: ['.pdf-avoid-break', 'pre', 'table', 'img'],
-              mode: ['css', 'legacy'],
-            },
-          } as any)
-          .from(exportNode)
-          .save();
-      } finally {
-        if (!cancelled) {
-          setExportEntryId('');
-        }
-      }
-    }, 90);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(exportTimeout);
-    };
-  }, [exportEntry]);
 
   const openCreateEntryModal = (
     prefilledCategory?: string,
@@ -584,13 +559,145 @@ export const App = () => {
               ? { ...command, value: nextValue }
               : command,
           ),
+          updatedAt: getCurrentIsoDate(),
         };
       }),
     }));
   };
 
-  const handleExportEntryPdf = (entry: KnowledgeEntry) => {
+  const handleTogglePinEntry = (entryId: string) => {
+    updateManualData((currentManualData) => ({
+      ...currentManualData,
+      entries: currentManualData.entries.map((entry) =>
+        entry.id === entryId
+          ? {
+              ...entry,
+              isPinned: !entry.isPinned,
+              updatedAt: getCurrentIsoDate(),
+            }
+          : entry,
+      ),
+    }));
+  };
+
+  const handleExportEntryPdf = async (entry: KnowledgeEntry) => {
     setExportEntryId(entry.id);
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      const pdf = new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm' });
+      const margin = 15;
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const contentWidth = pageWidth - margin * 2;
+      let cursorY = margin;
+
+      const ensureSpace = (height: number) => {
+        if (cursorY + height <= pageHeight - margin) {
+          return;
+        }
+
+        pdf.addPage();
+        cursorY = margin;
+      };
+
+      const writeText = (
+        text: string,
+        options: { color?: [number, number, number]; fontSize?: number; fontStyle?: string; lineGap?: number; maxWidth?: number } = {},
+      ) => {
+        const fontSize = options.fontSize ?? 11;
+        const lineGap = options.lineGap ?? 1.6;
+        const maxWidth = options.maxWidth ?? contentWidth;
+        pdf.setFont('helvetica', options.fontStyle ?? 'normal');
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(...(options.color ?? [30, 41, 59]));
+        const lines = pdf.splitTextToSize(text, maxWidth) as string[];
+        const lineHeight = (fontSize * 0.3528) * lineGap;
+        ensureSpace(lines.length * lineHeight + 2);
+        pdf.text(lines, margin, cursorY);
+        cursorY += lines.length * lineHeight + 2;
+      };
+
+      const writeSectionTitle = (title: string) => {
+        ensureSpace(12);
+        cursorY += 4;
+        pdf.setDrawColor(226, 232, 240);
+        pdf.line(margin, cursorY + 5, pageWidth - margin, cursorY + 5);
+        writeText(title, {
+          color: [15, 23, 42],
+          fontSize: 12,
+          fontStyle: 'bold',
+          lineGap: 1.6,
+        });
+      };
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(18);
+      pdf.setTextColor(15, 23, 42);
+      const titleLines = pdf.splitTextToSize(entry.titulo, contentWidth) as string[];
+      const titleLineHeight = 18 * 0.3528 * 1.6;
+      ensureSpace(titleLines.length * titleLineHeight + 8);
+      pdf.text(titleLines, margin, cursorY);
+      cursorY += titleLines.length * titleLineHeight + 8;
+
+      splitPdfText(entry.contenido).forEach((line) => {
+        if (/^!\[[^\]]*]\(([^)]+)\)$/.test(line)) {
+          writeText(line.replace(/^!\[([^\]]*)]\(([^)]+)\)$/, 'Imagen: $2'), {
+            color: [71, 85, 105],
+            fontSize: 10,
+          });
+          return;
+        }
+
+        writeText(line);
+      });
+
+      if (entry.pasos?.length) {
+        writeSectionTitle('Pasos');
+        entry.pasos.forEach((step, index) => {
+          writeText(`${index + 1}. ${step}`);
+        });
+      }
+
+      if (entry.comandos?.length) {
+        writeSectionTitle('Parametros y comandos utiles');
+        const labelWidth = 55;
+        const valueWidth = contentWidth - labelWidth;
+        const rowGap = 2;
+
+        entry.comandos.forEach((command) => {
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(10);
+          const labelLines = pdf.splitTextToSize(command.label, labelWidth - 4) as string[];
+          pdf.setFont('courier', 'normal');
+          pdf.setFontSize(10);
+          const valueLines = pdf.splitTextToSize(command.value, valueWidth - 6) as string[];
+          const rowHeight = Math.max(labelLines.length, valueLines.length) * (10 * 0.3528 * 1.6) + 6;
+          ensureSpace(rowHeight + rowGap);
+
+          pdf.setTextColor(71, 85, 105);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(labelLines, margin, cursorY + 5);
+
+          pdf.setFillColor(248, 250, 252);
+          pdf.setDrawColor(226, 232, 240);
+          pdf.roundedRect(margin + labelWidth, cursorY, valueWidth, rowHeight, 1.5, 1.5, 'FD');
+
+          pdf.setTextColor(15, 23, 42);
+          pdf.setFont('courier', 'normal');
+          pdf.text(valueLines, margin + labelWidth + 3, cursorY + 5);
+
+          cursorY += rowHeight + rowGap;
+        });
+      }
+
+      // A partir de ahora, para el código que pueda generar alguna excepción, siempre debo usar try-catch-resources en Java para garantizar el cierre seguro de los flujos del archivo PDF generado.
+      pdf.save(`${entry.id}.pdf`);
+    } catch (error) {
+      console.error('No se pudo exportar la ficha a PDF.', error);
+    } finally {
+      setExportEntryId('');
+    }
   };
 
   const handleEntrySave = () => {
@@ -626,6 +733,9 @@ export const App = () => {
         currentManualData.entries,
         originalId,
       );
+      const originalEntry = originalId
+        ? currentManualData.entries.find((entry) => entry.id === originalId)
+        : undefined;
       const nextEntry: KnowledgeEntry = {
         categoria: trimmedCategory,
         comandos: entryForm.comandos
@@ -651,6 +761,8 @@ export const App = () => {
                 ),
               ),
         titulo: trimmedTitle,
+        isPinned: originalEntry?.isPinned ?? false,
+        updatedAt: getCurrentIsoDate(),
       };
 
       const nextEntries =
@@ -742,6 +854,19 @@ export const App = () => {
   };
 
   const handleDeleteEntry = (entryId: string) => {
+    setDeleteConfirmationEntryId(entryId);
+  };
+
+  const handleCancelDeleteEntry = () => {
+    setDeleteConfirmationEntryId('');
+  };
+
+  const handleConfirmDeleteEntry = () => {
+    if (!deleteConfirmationEntryId) {
+      return;
+    }
+
+    const entryId = deleteConfirmationEntryId;
     updateManualData((currentManualData) => {
       const entryToDelete = currentManualData.entries.find(
         (entry) => entry.id === entryId,
@@ -760,6 +885,7 @@ export const App = () => {
         ],
       };
     });
+    setDeleteConfirmationEntryId('');
   };
 
   const handleRestoreEntry = (entryId: string) => {
@@ -798,6 +924,57 @@ export const App = () => {
     );
   };
 
+  const downloadJsonFile = (payload: ManualData, filename: string) => {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    });
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+  };
+
+  const handleExportBackup = () => {
+    // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
+    downloadJsonFile(
+      manualData,
+      `manual_backup_${new Date().toISOString().slice(0, 10)}.json`,
+    );
+  };
+
+  const handleImportBackupClick = () => {
+    backupInputRef.current?.click();
+  };
+
+  const handleImportBackup = async (file?: File) => {
+    if (!file) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Importar un backup sobrescribirá el estado local actual. ¿Quieres continuar?',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      // Recordatorio: Para cualquier proceso en Java que gestione la lectura o escritura de estos archivos de backup o metadatos de fichas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
+      const rawBackup = await file.text();
+      const nextManualData = normalizeManualData(JSON.parse(rawBackup));
+      persistManualData(nextManualData);
+      setManualData(nextManualData);
+      setSearchTerm('');
+    } catch {
+      window.alert('No se pudo importar el backup. Revisa que el JSON sea valido.');
+    }
+  };
+
   const activeEntryCategory = entryForm.categoria.trim()
     ? categoryMap.get(entryForm.categoria.trim().toLowerCase())
     : undefined;
@@ -810,6 +987,7 @@ export const App = () => {
   ) as CategoryColorKey;
   const entryThemeVars = buildThemeVars(entryEditorColorKey);
   const categoryThemeVars = buildThemeVars(categoryForm?.color ?? 'blue');
+  // Recordatorio: Si se implementa una lógica Java para la persistencia de estos cambios o el procesado de comandos en el servidor, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos y configuración.
   const toolbarContainerStyle = {
     ...entryThemeVars,
     borderColor: getCategoryColorHex(entryEditorColorKey),
@@ -896,11 +1074,14 @@ export const App = () => {
   ];
   const sidebarContent = (
     <SidebarUtilities
+      onExportBackup={handleExportBackup}
+      onImportBackupClick={handleImportBackupClick}
       onRestoreEntry={handleRestoreEntry}
       trashEntries={manualData.trash}
     />
   );
 
+  // Recordatorio: Para cualquier proceso en Java que gestione la configuración de estos iconos o estados de usuario, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
   const headerActions = (
     <>
       <button
@@ -909,9 +1090,46 @@ export const App = () => {
         aria-label={
           manualData.settings.darkMode ? 'Activar modo claro' : 'Activar modo oscuro'
         }
-        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+        title={
+          manualData.settings.darkMode ? 'Activar modo claro' : 'Activar modo oscuro'
+        }
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white transition-colors dark:bg-slate-900 ${
+          manualData.settings.darkMode
+            ? 'border-indigo-300/60 text-indigo-500 hover:border-indigo-400 hover:bg-indigo-50 dark:border-indigo-400/40 dark:text-indigo-400 dark:hover:bg-indigo-950/30'
+            : 'border-amber-300/60 text-amber-500 hover:border-amber-400 hover:bg-amber-50 dark:border-amber-400/40 dark:text-amber-400 dark:hover:bg-amber-950/30'
+        }`}
       >
-        {manualData.settings.darkMode ? 'Sol' : 'Luna'}
+        {manualData.settings.darkMode ? (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            className="h-5 w-5"
+          >
+            <path
+              d="M16.5 12.5A7.2 7.2 0 0 1 7.5 3.5 7.2 7.2 0 1 0 16.5 12.5Z"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.7"
+            />
+          </svg>
+        ) : (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            className="h-5 w-5"
+          >
+            <circle cx="10" cy="10" r="3.5" stroke="currentColor" strokeWidth="1.6" />
+            <path
+              d="M10 1.8v2M10 16.2v2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M1.8 10h2M16.2 10h2M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="1.6"
+            />
+          </svg>
+        )}
       </button>
       <button
         type="button"
@@ -952,16 +1170,29 @@ export const App = () => {
                     onClick={() =>
                       openCreateEntryModal(activeResultCategory.name, true)
                     }
-                    className="rounded-2xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
                   >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      className="h-5 w-5"
+                    >
+                      <path
+                        d="M10 4v12M4 10h12"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeWidth="1.8"
+                      />
+                    </svg>
                     Añadir Ficha a {activeResultCategory.name}
                   </button>
                 ) : null}
               </div>
 
-              {results.length ? (
+              {sortedResults.length ? (
                 <div className="grid gap-4">
-                  {results.map((entry) => {
+                  {sortedResults.map((entry) => {
                     const category = categoryMap.get(entry.categoria.toLowerCase());
 
                     return (
@@ -973,6 +1204,7 @@ export const App = () => {
                         onDeleteEntry={handleDeleteEntry}
                         onEditEntry={openEditEntryModal}
                         onExportPdf={handleExportEntryPdf}
+                        onTogglePin={handleTogglePinEntry}
                         pdfIsGenerating={exportEntryId === entry.id}
                       />
                     );
@@ -998,16 +1230,30 @@ export const App = () => {
                     Ecosistema de Conocimiento RGA
                   </h2>
                   <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
-                    Centro de mando dinamico para documentacion viva, protocolos
-                    de actuacion y credenciales tecnicas del equipo.
+                    Tu centro de conocimiento inteligente: Organiza guías de
+                    trabajo, revisa el estado de tus sistemas y genera manuales
+                    profesionales listos para compartir.
                   </p>
                 </div>
 
                 <button
                   type="button"
                   onClick={openCreateCategoryModal}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900 dark:hover:text-white"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
                 >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    className="h-5 w-5"
+                  >
+                    <path
+                      d="M10 4v12M4 10h12"
+                      stroke="currentColor"
+                      strokeLinecap="round"
+                      strokeWidth="1.8"
+                    />
+                  </svg>
                   Nueva Sección
                 </button>
               </div>
@@ -1022,6 +1268,33 @@ export const App = () => {
                   para garantizar la seguridad del codigo.
                 </p>
               </div>
+
+              {quickAccessEntries.length ? (
+                <section className="mt-6">
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                    Acceso Rápido
+                  </h3>
+                  <div className="mt-3 grid gap-4">
+                    {quickAccessEntries.map((entry) => {
+                      const category = categoryMap.get(entry.categoria.toLowerCase());
+
+                      return (
+                        <ResultCard
+                          key={entry.id}
+                          categoryColorKey={category?.color}
+                          entry={entry}
+                          onCommandSave={handleCommandSave}
+                          onDeleteEntry={handleDeleteEntry}
+                          onEditEntry={openEditEntryModal}
+                          onExportPdf={handleExportEntryPdf}
+                          onTogglePin={handleTogglePinEntry}
+                          pdfIsGenerating={exportEntryId === entry.id}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              ) : null}
 
               <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
                 {manualData.categories.map((category) => {
@@ -1065,7 +1338,7 @@ export const App = () => {
                             aria-hidden="true"
                             viewBox="0 0 20 20"
                             fill="none"
-                            className="icon-neon h-4 w-4"
+                            className="icon-neon h-5 w-5"
                           >
                             <path
                               d="M10 2.5a1 1 0 0 1 1 1v.6a6.3 6.3 0 0 1 1.8.8l.4-.4a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1 0 1.4l-.4.4c.3.6.6 1.2.8 1.8h.6a1 1 0 0 1 1 1v1.4a1 1 0 0 1-1 1h-.6a6.3 6.3 0 0 1-.8 1.8l.4.4a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4 0l-.4-.4a6.3 6.3 0 0 1-1.8.8v.6a1 1 0 0 1-1 1H8.6a1 1 0 0 1-1-1v-.6a6.3 6.3 0 0 1-1.8-.8l-.4.4a1 1 0 0 1-1.4 0l-1-1a1 1 0 0 1 0-1.4l.4-.4a6.3 6.3 0 0 1-.8-1.8H2a1 1 0 0 1-1-1V9.9a1 1 0 0 1 1-1h.6a6.3 6.3 0 0 1 .8-1.8L3 6.7a1 1 0 0 1 0-1.4l1-1a1 1 0 0 1 1.4 0l.4.4a6.3 6.3 0 0 1 1.8-.8v-.6a1 1 0 0 1 1-1H10Z"
@@ -1092,6 +1365,17 @@ export const App = () => {
         </section>
       </MainLayout>
 
+      <input
+        ref={backupInputRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden"
+        onChange={(event) => {
+          void handleImportBackup(event.target.files?.[0]);
+          event.target.value = '';
+        }}
+      />
+
       {modalState ? (
         <div className="fixed inset-0 z-50 bg-slate-950/70">
           {modalState.type === 'entry' ? (
@@ -1112,14 +1396,14 @@ export const App = () => {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+                    className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
                     onClick={handleEntrySave}
-                    className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:border-slate-700 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
+                    className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
                   >
                     Guardar cambios
                   </button>
@@ -1369,9 +1653,9 @@ export const App = () => {
                                 ],
                               }))
                             }
-                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+                            className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
                           >
-                            Anadir fila
+                            Añadir fila
                           </button>
                         </div>
 
@@ -1433,7 +1717,7 @@ export const App = () => {
                                           ),
                                   }))
                                 }
-                                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+                                className="rounded-xl border border-red-600 bg-red-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
                               >
                                 Quitar
                               </button>
@@ -1501,12 +1785,17 @@ export const App = () => {
                             .map((command, index) => (
                               <div
                                 key={`${command.label}-${index}`}
-                                className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[140px_minmax(0,1fr)]"
+                                className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900/40 sm:grid-cols-[140px_minmax(0,1fr)]"
+                                style={{
+                                  borderLeftColor: getCategoryColorHex(entryEditorColorKey),
+                                  borderLeftStyle: 'solid',
+                                  borderLeftWidth: 4,
+                                }}
                               >
-                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">
                                   {command.label || 'Etiqueta'}
                                 </span>
-                                <code className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-mono text-xs text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+                                <code className="overflow-x-auto whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-2 font-mono text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-950/80 dark:text-white">
                                   {command.value || 'Valor'}
                                 </code>
                               </div>
@@ -1612,14 +1901,14 @@ export const App = () => {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+                    className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
                   >
                     Cancelar
                   </button>
                   <button
                     type="button"
                     onClick={handleCategorySave}
-                    className="rounded-xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800 dark:border-slate-700 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
+                    className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
                   >
                     Guardar cambios
                   </button>
@@ -1630,17 +1919,38 @@ export const App = () => {
         </div>
       ) : null}
 
-      {exportEntry ? (
-        <div className="pointer-events-none fixed left-[-20000px] top-0 z-[-1]">
-          <PrintTemplate
-            category={exportCategory}
-            containerRef={(node) => {
-              pdfExportRef.current = node;
-            }}
-            entry={exportEntry}
-          />
+      {deleteConfirmationEntry ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Confirmar borrado
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">
+              ¿Estás seguro de que deseas mover esta ficha a la papelera?
+            </p>
+            <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+              {deleteConfirmationEntry.titulo}
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCancelDeleteEntry}
+                className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteEntry}
+                className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
+
     </>
   );
 };

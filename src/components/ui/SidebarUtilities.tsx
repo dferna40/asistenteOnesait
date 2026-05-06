@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import type { KnowledgeEntry } from '../../types';
 
 interface SidebarUtilitiesProps {
+  onExportBackup: () => void;
+  onImportBackupClick: () => void;
   onRestoreEntry: (entryId: string) => void;
   trashEntries: KnowledgeEntry[];
 }
@@ -66,6 +68,8 @@ const formatSqlInput = (rawValue: string) => {
 };
 
 export function SidebarUtilities({
+  onExportBackup,
+  onImportBackupClick,
   onRestoreEntry,
   trashEntries,
 }: SidebarUtilitiesProps) {
@@ -173,6 +177,28 @@ export function SidebarUtilities({
           </div>
         </section>
 
+        <section className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
+          <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-200">
+            Backup
+          </h3>
+          <div className="mt-3 grid gap-2">
+            <button
+              type="button"
+              onClick={onExportBackup}
+              className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+            >
+              Exportar Backup
+            </button>
+            <button
+              type="button"
+              onClick={onImportBackupClick}
+              className="rounded-xl border border-sky-500 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-700 transition-colors hover:border-sky-600 hover:bg-sky-500/20 dark:border-sky-400/60 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15"
+            >
+              Importar Backup
+            </button>
+          </div>
+        </section>
+
         <section
           className={`rounded-2xl border p-3 ${
             trashHasItems
@@ -181,15 +207,35 @@ export function SidebarUtilities({
           }`}
         >
           <div className="flex items-center justify-between gap-2">
-            <h3
-              className={`text-xs font-bold uppercase tracking-[0.2em] ${
-                trashHasItems
-                  ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.45)] dark:text-red-400'
-                  : 'text-slate-400 dark:text-slate-500'
-              }`}
-            >
-              Papelera
-            </h3>
+            <div className="flex items-center gap-2">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                className={`h-5 w-5 ${
+                  trashHasItems
+                    ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.45)] dark:text-red-400'
+                    : 'text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.35)] dark:text-orange-400'
+                }`}
+              >
+                <path
+                  d="M4.5 6h11M8 3.5h4m-6 2.5.6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-9"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.5"
+                />
+              </svg>
+              <h3
+                className={`text-xs font-bold uppercase tracking-[0.2em] ${
+                  trashHasItems
+                    ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.45)] dark:text-red-400'
+                    : 'text-slate-400 dark:text-slate-500'
+                }`}
+              >
+                Papelera
+              </h3>
+            </div>
             <span
               className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
                 trashHasItems
