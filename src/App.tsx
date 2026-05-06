@@ -56,6 +56,7 @@ const defaultCategoryMetadata: Record<
 interface EntryFormState {
   categoryColor: CategoryColorKey;
   categoryDescription: string;
+  categoryLocked: boolean;
   categoria: string;
   comandos: CommandOption[];
   contenido: string;
@@ -72,8 +73,13 @@ interface CategoryFormState {
 }
 
 type ModalState =
-  | { entryId?: string; mode: 'create' | 'edit'; type: 'entry' }
-  | { categoryName: string; type: 'category' }
+  | {
+      entryId?: string;
+      lockedCategory?: string;
+      mode: 'create' | 'edit';
+      type: 'entry';
+    }
+  | { categoryName?: string; mode: 'create' | 'edit'; type: 'category' }
   | null;
 
 const getDefaultCategoryDefinition = (name: string): CategoryDefinition => {
@@ -231,7 +237,7 @@ const persistManualData = (manualData: ManualData) => {
     return;
   }
 
-  // Cualquier lógica de persistencia en servidor Java para esta jerarquía dinámica debe usar try-catch-resources para el manejo de excepciones de E/S.
+  // Recordatorio: Si en el futuro se implementa una API en Java para persistir estas categorías dinámicas, es obligatorio usar try-catch-resources para el manejo de excepciones de entrada/salida de archivos.
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(manualData));
 };
 
@@ -272,9 +278,11 @@ const ensureUniqueEntryId = (
 const buildEntryFormState = (
   entry?: KnowledgeEntry,
   category?: CategoryDefinition,
+  categoryLocked = false,
 ): EntryFormState => ({
   categoryColor: category?.color ?? 'blue',
   categoryDescription: category?.description ?? '',
+  categoryLocked,
   categoria: entry?.categoria ?? category?.name ?? '',
   comandos:
     entry?.comandos?.length
@@ -288,11 +296,11 @@ const buildEntryFormState = (
 });
 
 const buildCategoryFormState = (
-  category: CategoryDefinition,
+  category?: CategoryDefinition,
 ): CategoryFormState => ({
-  color: category.color,
-  description: category.description,
-  name: category.name,
+  color: category?.color ?? 'blue',
+  description: category?.description ?? '',
+  name: category?.name ?? '',
 });
 
 export const App = () => {
@@ -321,26 +329,46 @@ export const App = () => {
   );
   const results = useSearch(manualData.entries, searchTerm);
   const hasSearchTerm = searchTerm.trim().length > 0;
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const activeResultCategory = manualData.categories.find(
+    (category) => category.name.toLowerCase() === normalizedSearchTerm,
+  );
 
-  const openCreateEntryModal = (prefilledCategory?: string) => {
+  const openCreateEntryModal = (
+    prefilledCategory?: string,
+    categoryLocked = false,
+  ) => {
     const categoryDefinition = prefilledCategory
       ? categoryMap.get(prefilledCategory.toLowerCase())
       : undefined;
 
-    setEntryForm(buildEntryFormState(undefined, categoryDefinition));
+    setEntryForm(
+      buildEntryFormState(undefined, categoryDefinition, categoryLocked),
+    );
     setEntryForm((current) => ({
       ...current,
+      categoryLocked,
       categoria: prefilledCategory ?? current.categoria,
     }));
     setFormError('');
-    setModalState({ mode: 'create', type: 'entry' });
+    setModalState({
+      lockedCategory: categoryLocked ? prefilledCategory : undefined,
+      mode: 'create',
+      type: 'entry',
+    });
   };
 
   const openEditEntryModal = (entry: KnowledgeEntry) => {
     const categoryDefinition = categoryMap.get(entry.categoria.toLowerCase());
-    setEntryForm(buildEntryFormState(entry, categoryDefinition));
+    setEntryForm(buildEntryFormState(entry, categoryDefinition, false));
     setFormError('');
     setModalState({ entryId: entry.id, mode: 'edit', type: 'entry' });
+  };
+
+  const openCreateCategoryModal = () => {
+    setCategoryForm(buildCategoryFormState());
+    setFormError('');
+    setModalState({ mode: 'create', type: 'category' });
   };
 
   const openCategoryModal = (categoryName: string) => {
@@ -351,7 +379,7 @@ export const App = () => {
 
     setCategoryForm(buildCategoryFormState(category));
     setFormError('');
-    setModalState({ categoryName, type: 'category' });
+    setModalState({ categoryName, mode: 'edit', type: 'category' });
   };
 
   const closeModal = () => {
@@ -498,7 +526,7 @@ export const App = () => {
     const duplicateCategory = manualData.categories.find(
       (category) =>
         category.name.toLowerCase() === trimmedName.toLowerCase() &&
-        category.name.toLowerCase() !== currentCategoryName.toLowerCase(),
+        category.name.toLowerCase() !== currentCategoryName?.toLowerCase(),
     );
 
     if (duplicateCategory) {
@@ -509,21 +537,27 @@ export const App = () => {
     }
 
     updateManualData((currentManualData) => {
-      const nextEntries = currentManualData.entries.map((entry) =>
-        entry.categoria.toLowerCase() === currentCategoryName.toLowerCase()
-          ? { ...entry, categoria: trimmedName }
-          : entry,
-      );
+      const nextEntries = currentCategoryName
+        ? currentManualData.entries.map((entry) =>
+            entry.categoria.toLowerCase() === currentCategoryName.toLowerCase()
+              ? { ...entry, categoria: trimmedName }
+              : entry,
+          )
+        : currentManualData.entries;
 
-      const nextCategories = currentManualData.categories.map((category) =>
-        category.name.toLowerCase() === currentCategoryName.toLowerCase()
-          ? {
-              color: categoryForm.color,
-              description: categoryForm.description.trim(),
-              name: trimmedName,
-            }
-          : category,
-      );
+      const nextCategoryDefinition = {
+        color: categoryForm.color,
+        description: categoryForm.description.trim(),
+        name: trimmedName,
+      };
+
+      const nextCategories = currentCategoryName
+        ? currentManualData.categories.map((category) =>
+            category.name.toLowerCase() === currentCategoryName.toLowerCase()
+              ? nextCategoryDefinition
+              : category,
+          )
+        : [...currentManualData.categories, nextCategoryDefinition];
 
       return {
         categories: deriveCategories(nextEntries, nextCategories),
@@ -551,7 +585,7 @@ export const App = () => {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(downloadUrl);
     window.alert(
-      'Guia: mueve el archivo descargado a src/data/ y renombralo como manual.json para convertirlo en la nueva base del asistente.',
+      'Guia: mueve el archivo descargado a src/data/, renombralo como manual.json y machaca el archivo original para convertirlo en la nueva base del asistente.',
     );
   };
 
@@ -591,14 +625,28 @@ export const App = () => {
         <section className="space-y-5 sm:space-y-6">
           {hasSearchTerm ? (
             <>
-              <div>
-                <h2 className="text-2xl font-semibold text-slate-900">
-                  Resultados
-                </h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  {results.length} coincidencia{results.length === 1 ? '' : 's'} para{' '}
-                  <span className="font-medium text-slate-800">"{searchTerm}"</span>.
-                </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold text-slate-900">
+                    Resultados
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {results.length} coincidencia{results.length === 1 ? '' : 's'} para{' '}
+                    <span className="font-medium text-slate-800">"{searchTerm}"</span>.
+                  </p>
+                </div>
+
+                {activeResultCategory ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openCreateEntryModal(activeResultCategory.name, true)
+                    }
+                    className="rounded-2xl border border-slate-900 bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                  >
+                    Añadir Ficha a {activeResultCategory.name}
+                  </button>
+                ) : null}
               </div>
 
               {results.length ? (
@@ -644,10 +692,10 @@ export const App = () => {
 
                 <button
                   type="button"
-                  onClick={() => openCreateEntryModal()}
+                  onClick={openCreateCategoryModal}
                   className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900"
                 >
-                  Nueva subseccion
+                  Nueva Sección
                 </button>
               </div>
 
@@ -740,12 +788,16 @@ export const App = () => {
                     ? modalState.mode === 'create'
                       ? 'Gestion de conocimiento'
                       : 'Editar ficha'
-                    : 'Editar seccion'}
+                    : modalState.mode === 'create'
+                      ? 'Nueva sección'
+                      : 'Editar seccion'}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
                   {modalState.type === 'entry'
                     ? 'Define categoria, contenido, pasos y comandos desde un unico formulario.'
-                    : 'Actualiza el nombre, la descripcion y el color de la seccion.'}
+                    : modalState.mode === 'create'
+                      ? 'Crea una nueva categoria dinamica con nombre, color y descripcion para la Home.'
+                      : 'Actualiza el nombre, la descripcion y el color de la seccion.'}
                 </p>
               </div>
 
@@ -785,6 +837,7 @@ export const App = () => {
                               categoria: event.target.value,
                             }))
                           }
+                          disabled={entryForm.categoryLocked}
                           className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-slate-400"
                           placeholder="Ej. BBDD"
                         />
@@ -811,7 +864,15 @@ export const App = () => {
                       </label>
                     </div>
 
-                    {isCreatingNewCategory ? (
+                    {entryForm.categoryLocked && activeEntryCategory ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                        La nueva ficha se añadira dentro de la seccion{' '}
+                        <span className="font-semibold text-slate-900">
+                          {activeEntryCategory.name}
+                        </span>
+                        . Para cambiarla, vuelve a la Home y entra desde otra seccion.
+                      </div>
+                    ) : isCreatingNewCategory ? (
                       <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[minmax(0,1fr)_180px]">
                         <label className="space-y-2 text-sm font-medium text-slate-700">
                           Descripcion de la seccion
