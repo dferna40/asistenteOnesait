@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { MainLayout } from './components/layout/MainLayout';
+import { PrintTemplate } from './components/ui/EntryPdfDocument';
 import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
 import { SidebarUtilities } from './components/ui/SidebarUtilities';
@@ -400,6 +401,8 @@ export const App = () => {
   const [formError, setFormError] = useState('');
   const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
   const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const pdfExportRef = useRef<HTMLDivElement | null>(null);
+  const [exportEntryId, setExportEntryId] = useState('');
 
   const categoryMap = useMemo(
     () =>
@@ -417,6 +420,12 @@ export const App = () => {
   const activeResultCategory = manualData.categories.find(
     (category) => category.name.toLowerCase() === normalizedSearchTerm,
   );
+  const exportEntry = exportEntryId
+    ? manualData.entries.find((entry) => entry.id === exportEntryId)
+    : undefined;
+  const exportCategory = exportEntry
+    ? categoryMap.get(exportEntry.categoria.toLowerCase())
+    : undefined;
 
   useEffect(() => {
     document.documentElement.classList.toggle(
@@ -424,6 +433,62 @@ export const App = () => {
       manualData.settings.darkMode,
     );
   }, [manualData.settings.darkMode]);
+
+  useEffect(() => {
+    if (!exportEntry || !pdfExportRef.current || typeof window === 'undefined') {
+      return;
+    }
+
+    let cancelled = false;
+    const exportTimeout = window.setTimeout(async () => {
+      try {
+        const html2pdf = (await import('html2pdf.js')).default as any;
+        const filename = `${slugify(exportEntry.categoria)}-${slugify(exportEntry.titulo)}.pdf`;
+        const exportNode = pdfExportRef.current;
+
+        if (!exportNode) {
+          setExportEntryId('');
+          return;
+        }
+
+        // Recordatorio: Si en el futuro este motor de PDF se traslada a un servicio backend en Java, es obligatorio el uso de try-catch-resources para gestionar los flujos de bytes del documento y garantizar la liberacion de memoria en el servidor.
+        await html2pdf()
+          .set({
+            filename,
+            html2canvas: {
+              backgroundColor: '#ffffff',
+              scale: 2,
+              useCORS: true,
+            },
+            image: {
+              quality: 0.98,
+              type: 'jpeg',
+            },
+            jsPDF: {
+              format: 'a4',
+              orientation: 'portrait',
+              unit: 'mm',
+            },
+            margin: [15, 15, 15, 15],
+            pagebreak: {
+              avoid: ['.pdf-avoid-break', 'pre', 'table', 'img'],
+              mode: ['css', 'legacy'],
+            },
+          } as any)
+          .from(exportNode)
+          .save();
+      } finally {
+        if (!cancelled) {
+          setExportEntryId('');
+        }
+      }
+    }, 90);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(exportTimeout);
+    };
+  }, [exportEntry]);
 
   const openCreateEntryModal = (
     prefilledCategory?: string,
@@ -521,6 +586,10 @@ export const App = () => {
         };
       }),
     }));
+  };
+
+  const handleExportEntryPdf = (entry: KnowledgeEntry) => {
+    setExportEntryId(entry.id);
   };
 
   const handleEntrySave = () => {
@@ -902,6 +971,8 @@ export const App = () => {
                         onCommandSave={handleCommandSave}
                         onDeleteEntry={handleDeleteEntry}
                         onEditEntry={openEditEntryModal}
+                        onExportPdf={handleExportEntryPdf}
+                        pdfIsGenerating={exportEntryId === entry.id}
                       />
                     );
                   })}
@@ -1555,6 +1626,18 @@ export const App = () => {
               </div>
             </div>
           )}
+        </div>
+      ) : null}
+
+      {exportEntry ? (
+        <div className="pointer-events-none fixed left-[-20000px] top-0 z-[-1]">
+          <PrintTemplate
+            category={exportCategory}
+            containerRef={(node) => {
+              pdfExportRef.current = node;
+            }}
+            entry={exportEntry}
+          />
         </div>
       ) : null}
     </>

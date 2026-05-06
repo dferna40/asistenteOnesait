@@ -17,6 +17,8 @@ interface ResultCardProps {
   ) => void;
   onDeleteEntry?: (entryId: string) => void;
   onEditEntry?: (entry: KnowledgeEntry) => void;
+  onExportPdf?: (entry: KnowledgeEntry) => void;
+  pdfIsGenerating?: boolean;
 }
 
 const healthLabelPattern = /\b(url|endpoint|host)\b/i;
@@ -97,6 +99,8 @@ export function ResultCard({
   onCommandSave,
   onDeleteEntry,
   onEditEntry,
+  onExportPdf,
+  pdfIsGenerating = false,
 }: ResultCardProps) {
   const [hiddenFields, setHiddenFields] = useState<Record<string, boolean>>({});
   const [editingFields, setEditingFields] = useState<Record<string, boolean>>({});
@@ -222,6 +226,42 @@ export function ResultCard({
         </div>
 
         <div className="flex items-center gap-2 self-start">
+          {onExportPdf ? (
+            <button
+              type="button"
+              onClick={() => onExportPdf(entry)}
+              aria-label={`Exportar PDF de ${entry.titulo}`}
+              title={`Exportar PDF de ${entry.titulo}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-900 dark:hover:text-white"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                className={`icon-neon h-4 w-4 ${pdfIsGenerating ? 'animate-pulse' : ''}`}
+              >
+                <path
+                  d="M6 2.5h5.5L16 7v9.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M11.5 2.5V7H16"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M7.1 12.1h5.8M7.1 14.6h4.6"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          ) : null}
+
           {onEditEntry ? (
             <button
               type="button"
