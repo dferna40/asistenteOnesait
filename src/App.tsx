@@ -85,6 +85,8 @@ interface CategoryFormState {
 }
 
 interface ToolbarAction {
+  buttonLabel: string;
+  icon: string;
   label: string;
   onClick: () => void;
 }
@@ -121,7 +123,9 @@ interface PdfTableRow {
 type PdfContentBlock =
   | { content: string; type: 'text' }
   | { content: string; language?: string; type: 'code' }
+  | { content: string; depth: number; type: 'heading' }
   | { items: PdfListItem[]; type: 'list' }
+  | { size: 'paragraph'; type: 'spacer' }
   | { rows: PdfTableRow[]; type: 'table' };
 
 type ModalState =
@@ -467,6 +471,48 @@ const insertTextAtCursor = (
   });
 };
 
+const prefixSelectedLines = (
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+  prefixBuilder: (lineIndex: number) => string,
+  placeholder: string,
+) => {
+  if (!textarea) {
+    setValue(`${currentValue}${prefixBuilder(0)}${placeholder}`);
+    return;
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = currentValue.slice(start, end);
+
+  if (!selectedText) {
+    const insertedText = `${prefixBuilder(0)}${placeholder}`;
+    const nextValue = `${currentValue.slice(0, start)}${insertedText}${currentValue.slice(end)}`;
+    setValue(nextValue);
+
+    requestAnimationFrame(() => {
+      const nextCursorPosition = start + insertedText.length;
+      textarea.focus();
+      textarea.setSelectionRange(nextCursorPosition, nextCursorPosition);
+    });
+    return;
+  }
+
+  const lines = selectedText.split('\n');
+  const prefixedText = lines
+    .map((line, lineIndex) => `${prefixBuilder(lineIndex)}${line}`)
+    .join('\n');
+  const nextValue = `${currentValue.slice(0, start)}${prefixedText}${currentValue.slice(end)}`;
+  setValue(nextValue);
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    textarea.setSelectionRange(start, start + prefixedText.length);
+  });
+};
+
 const normalizePdfText = (value: string) =>
   value
     .replace(/\*\*(.+?)\*\*/g, '$1')
@@ -515,6 +561,27 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
     }
 
     return null;
+  };
+  const parseHeadingLine = (line: string) => {
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (!headingMatch) {
+      return null;
+    }
+
+    return {
+      content: normalizePdfText(headingMatch[2]),
+      depth: headingMatch[1].length,
+      type: 'heading' as const,
+    };
+  };
+  const pushParagraphSpacer = () => {
+    const lastBlock = blocks[blocks.length - 1];
+
+    if (!lastBlock || lastBlock.type === 'spacer') {
+      return;
+    }
+
+    blocks.push({ size: 'paragraph', type: 'spacer' });
   };
 
   const flushTextBuffer = () => {
@@ -598,6 +665,23 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
 
     if (isInsideCodeBlock) {
       codeBuffer.push(line.replace(/\t/g, '  '));
+      return;
+    }
+
+    if (!trimmedLine) {
+      flushTextBuffer();
+      flushListBuffer();
+      flushTableBuffer();
+      pushParagraphSpacer();
+      return;
+    }
+
+    const parsedHeading = parseHeadingLine(line);
+    if (parsedHeading) {
+      flushTextBuffer();
+      flushListBuffer();
+      flushTableBuffer();
+      blocks.push(parsedHeading);
       return;
     }
 
@@ -1122,6 +1206,41 @@ export const App = () => {
         });
       };
 
+      const writeMarkdownHeading = (content: string, depth: number) => {
+        const headingDepth = Math.min(Math.max(depth, 1), 6);
+        const fontSizeByDepth: Record<number, number> = {
+          1: 15,
+          2: 13,
+          3: 11.5,
+          4: 10.5,
+          5: 10,
+          6: 10,
+        };
+        const marginTopByDepth: Record<number, number> = {
+          1: 4,
+          2: 3.5,
+          3: 3,
+          4: 2.5,
+          5: 2,
+          6: 2,
+        };
+
+        ensureSpace(12);
+        cursorY += marginTopByDepth[headingDepth];
+
+        if (headingDepth <= 3) {
+          pdf.setDrawColor(226, 232, 240);
+          pdf.line(margin, cursorY + 4.5, pageWidth - margin, cursorY + 4.5);
+        }
+
+        writeText(content, {
+          color: [15, 23, 42],
+          fontSize: fontSizeByDepth[headingDepth],
+          fontStyle: 'bold',
+          lineGap: 1.45,
+        });
+      };
+
       const writeImagePlaceholder = (label: string) => {
         const placeholderHeight = 18;
         ensureSpace(placeholderHeight + 4);
@@ -1621,8 +1740,18 @@ export const App = () => {
           continue;
         }
 
+        if (block.type === 'heading') {
+          writeMarkdownHeading(block.content, block.depth);
+          continue;
+        }
+
         if (block.type === 'list') {
           writeListBlock(block.items);
+          continue;
+        }
+
+        if (block.type === 'spacer') {
+          cursorY += block.size === 'paragraph' ? 3.5 : 0;
           continue;
         }
 
@@ -1633,10 +1762,14 @@ export const App = () => {
 
         const textLines = block.content
           .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean);
+          .map((line) => line.trim());
 
         for (const line of textLines) {
+          if (!line) {
+            cursorY += 2.5;
+            continue;
+          }
+
           await writeMarkdownLine(line);
         }
       }
@@ -2116,6 +2249,8 @@ export const App = () => {
   // Recordatorio: Si se implementa una logica Java para personalizar estas barras de herramientas o cargar macros de texto dinamicas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de configuracion de la interfaz.
   const toolbarActions: ToolbarAction[] = [
     {
+      buttonLabel: 'Negrita',
+      icon: 'B',
       label: '**Negrita**',
       onClick: () =>
         updateContentSelection(
@@ -2129,7 +2264,9 @@ export const App = () => {
         ),
     },
     {
-      label: '> Código',
+      buttonLabel: 'Codigo',
+      icon: '<>',
+      label: '> Codigo',
       onClick: () =>
         updateContentSelection(
           contentEditorRef.current,
@@ -2142,6 +2279,8 @@ export const App = () => {
         ),
     },
     {
+      buttonLabel: 'Imagen',
+      icon: '[]',
       label: '![Imagen]()',
       onClick: () =>
         updateContentSelection(
@@ -2155,19 +2294,64 @@ export const App = () => {
         ),
     },
     {
+      buttonLabel: 'Lista',
+      icon: '*',
       label: 'Lista',
+      onClick: () =>
+        prefixSelectedLines(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          () => '- ',
+          'Elemento de lista',
+        ),
+    },
+    {
+      buttonLabel: 'Numerada',
+      icon: '1.',
+      label: 'Numerada',
+      onClick: () =>
+        prefixSelectedLines(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          (lineIndex) => `${lineIndex + 1}. `,
+          'Primer elemento',
+        ),
+    },
+    {
+      buttonLabel: 'Salto',
+      icon: '//',
+      label: 'Salto',
+      onClick: () =>
+        insertTextAtCursor(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          '\n\n',
+        ),
+    },
+    {
+      buttonLabel: 'Seccion',
+      icon: 'H2',
+      label: 'Seccion',
       onClick: () =>
         updateContentSelection(
           contentEditorRef.current,
           entryForm.contenido,
           (nextValue) =>
             setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          '- ',
+          '## ',
           '',
-          'Elemento de lista',
+          'Nueva seccion',
         ),
     },
     {
+      buttonLabel: 'Tabla',
+      icon: '::',
       label: 'Tabla',
       onClick: () =>
         updateContentSelection(
@@ -2651,7 +2835,7 @@ export const App = () => {
                       {entryForm.categoryLocked && activeEntryCategory ? (
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
                           La nueva ficha se añadira dentro de la seccion{' '}
-                          <span className="font-semibold text-slate-900">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">
                             {activeEntryCategory.name}
                           </span>
                           . Para cambiarla, vuelve a la Home y entra desde otra seccion.
@@ -2696,7 +2880,7 @@ export const App = () => {
                       ) : activeEntryCategory ? (
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
                           La ficha se guardara dentro de la seccion{' '}
-                          <span className="font-semibold text-slate-900">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">
                             {activeEntryCategory.name}
                           </span>
                           , con la descripcion actual de la Home.
@@ -2710,13 +2894,6 @@ export const App = () => {
                         style={toolbarContainerStyle}
                       >
                         {toolbarActions.map((action, index) => {
-                          const toolbarMeta = [
-                            { icon: 'B', label: 'Negrita' },
-                            { icon: '<>', label: 'Codigo' },
-                            { icon: '[]', label: 'Imagen' },
-                            { icon: '•', label: 'Lista' },
-                            { icon: '::', label: 'Tabla' },
-                          ][index] ?? { icon: '+', label: action.label };
                           const isActive = activeToolbarActionId === `${index}`;
 
                           return (
@@ -2724,8 +2901,8 @@ export const App = () => {
                             key={action.label}
                             type="button"
                             onClick={() => handleToolbarActionClick(index, action)}
-                            aria-label={`Insertar ${toolbarMeta.label}`}
-                            title={`Insertar ${toolbarMeta.label}`}
+                            aria-label={`Insertar ${action.buttonLabel}`}
+                            title={`Insertar ${action.buttonLabel}`}
                             className={`inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-all duration-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 ${
                               isActive
                                 ? 'scale-[1.02] shadow-sm'
@@ -2745,9 +2922,9 @@ export const App = () => {
                               className="font-mono text-[11px]"
                               aria-hidden="true"
                             >
-                              {toolbarMeta.icon}
+                              {action.icon}
                             </span>
-                            <span>{toolbarMeta.label}</span>
+                            <span>{action.buttonLabel}</span>
                           </button>
                           );
                         })}

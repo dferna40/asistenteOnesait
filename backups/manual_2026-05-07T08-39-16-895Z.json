@@ -41,7 +41,10 @@
     "updatedAt": "2026-05-06T17:35:38.551Z"
   },
   {
+    "id": "entorno-local-rutas",
+    "titulo": "Rutas Criticas Locales",
     "categoria": "Entorno",
+    "contenido": "Ubicaciones clave en C:\\EntornoOnesait para el desarrollo diario.",
     "comandos": [
       {
         "label": "Entorno Raiz",
@@ -56,18 +59,15 @@
         "value": "C:\\EntornoOnesait\\EAP-7.4.0"
       }
     ],
-    "contenido": "Ubicaciones clave en C:\\EntornoOnesait para el desarrollo diario.\n\n\n\ndsfds\n\n1. Primer elemento1.\n2. Segundo elemento\n\n## Nueva seccion",
-    "id": "entorno-local-rutas",
-    "pasos": [],
     "tags": [
       "rutas",
       "jboss",
       "maven",
       "local"
     ],
-    "titulo": "Rutas Criticas Locales",
+    "pasos": [],
     "isPinned": false,
-    "updatedAt": "2026-05-07T08:39:16.087Z"
+    "updatedAt": "2026-05-07T08:36:53.508Z"
   },
   {
     "id": "ui-literales",
