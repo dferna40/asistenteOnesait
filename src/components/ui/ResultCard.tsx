@@ -8,6 +8,7 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 import type { CategoryColorKey, KnowledgeEntry } from '../../types';
 
 interface ResultCardProps {
+  activeTag?: string;
   categoryColorKey?: CategoryColorKey;
   entry: KnowledgeEntry;
   onCommandSave: (
@@ -18,6 +19,7 @@ interface ResultCardProps {
   onDeleteEntry?: (entryId: string) => void;
   onEditEntry?: (entry: KnowledgeEntry) => void;
   onExportPdf?: (entry: KnowledgeEntry) => void;
+  onTagClick?: (tag: string) => void;
   onTogglePin?: (entryId: string) => void;
   pdfIsGenerating?: boolean;
 }
@@ -122,12 +124,14 @@ const getCommandValueTone = (value: string) => {
 };
 
 export function ResultCard({
+  activeTag,
   categoryColorKey = 'slate',
   entry,
   onCommandSave,
   onDeleteEntry,
   onEditEntry,
   onExportPdf,
+  onTagClick,
   onTogglePin,
   pdfIsGenerating = false,
 }: ResultCardProps) {
@@ -259,6 +263,25 @@ export function ResultCard({
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">
             {entry.titulo}
           </h3>
+          {entry.tags.length ? (
+            <div className="flex flex-wrap gap-2">
+              {entry.tags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => onTagClick?.(tag)}
+                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium lowercase transition-colors ${
+                    activeTag === tag.toLowerCase()
+                      ? 'border-sky-400 bg-sky-100 text-sky-800 dark:border-sky-400/70 dark:bg-sky-500/20 dark:text-sky-200'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-sky-500/50 dark:hover:bg-sky-500/10 dark:hover:text-sky-300'
+                  }`}
+                  title={`Filtrar por tag ${tag}`}
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2 self-start">

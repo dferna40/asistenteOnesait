@@ -17,6 +17,7 @@ import type {
   CategoryDefinition,
   CommandOption,
   CommandOverridesByEntry,
+  EntryTemplate,
   KnowledgeEntry,
   ManualBackupPayload,
   ManualData,
@@ -84,6 +85,17 @@ interface CategoryFormState {
   name: string;
 }
 
+interface TemplateFormState {
+  categoria: string;
+  comandos: CommandOption[];
+  contenido: string;
+  id: string;
+  name: string;
+  pasos: string;
+  tags: string;
+  titulo: string;
+}
+
 interface ToolbarAction {
   buttonLabel: string;
   icon: string;
@@ -111,7 +123,14 @@ interface PdfCodeSegment {
   text: string;
 }
 
+interface PdfInlineSegment {
+  href?: string;
+  text: string;
+  type: 'link' | 'text';
+}
+
 interface PdfListItem {
+  indentLevel: number;
   marker: string;
   text: string;
 }
@@ -136,6 +155,7 @@ type ModalState =
       type: 'entry';
     }
   | { categoryName?: string; mode: 'create' | 'edit'; type: 'category' }
+  | { mode: 'create' | 'edit'; templateId?: string; type: 'template' }
   | null;
 
 const getDefaultCategoryDefinition = (name: string): CategoryDefinition => {
@@ -165,6 +185,23 @@ const normalizeEntry = (entry: KnowledgeEntry): KnowledgeEntry => ({
   pasos: entry.pasos?.map((step) => step.trim()).filter(Boolean) ?? [],
   tags: entry.tags?.map((tag) => tag.trim()).filter(Boolean) ?? [],
   updatedAt: entry.updatedAt || getCurrentIsoDate(),
+});
+
+const normalizeTemplate = (template: EntryTemplate): EntryTemplate => ({
+  ...template,
+  categoria: template.categoria?.trim() || undefined,
+  comandos:
+    template.comandos
+      ?.map((command) => ({
+        label: command.label.trim(),
+        value: command.value,
+      }))
+      .filter((command) => command.label.length > 0) ?? [],
+  name: template.name.trim(),
+  pasos: template.pasos?.map((step) => step.trim()).filter(Boolean) ?? [],
+  tags: template.tags?.map((tag) => tag.trim().toLowerCase()).filter(Boolean) ?? [],
+  titulo: template.titulo.trim(),
+  updatedAt: template.updatedAt || getCurrentIsoDate(),
 });
 
 const deriveCategories = (
@@ -236,6 +273,7 @@ const normalizeManualData = (source: unknown): ManualData => {
       categories: deriveCategories(entries),
       entries,
       settings: defaultSettings,
+      templates: [],
       trash: [],
     };
   }
@@ -248,6 +286,9 @@ const normalizeManualData = (source: unknown): ManualData => {
     const categories = Array.isArray(candidate.categories)
       ? deriveCategories(entries, candidate.categories)
       : deriveCategories(entries);
+    const templates = Array.isArray(candidate.templates)
+      ? candidate.templates.map((template) => normalizeTemplate(template))
+      : [];
 
     return {
       categories,
@@ -256,6 +297,7 @@ const normalizeManualData = (source: unknown): ManualData => {
         ...defaultSettings,
         ...(candidate.settings ?? {}),
       },
+      templates,
       trash: Array.isArray(candidate.trash)
         ? candidate.trash.map((entry) => normalizeEntry(entry))
         : [],
@@ -266,6 +308,7 @@ const normalizeManualData = (source: unknown): ManualData => {
     categories: [],
     entries: [],
     settings: defaultSettings,
+    templates: [],
     trash: [],
   };
 };
@@ -335,6 +378,16 @@ const splitLines = (value: string) =>
     .split('\n')
     .map((item) => item.trim())
     .filter(Boolean);
+
+const normalizeTags = (value: string) =>
+  Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((tag) => tag.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
 
 const hexToRgba = (hex: string, alpha: number) => {
   const normalizedHex = hex.replace('#', '');
@@ -418,6 +471,42 @@ const buildCategoryFormState = (
   color: category?.color ?? 'blue',
   description: category?.description ?? '',
   name: category?.name ?? '',
+});
+
+const buildTemplateFormState = (
+  template?: EntryTemplate,
+  fallbackCategory = '',
+): TemplateFormState => ({
+  categoria: template?.categoria ?? fallbackCategory,
+  comandos:
+    template?.comandos?.length
+      ? template.comandos.map((command) => ({ ...command }))
+      : [{ label: '', value: '' }],
+  contenido: template?.contenido ?? '',
+  id: template?.id ?? '',
+  name: template?.name ?? '',
+  pasos: template?.pasos?.join('\n') ?? '',
+  tags: template?.tags?.join(', ') ?? '',
+  titulo: template?.titulo ?? '',
+});
+
+const applyTemplateToEntryForm = (
+  currentForm: EntryFormState,
+  template: EntryTemplate,
+): EntryFormState => ({
+  ...currentForm,
+  categoria:
+    currentForm.categoryLocked || currentForm.categoria.trim().length > 0
+      ? currentForm.categoria
+      : (template.categoria ?? currentForm.categoria),
+  comandos:
+    template.comandos?.length
+      ? template.comandos.map((command) => ({ ...command }))
+      : [{ label: '', value: '' }],
+  contenido: template.contenido,
+  pasos: template.pasos?.join('\n') ?? '',
+  tags: template.tags.join(', '),
+  titulo: template.titulo,
 });
 
 const updateContentSelection = (
@@ -513,6 +602,55 @@ const prefixSelectedLines = (
   });
 };
 
+const indentSelectedLines = (
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+  indent = '\t',
+) => {
+  if (!textarea) {
+    setValue(`${currentValue}${indent}`);
+    return;
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = currentValue.slice(start, end);
+
+  if (!selectedText) {
+    insertTextAtCursor(textarea, currentValue, setValue, indent);
+    return;
+  }
+
+  const lineStart = currentValue.lastIndexOf('\n', start - 1) + 1;
+  const lineEnd = currentValue.indexOf('\n', end);
+  const safeLineEnd = lineEnd === -1 ? currentValue.length : lineEnd;
+  const selectedBlock = currentValue.slice(lineStart, safeLineEnd);
+  const indentedBlock = selectedBlock
+    .split('\n')
+    .map((line) => `${indent}${line}`)
+    .join('\n');
+  const nextValue = `${currentValue.slice(0, lineStart)}${indentedBlock}${currentValue.slice(safeLineEnd)}`;
+
+  setValue(nextValue);
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    textarea.setSelectionRange(start + indent.length, end + indent.length * selectedBlock.split('\n').length);
+  });
+};
+
+const normalizeIndentation = (value: string) => value.replace(/\t/g, '    ');
+
+const getIndentLevel = (value: string) => {
+  const leadingWhitespace = value.match(/^\s*/)?.[0] ?? '';
+  const normalizedLength = normalizeIndentation(leadingWhitespace).length;
+
+  return Math.floor(normalizedLength / 4);
+};
+
+const stripLeadingWhitespace = (value: string) => value.replace(/^\s+/, '');
+
 const normalizePdfText = (value: string) =>
   value
     .replace(/\*\*(.+?)\*\*/g, '$1')
@@ -520,6 +658,56 @@ const normalizePdfText = (value: string) =>
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^[-*]\s+/gm, '- ')
     .trim();
+
+const parsePdfInlineSegments = (value: string): PdfInlineSegment[] => {
+  const segments: PdfInlineSegment[] = [];
+  const pattern =
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/gi;
+  let lastIndex = 0;
+
+  for (const match of value.matchAll(pattern)) {
+    const matchIndex = match.index ?? 0;
+
+    if (matchIndex > lastIndex) {
+      segments.push({
+        text: value.slice(lastIndex, matchIndex),
+        type: 'text',
+      });
+    }
+
+    if (match[1] && match[2]) {
+      segments.push({
+        href: match[2],
+        text: match[1],
+        type: 'link',
+      });
+    } else if (match[3]) {
+      segments.push({
+        href: match[3],
+        text: match[3],
+        type: 'link',
+      });
+    }
+
+    lastIndex = matchIndex + match[0].length;
+  }
+
+  if (lastIndex < value.length) {
+    segments.push({
+      text: value.slice(lastIndex),
+      type: 'text',
+    });
+  }
+
+  return segments.length
+    ? segments
+    : [
+        {
+          text: value,
+          type: 'text',
+        },
+      ];
+};
 
 const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
   const blocks: PdfContentBlock[] = [];
@@ -544,19 +732,21 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
       .split('|')
       .map((cell) => normalizePdfText(cell.trim()));
   const parseListLine = (line: string) => {
-    const bulletMatch = line.match(/^\s*([-*])\s+(.+)$/);
+    const bulletMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
     if (bulletMatch) {
       return {
-        marker: bulletMatch[1],
-        text: normalizePdfText(bulletMatch[2]),
+        indentLevel: getIndentLevel(bulletMatch[1]),
+        marker: bulletMatch[2],
+        text: normalizePdfText(bulletMatch[3]),
       };
     }
 
-    const orderedMatch = line.match(/^\s*(\d+\.)\s+(.+)$/);
+    const orderedMatch = line.match(/^(\s*)(\d+\.)\s+(.+)$/);
     if (orderedMatch) {
       return {
-        marker: orderedMatch[1],
-        text: normalizePdfText(orderedMatch[2]),
+        indentLevel: getIndentLevel(orderedMatch[1]),
+        marker: orderedMatch[2],
+        text: normalizePdfText(orderedMatch[3]),
       };
     }
 
@@ -846,6 +1036,8 @@ const resolvePdfImageAsset = async (source: string) => {
 export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState('');
+  const [activeTagFilter, setActiveTagFilter] = useState('');
   const [manualData, setManualData] = useState<ManualData>(() =>
     readStoredManualData(),
   );
@@ -856,7 +1048,11 @@ export const App = () => {
   const [categoryForm, setCategoryForm] = useState<CategoryFormState | null>(
     null,
   );
+  const [templateForm, setTemplateForm] = useState<TemplateFormState | null>(
+    null,
+  );
   const [formError, setFormError] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -882,7 +1078,12 @@ export const App = () => {
       ),
     [manualData.categories],
   );
-  const results = useSearch(manualData.entries, debouncedSearchTerm);
+  const results = useSearch(
+    manualData.entries,
+    debouncedSearchTerm,
+    activeCategoryFilter,
+    activeTagFilter,
+  );
   const sortPinnedEntries = (entries: KnowledgeEntry[]) =>
     [...entries].sort((firstEntry, secondEntry) => {
       if (firstEntry.isPinned !== secondEntry.isPinned) {
@@ -899,11 +1100,13 @@ export const App = () => {
     () => sortPinnedEntries(manualData.entries.filter((entry) => entry.isPinned)),
     [manualData.entries],
   );
-  const hasSearchTerm = searchTerm.trim().length > 0;
-  const normalizedSearchTerm = debouncedSearchTerm.trim().toLowerCase();
-  const activeResultCategory = manualData.categories.find(
-    (category) => category.name.toLowerCase() === normalizedSearchTerm,
-  );
+  const hasActiveFilters =
+    searchTerm.trim().length > 0 ||
+    activeCategoryFilter.trim().length > 0 ||
+    activeTagFilter.trim().length > 0;
+  const activeResultCategory = activeCategoryFilter
+    ? categoryMap.get(activeCategoryFilter.toLowerCase())
+    : undefined;
   const deleteConfirmationEntry = deleteConfirmationEntryId
     ? manualData.entries.find((entry) => entry.id === deleteConfirmationEntryId)
     : undefined;
@@ -1037,8 +1240,10 @@ export const App = () => {
     prefilledCategory?: string,
     categoryLocked = false,
   ) => {
-    const categoryDefinition = prefilledCategory
-      ? categoryMap.get(prefilledCategory.toLowerCase())
+    const fallbackCategory = manualData.categories[0]?.name ?? '';
+    const nextCategory = prefilledCategory ?? fallbackCategory;
+    const categoryDefinition = nextCategory
+      ? categoryMap.get(nextCategory.toLowerCase())
       : undefined;
 
     setEntryForm(
@@ -1047,8 +1252,9 @@ export const App = () => {
     setEntryForm((current) => ({
       ...current,
       categoryLocked,
-      categoria: prefilledCategory ?? current.categoria,
+      categoria: nextCategory || current.categoria,
     }));
+    setSelectedTemplateId('');
     setFormError('');
     setModalState({
       lockedCategory: categoryLocked ? prefilledCategory : undefined,
@@ -1060,6 +1266,7 @@ export const App = () => {
   const openEditEntryModal = (entry: KnowledgeEntry) => {
     const categoryDefinition = categoryMap.get(entry.categoria.toLowerCase());
     setEntryForm(buildEntryFormState(entry, categoryDefinition, false));
+    setSelectedTemplateId('');
     setFormError('');
     setModalState({ entryId: entry.id, mode: 'edit', type: 'entry' });
   };
@@ -1068,6 +1275,18 @@ export const App = () => {
     setCategoryForm(buildCategoryFormState());
     setFormError('');
     setModalState({ mode: 'create', type: 'category' });
+  };
+
+  const openCreateTemplateModal = () => {
+    setTemplateForm(buildTemplateFormState(undefined, manualData.categories[0]?.name ?? ''));
+    setFormError('');
+    setModalState({ mode: 'create', type: 'template' });
+  };
+
+  const openEditTemplateModal = (template: EntryTemplate) => {
+    setTemplateForm(buildTemplateFormState(template));
+    setFormError('');
+    setModalState({ mode: 'edit', templateId: template.id, type: 'template' });
   };
 
   const openCategoryModal = (categoryName: string) => {
@@ -1084,6 +1303,8 @@ export const App = () => {
   const closeModal = () => {
     setModalState(null);
     setCategoryForm(null);
+    setTemplateForm(null);
+    setSelectedTemplateId('');
     setFormError('');
   };
 
@@ -1178,19 +1399,156 @@ export const App = () => {
 
       const writeText = (
         text: string,
-        options: { color?: [number, number, number]; fontSize?: number; fontStyle?: string; lineGap?: number; maxWidth?: number } = {},
+        options: {
+          color?: [number, number, number];
+          fontSize?: number;
+          fontStyle?: string;
+          lineGap?: number;
+          maxWidth?: number;
+          x?: number;
+        } = {},
       ) => {
         const fontSize = options.fontSize ?? 11;
         const lineGap = options.lineGap ?? 1.6;
         const maxWidth = options.maxWidth ?? contentWidth;
+        const x = options.x ?? margin;
         pdf.setFont('helvetica', options.fontStyle ?? 'normal');
         pdf.setFontSize(fontSize);
         pdf.setTextColor(...(options.color ?? [30, 41, 59]));
         const lines = pdf.splitTextToSize(text, maxWidth) as string[];
         const lineHeight = (fontSize * 0.3528) * lineGap;
         ensureSpace(lines.length * lineHeight + 2);
-        pdf.text(lines, margin, cursorY);
+        pdf.text(lines, x, cursorY);
         cursorY += lines.length * lineHeight + 2;
+      };
+
+      const writeInlineText = (
+        text: string,
+        options: {
+          color?: [number, number, number];
+          fontSize?: number;
+          fontStyle?: 'bold' | 'normal';
+          lineGap?: number;
+          maxWidth?: number;
+          x?: number;
+        } = {},
+      ) => {
+        const fontSize = options.fontSize ?? 11;
+        const lineGap = options.lineGap ?? 1.6;
+        const x = options.x ?? margin;
+        const maxWidth = options.maxWidth ?? contentWidth;
+        const baseColor = options.color ?? [30, 41, 59];
+        const baseFontStyle = options.fontStyle ?? 'normal';
+        const segments = parsePdfInlineSegments(text);
+        const pieces: Array<PdfInlineSegment & { text: string }> = [];
+
+        segments.forEach((segment) => {
+          const tokens = segment.text.match(/\S+\s*|\s+/g) ?? [segment.text];
+
+          tokens.forEach((token) => {
+            if (token.length) {
+              pieces.push({
+                ...segment,
+                text: token,
+              });
+            }
+          });
+        });
+
+        const measurePieceWidth = (piece: PdfInlineSegment) => {
+          pdf.setFont('helvetica', piece.type === 'link' ? 'normal' : baseFontStyle);
+          pdf.setFontSize(fontSize);
+          return pdf.getTextWidth(piece.text);
+        };
+
+        const wrappedLines: PdfInlineSegment[][] = [];
+        let currentLine: PdfInlineSegment[] = [];
+        let currentWidth = 0;
+
+        const pushCurrentLine = () => {
+          wrappedLines.push(currentLine.length ? currentLine : [{ text: ' ', type: 'text' }]);
+          currentLine = [];
+          currentWidth = 0;
+        };
+
+        const appendPiece = (piece: PdfInlineSegment) => {
+          const pieceWidth = measurePieceWidth(piece);
+
+          if (!currentLine.length || currentWidth + pieceWidth <= maxWidth) {
+            currentLine.push(piece);
+            currentWidth += pieceWidth;
+            return;
+          }
+
+          pushCurrentLine();
+          currentLine.push(piece);
+          currentWidth = pieceWidth;
+        };
+
+        pieces.forEach((piece) => {
+          const pieceWidth = measurePieceWidth(piece);
+
+          if (pieceWidth <= maxWidth) {
+            appendPiece(piece);
+            return;
+          }
+
+          let chunk = '';
+
+          for (const character of piece.text) {
+            const candidate = `${chunk}${character}`;
+            const candidatePiece = { ...piece, text: candidate };
+
+            if (measurePieceWidth(candidatePiece) > maxWidth && chunk) {
+              appendPiece({ ...piece, text: chunk });
+              chunk = character;
+              continue;
+            }
+
+            chunk = candidate;
+          }
+
+          if (chunk) {
+            appendPiece({ ...piece, text: chunk });
+          }
+        });
+
+        if (currentLine.length) {
+          pushCurrentLine();
+        }
+
+        const lineHeight = fontSize * 0.3528 * lineGap;
+        ensureSpace(wrappedLines.length * lineHeight + 2);
+
+        wrappedLines.forEach((linePieces, lineIndex) => {
+          let cursorX = x;
+          const lineY = cursorY + lineIndex * lineHeight;
+
+          linePieces.forEach((piece) => {
+            const isLink = piece.type === 'link' && piece.href;
+            const pieceColor = isLink ? [37, 99, 235] as [number, number, number] : baseColor;
+
+            pdf.setFont('helvetica', isLink ? 'normal' : baseFontStyle);
+            pdf.setFontSize(fontSize);
+            pdf.setTextColor(...pieceColor);
+            pdf.text(piece.text, cursorX, lineY);
+
+            const pieceWidth = measurePieceWidth(piece);
+
+            if (isLink) {
+              pdf.setDrawColor(...pieceColor);
+              pdf.setLineWidth(0.2);
+              pdf.line(cursorX, lineY + 0.6, cursorX + pieceWidth, lineY + 0.6);
+              pdf.link(cursorX, lineY - fontSize * 0.28, pieceWidth, lineHeight, {
+                url: piece.href!,
+              });
+            }
+
+            cursorX += pieceWidth;
+          });
+        });
+
+        cursorY += wrappedLines.length * lineHeight + 2;
       };
 
       const writeSectionTitle = (title: string) => {
@@ -1582,25 +1940,121 @@ export const App = () => {
       const writeListBlock = (items: PdfListItem[]) => {
         const markerWidth = 12;
         const itemGap = 2.5;
+        const indentWidth = 8;
 
         items.forEach((item) => {
-          const itemLines = pdf.splitTextToSize(
-            item.text,
-            contentWidth - markerWidth,
-          ) as string[];
+          const itemX = margin + item.indentLevel * indentWidth;
+          const textX = itemX + markerWidth;
+          const textWidth = Math.max(24, pageWidth - margin - textX);
+          const segments = parsePdfInlineSegments(item.text);
+          const measurePieceWidth = (piece: PdfInlineSegment) => {
+            pdf.setFont('helvetica', 'normal');
+            pdf.setFontSize(10);
+            return pdf.getTextWidth(piece.text);
+          };
+          const pieces: PdfInlineSegment[] = [];
+
+          segments.forEach((segment) => {
+            const tokens = segment.text.match(/\S+\s*|\s+/g) ?? [segment.text];
+            tokens.forEach((token) => {
+              if (token.length) {
+                pieces.push({ ...segment, text: token });
+              }
+            });
+          });
+
+          const lines: PdfInlineSegment[][] = [];
+          let currentLine: PdfInlineSegment[] = [];
+          let currentWidth = 0;
+
+          const pushLine = () => {
+            lines.push(currentLine.length ? currentLine : [{ text: ' ', type: 'text' }]);
+            currentLine = [];
+            currentWidth = 0;
+          };
+
+          const appendPiece = (piece: PdfInlineSegment) => {
+            const pieceWidth = measurePieceWidth(piece);
+
+            if (!currentLine.length || currentWidth + pieceWidth <= textWidth) {
+              currentLine.push(piece);
+              currentWidth += pieceWidth;
+              return;
+            }
+
+            pushLine();
+            currentLine.push(piece);
+            currentWidth = pieceWidth;
+          };
+
+          pieces.forEach((piece) => {
+            const pieceWidth = measurePieceWidth(piece);
+
+            if (pieceWidth <= textWidth) {
+              appendPiece(piece);
+              return;
+            }
+
+            let chunk = '';
+
+            for (const character of piece.text) {
+              const candidate = `${chunk}${character}`;
+              const candidatePiece = { ...piece, text: candidate };
+
+              if (measurePieceWidth(candidatePiece) > textWidth && chunk) {
+                appendPiece({ ...piece, text: chunk });
+                chunk = character;
+                continue;
+              }
+
+              chunk = candidate;
+            }
+
+            if (chunk) {
+              appendPiece({ ...piece, text: chunk });
+            }
+          });
+
+          if (currentLine.length) {
+            pushLine();
+          }
+
           const lineHeight = 10 * 0.3528 * 1.55;
-          const itemHeight = itemLines.length * lineHeight + 2;
+          const itemHeight = lines.length * lineHeight + 2;
 
           ensureSpace(itemHeight + itemGap);
           pdf.setFont('helvetica', 'bold');
           pdf.setFontSize(10);
           pdf.setTextColor(51, 65, 85);
-          pdf.text(item.marker, margin, cursorY + 4);
+          pdf.text(item.marker, itemX, cursorY + 4);
 
-          pdf.setFont('helvetica', 'normal');
-          pdf.setFontSize(10);
-          pdf.setTextColor(15, 23, 42);
-          pdf.text(itemLines, margin + markerWidth, cursorY + 4);
+          lines.forEach((linePieces, lineIndex) => {
+            let cursorX = textX;
+            const lineY = cursorY + 4 + lineIndex * lineHeight;
+
+            linePieces.forEach((piece) => {
+              const isLink = piece.type === 'link' && piece.href;
+              const pieceColor = isLink ? [37, 99, 235] as [number, number, number] : [15, 23, 42] as [number, number, number];
+              const pieceWidth = measurePieceWidth(piece);
+
+              pdf.setFont('helvetica', 'normal');
+              pdf.setFontSize(10);
+              pdf.setTextColor(...pieceColor);
+              pdf.text(piece.text, cursorX, lineY);
+
+              if (isLink) {
+                pdf.setDrawColor(...pieceColor);
+                pdf.setLineWidth(0.2);
+                pdf.line(cursorX, lineY + 0.6, cursorX + pieceWidth, lineY + 0.6);
+                pdf.link(cursorX, lineY - 2.8, pieceWidth, lineHeight, {
+                  url: piece.href!,
+                });
+              }
+
+              cursorX += pieceWidth;
+            });
+          });
+
           cursorY += itemHeight + itemGap;
         });
       };
@@ -1700,7 +2154,7 @@ export const App = () => {
         const matches = Array.from(line.matchAll(markdownImagePattern));
 
         if (!matches.length) {
-          writeText(normalizePdfText(line));
+          writeInlineText(normalizePdfText(line));
           return;
         }
 
@@ -1712,7 +2166,7 @@ export const App = () => {
           const beforeText = line.slice(lastIndex, matchIndex).trim();
 
           if (beforeText) {
-            writeText(normalizePdfText(beforeText));
+            writeInlineText(normalizePdfText(beforeText));
           }
 
           await writeImageToPdf(imageSource);
@@ -1721,7 +2175,7 @@ export const App = () => {
 
         const afterText = line.slice(lastIndex).trim();
         if (afterText) {
-          writeText(normalizePdfText(afterText));
+          writeInlineText(normalizePdfText(afterText));
         }
       };
 
@@ -1761,12 +2215,63 @@ export const App = () => {
         }
 
         const textLines = block.content
-          .split('\n')
-          .map((line) => line.trim());
+          .split('\n');
 
-        for (const line of textLines) {
+        for (const rawLine of textLines) {
+          const normalizedLine = normalizeIndentation(rawLine);
+          const line = stripLeadingWhitespace(normalizedLine).trimEnd();
+
           if (!line) {
             cursorY += 2.5;
+            continue;
+          }
+
+          const indentLevel = getIndentLevel(normalizedLine);
+          const indentWidth = indentLevel * 8;
+          const originalMargin = margin;
+          const originalContentWidth = contentWidth;
+
+          if (indentWidth > 0) {
+            const scopedWidth = Math.max(30, originalContentWidth - indentWidth);
+            const writeIndentedLine = async () => {
+              const matches = Array.from(line.matchAll(markdownImagePattern));
+
+              if (!matches.length) {
+                writeInlineText(normalizePdfText(line), {
+                  maxWidth: scopedWidth,
+                  x: originalMargin + indentWidth,
+                });
+                return;
+              }
+
+              let lastIndex = 0;
+
+              for (const match of matches) {
+                const [fullMatch, , imageSource = ''] = match;
+                const matchIndex = match.index ?? 0;
+                const beforeText = line.slice(lastIndex, matchIndex).trim();
+
+                if (beforeText) {
+                  writeInlineText(normalizePdfText(beforeText), {
+                    maxWidth: scopedWidth,
+                    x: originalMargin + indentWidth,
+                  });
+                }
+
+                await writeImageToPdf(imageSource);
+                lastIndex = matchIndex + fullMatch.length;
+              }
+
+              const afterText = line.slice(lastIndex).trim();
+              if (afterText) {
+                writeInlineText(normalizePdfText(afterText), {
+                  maxWidth: scopedWidth,
+                  x: originalMargin + indentWidth,
+                });
+              }
+            };
+
+            await writeIndentedLine();
             continue;
           }
 
@@ -1836,11 +2341,10 @@ export const App = () => {
 
     const normalizedCategoryKey = trimmedCategory.toLowerCase();
     const existingCategory = categoryMap.get(normalizedCategoryKey);
-    const isNewCategory = !existingCategory;
 
-    if (isNewCategory && !entryForm.categoryDescription.trim()) {
+    if (!existingCategory) {
       setFormError(
-        'Las categorias nuevas necesitan una descripcion para el bloque de la Home.',
+        'La ficha debe pertenecer a una seccion existente. Crea primero la seccion desde la Home si aun no existe.',
       );
       return;
     }
@@ -1885,10 +2389,7 @@ export const App = () => {
         pasos: splitLines(entryForm.pasos),
         tags:
           entryForm.tags.trim().length > 0
-            ? entryForm.tags
-                .split(',')
-                .map((tag) => tag.trim())
-                .filter(Boolean)
+            ? normalizeTags(entryForm.tags)
             : Array.from(
                 new Set(
                   [trimmedCategory, trimmedTitle]
@@ -1908,20 +2409,9 @@ export const App = () => {
             )
           : [...currentManualData.entries, nextEntry];
 
-      const nextCategories = isNewCategory
-        ? [
-            ...currentManualData.categories,
-            {
-              color: entryForm.categoryColor,
-              description: entryForm.categoryDescription.trim(),
-              name: trimmedCategory,
-            },
-          ]
-        : currentManualData.categories;
-
       return {
         ...currentManualData,
-        categories: deriveCategories(nextEntries, nextCategories),
+        categories: deriveCategories(nextEntries, currentManualData.categories),
         entries: nextEntries,
       };
     });
@@ -1987,6 +2477,180 @@ export const App = () => {
     });
 
     closeModal();
+  };
+
+  const handleTemplateSave = () => {
+    if (!templateForm || modalState?.type !== 'template') {
+      return;
+    }
+
+    const trimmedName = templateForm.name.trim();
+    const trimmedContent = templateForm.contenido.trim();
+
+    if (!trimmedName || !trimmedContent) {
+      setFormError(
+        'El nombre y el contenido base son obligatorios para guardar la plantilla.',
+      );
+      return;
+    }
+
+    const trimmedCategory = templateForm.categoria.trim();
+    if (
+      trimmedCategory &&
+      !manualData.categories.some(
+        (category) => category.name.toLowerCase() === trimmedCategory.toLowerCase(),
+      )
+    ) {
+      setFormError(
+        'La seccion sugerida de la plantilla debe existir antes de guardarla.',
+      );
+      return;
+    }
+
+    const originalTemplateId =
+      modalState.mode === 'edit' ? modalState.templateId : undefined;
+    const customTemplateId = templateForm.id.trim();
+    const duplicateTemplateId = customTemplateId
+      ? manualData.templates.some(
+          (template) =>
+            template.id === customTemplateId && template.id !== originalTemplateId,
+        )
+      : false;
+
+    if (duplicateTemplateId) {
+      setFormError(
+        'Ya existe una plantilla con ese ID. Usa otro identificador o deja el campo vacio para autogenerarlo.',
+      );
+      return;
+    }
+
+    updateManualData((currentManualData) => {
+      const nextId = ensureUniqueEntryId(
+        templateForm.id || `plantilla-${trimmedName}`,
+        currentManualData.templates.map((template) => ({
+          id: template.id,
+        })) as KnowledgeEntry[],
+        originalTemplateId,
+      );
+
+      const nextTemplate = normalizeTemplate({
+        categoria: trimmedCategory || undefined,
+        comandos: templateForm.comandos
+          .map((command) => ({
+            label: command.label.trim(),
+            value: command.value,
+          }))
+          .filter((command) => command.label.length > 0),
+        contenido: trimmedContent,
+        id: nextId,
+        name: trimmedName,
+        pasos: splitLines(templateForm.pasos),
+        tags: normalizeTags(templateForm.tags),
+        titulo: templateForm.titulo.trim(),
+        updatedAt: getCurrentIsoDate(),
+      });
+
+      const nextTemplates =
+        modalState.mode === 'edit'
+          ? currentManualData.templates.map((template) =>
+              template.id === modalState.templateId ? nextTemplate : template,
+            )
+          : [...currentManualData.templates, nextTemplate];
+
+      return {
+        ...currentManualData,
+        templates: nextTemplates,
+      };
+    });
+
+    closeModal();
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    updateManualData((currentManualData) => ({
+      ...currentManualData,
+      templates: currentManualData.templates.filter(
+        (template) => template.id !== templateId,
+      ),
+    }));
+
+    closeModal();
+  };
+
+  const handleApplySelectedTemplate = () => {
+    if (!selectedTemplateId) {
+      setFormError('Selecciona una plantilla antes de aplicarla.');
+      return;
+    }
+
+    const template = manualData.templates.find(
+      (currentTemplate) => currentTemplate.id === selectedTemplateId,
+    );
+
+    if (!template) {
+      setFormError('No se ha encontrado la plantilla seleccionada.');
+      return;
+    }
+
+    setEntryForm((current) => applyTemplateToEntryForm(current, template));
+    setFormError('');
+  };
+
+  const handleSaveCurrentEntryAsTemplate = () => {
+    setTemplateForm(
+      buildTemplateFormState({
+        categoria: entryForm.categoria.trim() || undefined,
+        comandos: entryForm.comandos
+          .map((command) => ({
+            label: command.label.trim(),
+            value: command.value,
+          }))
+          .filter((command) => command.label.length > 0),
+        contenido: entryForm.contenido,
+        id: '',
+        name: entryForm.titulo.trim()
+          ? `Plantilla ${entryForm.titulo.trim()}`
+          : '',
+        pasos: splitLines(entryForm.pasos),
+        tags: normalizeTags(entryForm.tags),
+        titulo: entryForm.titulo.trim(),
+        updatedAt: getCurrentIsoDate(),
+      }),
+    );
+    setFormError('');
+    setModalState({ mode: 'create', type: 'template' });
+  };
+
+  const openCreateEntryWithTemplate = (template: EntryTemplate) => {
+    const preferredCategory =
+      activeCategoryFilter || template.categoria || manualData.categories[0]?.name || '';
+    const shouldLockCategory = Boolean(activeCategoryFilter);
+    const categoryDefinition = preferredCategory
+      ? categoryMap.get(preferredCategory.toLowerCase())
+      : undefined;
+    const baseForm = buildEntryFormState(
+      undefined,
+      categoryDefinition,
+      shouldLockCategory,
+    );
+
+    setEntryForm(
+      applyTemplateToEntryForm(
+        {
+          ...baseForm,
+          categoria: preferredCategory,
+          categoryLocked: shouldLockCategory,
+        },
+        template,
+      ),
+    );
+    setSelectedTemplateId(template.id);
+    setFormError('');
+    setModalState({
+      lockedCategory: shouldLockCategory ? preferredCategory : undefined,
+      mode: 'create',
+      type: 'entry',
+    });
   };
 
   const handleDeleteEntry = (entryId: string) => {
@@ -2220,8 +2884,6 @@ export const App = () => {
   const activeEntryCategory = entryForm.categoria.trim()
     ? categoryMap.get(entryForm.categoria.trim().toLowerCase())
     : undefined;
-  const isCreatingNewCategory =
-    entryForm.categoria.trim().length > 0 && !activeEntryCategory;
   const entryEditorColorKey = (
     entryForm.categoryColor ||
     activeEntryCategory?.color ||
@@ -2229,6 +2891,18 @@ export const App = () => {
   ) as CategoryColorKey;
   const entryThemeVars = buildThemeVars(entryEditorColorKey);
   const categoryThemeVars = buildThemeVars(categoryForm?.color ?? 'blue');
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+    setActiveCategoryFilter('');
+    setActiveTagFilter('');
+  };
+  const handleCategoryFilter = (categoryName: string) => {
+    setActiveCategoryFilter(categoryName);
+  };
+  const handleTagFilter = (tag: string) => {
+    setActiveTagFilter(tag.toLowerCase());
+  };
   // Recordatorio: Si se implementa una lógica Java para la persistencia de estos cambios o el procesado de comandos en el servidor, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos y configuración.
   const toolbarContainerStyle = {
     ...entryThemeVars,
@@ -2294,6 +2968,21 @@ export const App = () => {
         ),
     },
     {
+      buttonLabel: 'Enlace',
+      icon: 'lnk',
+      label: 'Enlace',
+      onClick: () =>
+        updateContentSelection(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
+          '[',
+          '](https://)',
+          'texto del enlace',
+        ),
+    },
+    {
       buttonLabel: 'Lista',
       icon: '*',
       label: 'Lista',
@@ -2319,6 +3008,18 @@ export const App = () => {
             setEntryForm((current) => ({ ...current, contenido: nextValue })),
           (lineIndex) => `${lineIndex + 1}. `,
           'Primer elemento',
+        ),
+    },
+    {
+      buttonLabel: 'Tab',
+      icon: '>>',
+      label: 'Tab',
+      onClick: () =>
+        indentSelectedLines(
+          contentEditorRef.current,
+          entryForm.contenido,
+          (nextValue) =>
+            setEntryForm((current) => ({ ...current, contenido: nextValue })),
         ),
     },
     {
@@ -2474,11 +3175,11 @@ export const App = () => {
         headerActions={headerActions}
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}
-        onHomeClick={() => setSearchTerm('')}
+        onHomeClick={clearAllFilters}
         sidebarContent={sidebarContent}
       >
         <section className="space-y-5 sm:space-y-6">
-          {hasSearchTerm ? (
+          {hasActiveFilters ? (
             <>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -2487,8 +3188,29 @@ export const App = () => {
                   </h2>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
                     {results.length} coincidencia{results.length === 1 ? '' : 's'} para{' '}
-                    <span className="font-medium text-slate-800 dark:text-slate-100">"{searchTerm}"</span>.
+                    <span className="font-medium text-slate-800 dark:text-slate-100">
+                      {searchTerm.trim().length ? `"${searchTerm}"` : 'los filtros activos'}
+                    </span>.
                   </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {activeResultCategory ? (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                        Seccion activa: {activeResultCategory.name}
+                      </span>
+                    ) : null}
+                    {activeTagFilter ? (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-sky-300 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-200">
+                        Tag activo: #{activeTagFilter}
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900"
+                    >
+                      Limpiar filtro
+                    </button>
+                  </div>
                 </div>
 
                 {activeResultCategory ? (
@@ -2524,6 +3246,7 @@ export const App = () => {
 
                     return (
                       <ResultCard
+                        activeTag={activeTagFilter}
                         key={entry.id}
                         categoryColorKey={category?.color}
                         entry={entry}
@@ -2531,6 +3254,7 @@ export const App = () => {
                         onDeleteEntry={handleDeleteEntry}
                         onEditEntry={openEditEntryModal}
                         onExportPdf={handleExportEntryPdf}
+                        onTagClick={handleTagFilter}
                         onTogglePin={handleTogglePinEntry}
                         pdfIsGenerating={exportEntryId === entry.id}
                       />
@@ -2563,26 +3287,53 @@ export const App = () => {
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={openCreateCategoryModal}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
-                >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    className="h-5 w-5"
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={openCreateTemplateModal}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-sky-500/60 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 hover:text-sky-800 dark:border-sky-400/50 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15 dark:hover:text-sky-200"
                   >
-                    <path
-                      d="M10 4v12M4 10h12"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeWidth="1.8"
-                    />
-                  </svg>
-                  Nueva Sección
-                </button>
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      className="h-5 w-5"
+                    >
+                      <path
+                        d="M6 3.5h8a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 14 16.5H6A1.5 1.5 0 0 1 4.5 15V5A1.5 1.5 0 0 1 6 3.5Z"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                      />
+                      <path
+                        d="M7.5 7h5M7.5 10h5M7.5 13h3"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    Nueva Plantilla
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openCreateCategoryModal}
+                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      className="h-5 w-5"
+                    >
+                      <path
+                        d="M10 4v12M4 10h12"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeWidth="1.8"
+                      />
+                    </svg>
+                    Nueva Sección
+                  </button>
+                </div>
               </div>
 
               <div className="mt-4 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
@@ -2607,6 +3358,7 @@ export const App = () => {
 
                       return (
                         <ResultCard
+                          activeTag={activeTagFilter}
                           key={entry.id}
                           categoryColorKey={category?.color}
                           entry={entry}
@@ -2614,11 +3366,83 @@ export const App = () => {
                           onDeleteEntry={handleDeleteEntry}
                           onEditEntry={openEditEntryModal}
                           onExportPdf={handleExportEntryPdf}
+                          onTagClick={handleTagFilter}
                           onTogglePin={handleTogglePinEntry}
                           pdfIsGenerating={exportEntryId === entry.id}
                         />
                       );
                     })}
+                  </div>
+                </section>
+              ) : null}
+
+              {manualData.templates.length ? (
+                <section className="mt-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                      Plantillas
+                    </h3>
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      {manualData.templates.length} plantilla{manualData.templates.length === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-4 md:grid-cols-2">
+                    {manualData.templates.map((template) => (
+                      <div
+                        key={template.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h4 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                              {template.name}
+                            </h4>
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                              {template.categoria
+                                ? `Seccion sugerida: ${template.categoria}`
+                                : 'Reusable en distintas secciones'}
+                            </p>
+                          </div>
+                          <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
+                            {template.id}
+                          </span>
+                        </div>
+
+                        {template.tags.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {template.tags.map((tag) => (
+                              <span
+                                key={`${template.id}-${tag}`}
+                                className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                          {template.contenido}
+                        </p>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openCreateEntryWithTemplate(template)}
+                            className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+                          >
+                            Usar en ficha
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditTemplateModal(template)}
+                            className="rounded-xl border border-sky-600 bg-sky-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500"
+                          >
+                            Editar plantilla
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </section>
               ) : null}
@@ -2640,7 +3464,7 @@ export const App = () => {
                       <div className="flex items-start justify-between gap-3">
                         <button
                           type="button"
-                          onClick={() => setSearchTerm(category.name)}
+                          onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 flex-1 text-left"
                         >
                           <span className="inline-flex rounded-full border border-current/15 px-3 py-2 text-sm font-medium">
@@ -2736,6 +3560,13 @@ export const App = () => {
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
+                    onClick={handleSaveCurrentEntryAsTemplate}
+                    className="rounded-xl border border-sky-600 bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500"
+                  >
+                    Guardar como plantilla
+                  </button>
+                  <button
+                    type="button"
                     onClick={closeModal}
                     className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
                   >
@@ -2764,11 +3595,40 @@ export const App = () => {
                         </p>
                       </div>
 
+                      {manualData.templates.length ? (
+                        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60 md:grid-cols-[minmax(0,1fr)_auto]">
+                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Plantilla
+                            <select
+                              value={selectedTemplateId}
+                              onChange={(event) => setSelectedTemplateId(event.target.value)}
+                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                            >
+                              <option value="">Selecciona una plantilla</option>
+                              {manualData.templates.map((template) => (
+                                <option key={template.id} value={template.id}>
+                                  {template.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <div className="flex items-end">
+                            <button
+                              type="button"
+                              onClick={handleApplySelectedTemplate}
+                              className="w-full rounded-xl border border-sky-600 bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500 md:w-auto"
+                            >
+                              Aplicar plantilla
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
                       <div className="grid gap-4 md:grid-cols-2">
                         <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          Categoria
-                          <input
-                            list="existing-categories"
+                          Seccion
+                          <select
                             value={entryForm.categoria}
                             onChange={(event) =>
                               setEntryForm((current) => ({
@@ -2778,13 +3638,18 @@ export const App = () => {
                             }
                             disabled={entryForm.categoryLocked}
                             className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white disabled:bg-slate-100 disabled:text-slate-500 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
-                            placeholder="Ej. BBDD"
-                          />
-                          <datalist id="existing-categories">
+                          >
+                            <option value="">
+                              {manualData.categories.length
+                                ? 'Selecciona una seccion'
+                                : 'No hay secciones creadas'}
+                            </option>
                             {manualData.categories.map((category) => (
-                              <option key={category.name} value={category.name} />
+                              <option key={category.name} value={category.name}>
+                                {category.name}
+                              </option>
                             ))}
-                          </datalist>
+                          </select>
                         </label>
 
                         <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -2827,8 +3692,11 @@ export const App = () => {
                               }))
                             }
                             className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                            placeholder="tag1, tag2, tag3"
+                            placeholder="oracle, produccion, incidencia, rga"
                           />
+                          <p className="text-xs font-normal leading-5 text-slate-500 dark:text-slate-400">
+                            Usa de 2 a 5 tags cortos para busqueda, separados por comas. Convencion recomendada: tecnologia, entorno, tipo de tarea y sistema o negocio. Ejemplo: oracle, produccion, incidencia, rga.
+                          </p>
                         </label>
                       </div>
 
@@ -2840,42 +3708,13 @@ export const App = () => {
                           </span>
                           . Para cambiarla, vuelve a la Home y entra desde otra seccion.
                         </div>
-                      ) : isCreatingNewCategory ? (
-                        <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[minmax(0,1fr)_180px]">
-                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Descripcion de la seccion
-                            <input
-                              value={entryForm.categoryDescription}
-                              onChange={(event) =>
-                                setEntryForm((current) => ({
-                                  ...current,
-                                  categoryDescription: event.target.value,
-                                }))
-                              }
-                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                              placeholder="Resumen corto para el bloque de la Home"
-                            />
-                          </label>
-
-                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Color de la seccion
-                            <select
-                              value={entryForm.categoryColor}
-                              onChange={(event) =>
-                                setEntryForm((current) => ({
-                                  ...current,
-                                  categoryColor: event.target.value as CategoryColorKey,
-                                }))
-                              }
-                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                            >
-                              {categoryColorOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
+                      ) : !manualData.categories.length ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                          Antes de crear fichas necesitas al menos una seccion. Crea la seccion desde la Home y luego vuelve aqui.
+                        </div>
+                      ) : !activeEntryCategory ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                          Selecciona una seccion existente para que la ficha quede bien organizada.
                         </div>
                       ) : activeEntryCategory ? (
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
@@ -2958,6 +3797,22 @@ export const App = () => {
                               contenido: event.target.value,
                             }))
                           }
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Tab') {
+                              return;
+                            }
+
+                            event.preventDefault();
+                            indentSelectedLines(
+                              contentEditorRef.current,
+                              entryForm.contenido,
+                              (nextValue) =>
+                                setEntryForm((current) => ({
+                                  ...current,
+                                  contenido: nextValue,
+                                })),
+                            );
+                          }}
                           className={`themed-field min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white ${isUploadingImage ? 'cursor-wait' : ''}`}
                           placeholder="# Titulo de seccion&#10;&#10;Escribe aqui tu documentacion en Markdown..."
                         />
@@ -3151,7 +4006,7 @@ export const App = () => {
                 </div>
               </div>
             </div>
-          ) : (
+          ) : modalState.type === 'category' ? (
             <div className="flex h-full items-center justify-center p-4">
               <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900" style={categoryThemeVars}>
                 <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
@@ -3268,6 +4123,281 @@ export const App = () => {
                     className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
                   >
                     Guardar cambios
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full items-center justify-center p-4">
+              <div className="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      {modalState.mode === 'create'
+                        ? 'Nueva plantilla'
+                        : 'Editar plantilla'}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      Define una estructura reutilizable para acelerar la creación de fichas.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    aria-label="Cerrar modal"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+                  >
+                    X
+                  </button>
+                </div>
+
+                <div className="grid gap-6 px-5 py-5 sm:px-6 sm:py-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+                  <section className="space-y-4">
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Nombre de la plantilla
+                      <input
+                        value={templateForm?.name ?? ''}
+                        onChange={(event) =>
+                          setTemplateForm((current) =>
+                            current ? { ...current, name: event.target.value } : current,
+                          )
+                        }
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                        placeholder="Ej. Plantilla Incidencia Batch"
+                      />
+                    </label>
+
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      ID de plantilla
+                      <input
+                        value={templateForm?.id ?? ''}
+                        onChange={(event) =>
+                          setTemplateForm((current) =>
+                            current ? { ...current, id: event.target.value } : current,
+                          )
+                        }
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                        placeholder="Se genera automaticamente si lo dejas vacio"
+                      />
+                    </label>
+
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Sección sugerida
+                      <select
+                        value={templateForm?.categoria ?? ''}
+                        onChange={(event) =>
+                          setTemplateForm((current) =>
+                            current ? { ...current, categoria: event.target.value } : current,
+                          )
+                        }
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                      >
+                        <option value="">Sin sección fija</option>
+                        {manualData.categories.map((category) => (
+                          <option key={category.name} value={category.name}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Título sugerido
+                      <input
+                        value={templateForm?.titulo ?? ''}
+                        onChange={(event) =>
+                          setTemplateForm((current) =>
+                            current ? { ...current, titulo: event.target.value } : current,
+                          )
+                        }
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                        placeholder="Ej. Nueva incidencia"
+                      />
+                    </label>
+
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Tags sugeridos
+                      <input
+                        value={templateForm?.tags ?? ''}
+                        onChange={(event) =>
+                          setTemplateForm((current) =>
+                            current ? { ...current, tags: event.target.value } : current,
+                          )
+                        }
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                        placeholder="batch, incidencia, produccion"
+                      />
+                    </label>
+
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Pasos sugeridos
+                      <textarea
+                        value={templateForm?.pasos ?? ''}
+                        onChange={(event) =>
+                          setTemplateForm((current) =>
+                            current ? { ...current, pasos: event.target.value } : current,
+                          )
+                        }
+                        rows={5}
+                        className="themed-field w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                        placeholder="Un paso por linea"
+                      />
+                    </label>
+                  </section>
+
+                  <section className="space-y-4">
+                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Contenido base Markdown
+                      <textarea
+                        value={templateForm?.contenido ?? ''}
+                        onChange={(event) =>
+                          setTemplateForm((current) =>
+                            current ? { ...current, contenido: event.target.value } : current,
+                          )
+                        }
+                        rows={14}
+                        className="themed-field min-h-[280px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                        placeholder="## Contexto&#10;&#10;## Pasos&#10;&#10;## Validacion"
+                      />
+                    </label>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                          Comandos y parámetros sugeridos
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTemplateForm((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    comandos: [
+                                      ...current.comandos,
+                                      { label: '', value: '' },
+                                    ],
+                                  }
+                                : current,
+                            )
+                          }
+                          className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+                        >
+                          Añadir fila
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {(templateForm?.comandos ?? []).map((command, index) => (
+                          <div
+                            key={`template-command-${index}`}
+                            className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[180px_minmax(0,1fr)_auto]"
+                          >
+                            <input
+                              value={command.label}
+                              onChange={(event) =>
+                                setTemplateForm((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        comandos: current.comandos.map(
+                                          (currentCommand, commandIndex) =>
+                                            commandIndex === index
+                                              ? {
+                                                  ...currentCommand,
+                                                  label: event.target.value,
+                                                }
+                                              : currentCommand,
+                                        ),
+                                      }
+                                    : current,
+                                )
+                              }
+                              className="themed-field rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                              placeholder="Etiqueta"
+                            />
+                            <input
+                              value={command.value}
+                              onChange={(event) =>
+                                setTemplateForm((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        comandos: current.comandos.map(
+                                          (currentCommand, commandIndex) =>
+                                            commandIndex === index
+                                              ? {
+                                                  ...currentCommand,
+                                                  value: event.target.value,
+                                                }
+                                              : currentCommand,
+                                        ),
+                                      }
+                                    : current,
+                                )
+                              }
+                              className="themed-field rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                              placeholder="Valor"
+                            />
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTemplateForm((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        comandos:
+                                          current.comandos.length === 1
+                                            ? [{ label: '', value: '' }]
+                                            : current.comandos.filter(
+                                                (_, commandIndex) =>
+                                                  commandIndex !== index,
+                                              ),
+                                      }
+                                    : current,
+                                )
+                              }
+                              className="rounded-xl border border-red-600 bg-red-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
+                            >
+                              Quitar
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {formError ? (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {formError}
+                      </div>
+                    ) : null}
+                  </section>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
+                  {modalState.mode === 'edit' && modalState.templateId ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTemplate(modalState.templateId!)}
+                      className="mr-auto rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 transition-all duration-200 hover:border-rose-300 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/20"
+                    >
+                      Eliminar plantilla
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTemplateSave}
+                    className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+                  >
+                    Guardar plantilla
                   </button>
                 </div>
               </div>

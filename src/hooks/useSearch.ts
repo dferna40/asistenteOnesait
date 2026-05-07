@@ -27,18 +27,38 @@ const buildEntrySearchBlob = (entry: KnowledgeEntry) =>
     .join(' ')
     .toLowerCase();
 
-export function useSearch(entries: KnowledgeEntry[], rawSearchTerm: string) {
+export function useSearch(
+  entries: KnowledgeEntry[],
+  rawSearchTerm: string,
+  activeCategoryFilter?: string,
+  activeTagFilter?: string,
+) {
   return useMemo(() => {
     const term = normalize(rawSearchTerm);
+    const normalizedCategoryFilter = normalize(activeCategoryFilter ?? '');
+    const normalizedTagFilter = normalize(activeTagFilter ?? '');
+    let filteredEntries = entries;
+
+    if (normalizedCategoryFilter) {
+      filteredEntries = filteredEntries.filter(
+        (entry) => normalize(entry.categoria) === normalizedCategoryFilter,
+      );
+    }
+
+    if (normalizedTagFilter) {
+      filteredEntries = filteredEntries.filter((entry) =>
+        entry.tags.some((tag) => normalize(tag) === normalizedTagFilter),
+      );
+    }
 
     if (!term) {
-      return entries;
+      return filteredEntries;
     }
 
     if (term.startsWith('/cmd')) {
       const cmdQuery = normalize(term.replace('/cmd', ''));
 
-      return entries.filter((entry) => {
+      return filteredEntries.filter((entry) => {
         const validCategory =
           entry.categoria === 'Batch' || entry.categoria === 'General';
         const hasCommands = Boolean(entry.comandos?.length);
@@ -58,7 +78,7 @@ export function useSearch(entries: KnowledgeEntry[], rawSearchTerm: string) {
     if (term.startsWith('/env')) {
       const envQuery = normalize(term.replace('/env', ''));
 
-      return entries.filter((entry) => {
+      return filteredEntries.filter((entry) => {
         if (entry.categoria !== 'Entorno') {
           return false;
         }
@@ -74,7 +94,7 @@ export function useSearch(entries: KnowledgeEntry[], rawSearchTerm: string) {
     if (term.startsWith('/uml')) {
       const umlQuery = normalize(term.replace('/uml', ''));
 
-      return entries.filter((entry) => {
+      return filteredEntries.filter((entry) => {
         if (entry.categoria !== 'UML') {
           return false;
         }
@@ -87,8 +107,6 @@ export function useSearch(entries: KnowledgeEntry[], rawSearchTerm: string) {
       });
     }
 
-    // Para cualquier implementación de lógica Java relacionada con Seguros que gestione
-    // excepciones, es obligatorio usar try-catch-resources.
-    return entries.filter((entry) => buildEntrySearchBlob(entry).includes(term));
-  }, [entries, rawSearchTerm]);
+    return filteredEntries.filter((entry) => buildEntrySearchBlob(entry).includes(term));
+  }, [activeCategoryFilter, activeTagFilter, entries, rawSearchTerm]);
 }

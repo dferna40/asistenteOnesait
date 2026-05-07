@@ -56,7 +56,7 @@
         "value": "C:\\EntornoOnesait\\EAP-7.4.0"
       }
     ],
-    "contenido": "Ubicaciones clave en C:\\EntornoOnesait para el desarrollo diario.\n\n\n1. Primer elemento- Elemento de lista\t\t\tdsfds\nwwww.google.com \n\n1. Primer elemento1.\n2. Segundo elemento\n\n## Nueva seccion",
+    "contenido": "Ubicaciones clave en C:\\EntornoOnesait para el desarrollo diario.\n\n\n\ndsfds\n\n1. Primer elemento1.\n2. Segundo elemento\n\n## Nueva seccion",
     "id": "entorno-local-rutas",
     "pasos": [],
     "tags": [
@@ -67,7 +67,7 @@
     ],
     "titulo": "Rutas Criticas Locales",
     "isPinned": false,
-    "updatedAt": "2026-05-07T09:55:39.587Z"
+    "updatedAt": "2026-05-07T08:39:16.087Z"
   },
   {
     "id": "ui-literales",

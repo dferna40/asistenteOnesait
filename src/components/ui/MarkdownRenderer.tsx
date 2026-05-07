@@ -252,13 +252,13 @@ const createMarkdownComponents = (
     </button>
   ),
   li: (props: ComponentProps<'li'>) => (
-    <li {...props} className="leading-7 text-slate-700 dark:text-slate-200 marker:text-slate-500 dark:marker:text-slate-300" />
+    <li {...props} className="whitespace-pre-wrap leading-7 text-slate-700 dark:text-slate-200 marker:text-slate-500 dark:marker:text-slate-300" />
   ),
   ol: (props: ComponentProps<'ol'>) => (
     <ol {...props} className="my-4 list-decimal space-y-2 pl-5" />
   ),
   p: (props: ComponentProps<'p'>) => (
-    <p {...props} className="my-3 leading-7 text-slate-700 dark:text-slate-200" />
+    <p {...props} className="my-3 whitespace-pre-wrap leading-7 text-slate-700 dark:text-slate-200" />
   ),
   strong: (props: ComponentProps<'strong'>) => (
     <strong {...props} className="font-semibold text-slate-900 dark:text-white" />

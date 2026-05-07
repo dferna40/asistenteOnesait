@@ -27,10 +27,23 @@ export interface AppSettings {
   darkMode: boolean;
 }
 
+export interface EntryTemplate {
+  id: string;
+  name: string;
+  titulo: string;
+  categoria?: KnowledgeCategory;
+  contenido: string;
+  pasos?: string[];
+  comandos?: CommandOption[];
+  tags: string[];
+  updatedAt?: string;
+}
+
 export interface ManualData {
   categories: CategoryDefinition[];
   entries: KnowledgeEntry[];
   settings: AppSettings;
+  templates: EntryTemplate[];
   trash: KnowledgeEntry[];
 }
 
