@@ -14,6 +14,10 @@ import {
 } from './constants/categoryColors';
 import manualEntries from './data/manual.json';
 import { useSearch } from './hooks/useSearch';
+import {
+  clipboardCopyEventName,
+  type ClipboardCopyEventDetail,
+} from './utils/clipboard';
 import type {
   AppSettings,
   AppCustomizationSettings,
@@ -418,6 +422,12 @@ const buildThemeVars = (colorKey: CategoryColorKey): CSSProperties => {
   return {
     '--card-glow': hexToRgba(hex, 0.14),
     '--card-ring': hexToRgba(hex, 0.22),
+    '--section-gradient-accent': hexToRgba(hex, 0.14),
+    '--section-gradient-soft': hexToRgba(hex, 0.06),
+    '--section-gradient-border': hexToRgba(hex, 0.4),
+    '--section-gradient-highlight': hexToRgba(hex, 0.2),
+    '--section-pill-accent': hexToRgba(hex, 0.16),
+    '--section-pill-border': hexToRgba(hex, 0.34),
     '--field-focus': hex,
     '--field-focus-glow': hexToRgba(hex, 0.16),
   } as CSSProperties;
@@ -1115,6 +1125,7 @@ export const App = () => {
   const activeResultCategory = activeCategoryFilter
     ? categoryMap.get(activeCategoryFilter.toLowerCase())
     : undefined;
+  const activeResultThemeVars = buildThemeVars(activeResultCategory?.color ?? 'blue');
   const deleteConfirmationEntry = deleteConfirmationEntryId
     ? manualData.entries.find((entry) => entry.id === deleteConfirmationEntryId)
     : undefined;
@@ -1149,6 +1160,25 @@ export const App = () => {
       window.clearTimeout(timeoutId);
     };
   }, [saveToast]);
+
+  useEffect(() => {
+    const handleClipboardCopy = (
+      event: Event,
+    ) => {
+      const customEvent = event as CustomEvent<ClipboardCopyEventDetail>;
+
+      setSaveToast({
+        message: customEvent.detail?.message || 'Texto copiado.',
+        tone: 'success',
+      });
+    };
+
+    window.addEventListener(clipboardCopyEventName, handleClipboardCopy);
+
+    return () => {
+      window.removeEventListener(clipboardCopyEventName, handleClipboardCopy);
+    };
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -2326,7 +2356,7 @@ export const App = () => {
         });
       }
 
-      // A partir de ahora, para el código que pueda generar alguna excepción, siempre debo usar try-catch-resources en Java para garantizar el cierre seguro de los flujos del archivo PDF generado.
+  // A partir de ahora, para el código que pueda generar alguna excepción, siempre debo usar try-catch-resources en Java para garantizar el cierre seguro de los flujos del archivo PDF generado.
       pdf.save(`${entry.id}.pdf`);
     } catch (error) {
       console.error('No se pudo exportar la ficha a PDF.', error);
@@ -2814,7 +2844,7 @@ export const App = () => {
         extractManualImportSource(parsedBackup),
       );
       const importSummaryConfirmed = window.confirm(
-        `Se importaran ${nextManualData.entries.length} fichas y ${nextManualData.categories.length} secciones. El estado local actual sera reemplazado. ¿Quieres continuar?`,
+      `Se importaran ${nextManualData.entries.length} fichas y ${nextManualData.categories.length} secciones. El estado local actual sera reemplazado. ¿Quieres continuar?`,
       );
 
       if (!importSummaryConfirmed) {
@@ -3244,10 +3274,17 @@ export const App = () => {
               onSave={handleSaveCustomization}
             />
           ) : hasActiveFilters ? (
-            <>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-4">
+              <div
+                className="hero-shell animate-fade-in overflow-hidden rounded-[2rem] border border-slate-200 p-5 shadow-sm dark:border-slate-800 sm:p-6"
+                style={activeResultThemeVars}
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                  <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sky-700 dark:text-sky-300">
+                    Navegacion activa
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
                     Resultados
                   </h2>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
@@ -3258,7 +3295,10 @@ export const App = () => {
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {activeResultCategory ? (
-                      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-200">
+                      <span
+                        className="section-gradient-pill inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium text-slate-800 dark:text-slate-100"
+                        style={activeResultThemeVars}
+                      >
                         Seccion activa: {activeResultCategory.name}
                       </span>
                     ) : null}
@@ -3270,7 +3310,7 @@ export const App = () => {
                     <button
                       type="button"
                       onClick={clearAllFilters}
-                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900"
+                      className="sidebar-soft-button inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900"
                     >
                       Limpiar filtro
                     </button>
@@ -3283,7 +3323,8 @@ export const App = () => {
                     onClick={() =>
                       openCreateEntryModal(activeResultCategory.name, true)
                     }
-                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
+                    className="section-gradient-pill inline-flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
+                    style={activeResultThemeVars}
                   >
                     <svg
                       aria-hidden="true"
@@ -3301,6 +3342,7 @@ export const App = () => {
                     Añadir Ficha a {activeResultCategory.name}
                   </button>
                 ) : null}
+              </div>
               </div>
 
               {sortedResults.length ? (
@@ -3326,7 +3368,7 @@ export const App = () => {
                   })}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:px-6 sm:py-10">
+                <div className="app-surface-shell rounded-[1.8rem] border border-dashed border-slate-300 px-4 py-8 text-center shadow-sm dark:border-slate-700 sm:px-6 sm:py-10">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                     No hemos encontrado resultados
                   </h3>
@@ -3336,89 +3378,138 @@ export const App = () => {
                   </p>
                 </div>
               )}
-            </>
+            </div>
           ) : (
-            <div className="animate-fade-in rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-4">
-                  <AppLogo
-                    appIconDataUrl={customization.appIconDataUrl}
-                    appName={customization.appName}
-                    className="mt-1 h-14 w-14 shrink-0 sm:h-16 sm:w-16"
-                  />
-                  <div>
-                    <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                      {customization.heroTitle}
-                    </h2>
-                    <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
+            <div className="space-y-6">
+            <div className="hero-shell animate-fade-in overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="hero-grid relative p-5 sm:p-6 lg:p-8">
+                <div className="hero-orb hero-orb-primary" aria-hidden="true" />
+                <div className="hero-orb hero-orb-secondary" aria-hidden="true" />
+
+                <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <div className="flex items-center gap-4">
+                      <AppLogo
+                        appIconDataUrl={customization.appIconDataUrl}
+                        appName={customization.appName}
+                        className="h-16 w-16 shrink-0 sm:h-20 sm:w-20"
+                      />
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sky-700 dark:text-sky-300">
+                          Centro operativo
+                        </p>
+                        <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-[2.5rem]">
+                          {customization.heroTitle}
+                        </h2>
+                      </div>
+                    </div>
+
+                    <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
                       {customization.heroDescription}
                     </p>
-                    <div className="hidden">
-                      <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
-                    Tu centro de conocimiento inteligente: Organiza guías de
-                    trabajo, revisa el estado de tus sistemas y genera manuales
-                    profesionales listos para compartir.
+
+                    <div className="mt-5 flex flex-wrap gap-2.5">
+                      <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-200">
+                        Manuales versionados
+                      </span>
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-800 shadow-sm dark:border-sky-400/20 dark:bg-sky-500/10 dark:text-sky-200">
+                        Busqueda operativa
+                      </span>
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                        Plantillas reutilizables
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={openCreateTemplateModal}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-sky-500/60 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 hover:text-sky-800 dark:border-sky-400/50 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15 dark:hover:text-sky-200"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        className="h-5 w-5"
+                      >
+                        <path
+                          d="M6 3.5h8a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 14 16.5H6A1.5 1.5 0 0 1 4.5 15V5A1.5 1.5 0 0 1 6 3.5Z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                        />
+                        <path
+                          d="M7.5 7h5M7.5 10h5M7.5 13h3"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      Nueva Plantilla
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openCreateCategoryModal}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        className="h-5 w-5"
+                      >
+                        <path
+                          d="M10 4v12M4 10h12"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeWidth="1.8"
+                        />
+                      </svg>
+                      Nueva Seccion
+                    </button>
+                  </div>
+                </div>
+              </div>
+              </div>
+
+              <div className="border-t border-slate-200/80 bg-slate-50/80 px-5 py-3 dark:border-slate-800 dark:bg-slate-950/40 sm:px-6 lg:px-8">
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:items-center">
+                  <div className="flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-sm text-blue-900 dark:border-sky-400/20 dark:bg-sky-500/10 dark:text-sky-100">
+                    <span className="text-base leading-none" aria-hidden="true">
+                      *
+                    </span>
+                    <p className="font-medium leading-5">
+                      Recordatorio: {customization.reminderText}
                     </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        Secciones
+                      </p>
+                      <p className="mt-1.5 text-xl font-extrabold text-slate-900 dark:text-white">
+                        {manualData.categories.length}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        Fichas
+                      </p>
+                      <p className="mt-1.5 text-xl font-extrabold text-slate-900 dark:text-white">
+                        {manualData.entries.length}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        Plantillas
+                      </p>
+                      <p className="mt-1.5 text-xl font-extrabold text-slate-900 dark:text-white">
+                        {manualData.templates.length}
+                      </p>
                     </div>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={openCreateTemplateModal}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-sky-500/60 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 hover:text-sky-800 dark:border-sky-400/50 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15 dark:hover:text-sky-200"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      className="h-5 w-5"
-                    >
-                      <path
-                        d="M6 3.5h8a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 14 16.5H6A1.5 1.5 0 0 1 4.5 15V5A1.5 1.5 0 0 1 6 3.5Z"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                      />
-                      <path
-                        d="M7.5 7h5M7.5 10h5M7.5 13h3"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    Nueva Plantilla
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openCreateCategoryModal}
-                    className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 20 20"
-                      fill="none"
-                      className="h-5 w-5"
-                    >
-                      <path
-                        d="M10 4v12M4 10h12"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeWidth="1.8"
-                      />
-                    </svg>
-                    Nueva Sección
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                <span className="text-lg leading-none" aria-hidden="true">
-                  *
-                </span>
-                <p className="font-medium leading-6">
-                  Recordatorio: {customization.reminderText}
-                </p>
               </div>
 
               {quickAccessEntries.length ? (
@@ -3532,7 +3623,7 @@ export const App = () => {
                   return (
                     <div
                       key={category.name}
-                      className={`neon-card rounded-2xl border p-4 transition-all duration-200 ${theme.chip}`}
+                      className={`neon-card section-gradient-card rounded-2xl border p-4 transition-all duration-200 ${theme.chip}`}
                       style={buildThemeVars(category.color)}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -3541,7 +3632,7 @@ export const App = () => {
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 flex-1 text-left"
                         >
-                          <span className="inline-flex rounded-full border border-current/15 px-3 py-2 text-sm font-medium">
+                          <span className="section-gradient-pill inline-flex rounded-full border px-3 py-2 text-sm font-medium">
                             {category.name}
                           </span>
                           <span className="mt-2 block text-[11px] leading-5 text-slate-500 dark:text-slate-300 sm:text-xs sm:leading-5">
@@ -3602,7 +3693,7 @@ export const App = () => {
       />
 
       {saveToast ? (
-        <div className="fixed bottom-4 right-4 z-[80] max-w-sm rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
+        <div className="modal-shell fixed bottom-4 right-4 z-[80] max-w-sm rounded-2xl border border-slate-200 px-4 py-3 shadow-lg dark:border-slate-700">
           <p
             className={`text-sm font-medium ${
               saveToast.tone === 'success'
@@ -3616,10 +3707,10 @@ export const App = () => {
       ) : null}
 
       {modalState ? (
-        <div className="fixed inset-0 z-50 bg-slate-950/70">
+        <div className="modal-overlay fixed inset-0 z-50">
           {modalState.type === 'entry' ? (
-            <div className="flex h-full flex-col bg-white dark:bg-slate-900" style={entryThemeVars}>
-              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-6">
+            <div className="app-surface-shell flex h-full flex-col" style={entryThemeVars}>
+              <div className="modal-shell flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-6">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                     {modalState.mode === 'create'
@@ -3657,9 +3748,9 @@ export const App = () => {
               </div>
 
               <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-2">
-                <div className="min-h-0 overflow-y-auto border-r border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-950/70">
+                <div className="app-surface-shell min-h-0 overflow-y-auto border-r border-slate-200 dark:border-slate-800">
                   <div className="space-y-6 p-5 sm:p-6">
-                    <section className="neon-card space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                    <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div>
                         <p className="text-sm font-semibold text-slate-900 dark:text-white">
                           Contexto de la ficha
@@ -3670,7 +3761,7 @@ export const App = () => {
                       </div>
 
                       {manualData.templates.length ? (
-                        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60 md:grid-cols-[minmax(0,1fr)_auto]">
+                        <div className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-800 md:grid-cols-[minmax(0,1fr)_auto]">
                           <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                             Plantilla
                             <select
@@ -3801,7 +3892,7 @@ export const App = () => {
                       ) : null}
                     </section>
 
-                    <section className="neon-card space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                    <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div
                         className="flex flex-wrap items-center gap-2 rounded-xl border-b border-slate-200 bg-slate-50/80 px-2 py-2 dark:bg-slate-900/80 dark:border-slate-800"
                         style={toolbarContainerStyle}
@@ -3893,7 +3984,7 @@ export const App = () => {
                       </div>
                     </section>
 
-                    <section className="neon-card space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                    <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <label className="block space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                         Pasos
                         <textarea
@@ -4008,11 +4099,11 @@ export const App = () => {
                   </div>
                 </div>
 
-                <div className="min-h-0 overflow-y-auto bg-white dark:bg-slate-900">
+                <div className="app-surface-shell min-h-0 overflow-y-auto">
                   <div className="space-y-6 p-5 sm:p-6">
-                    <div className="neon-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                    <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div className="flex flex-wrap items-center gap-3">
-                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+                        <span className="section-gradient-pill inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 dark:text-slate-100" style={entryThemeVars}>
                           {entryForm.categoria || 'Sin categoria'}
                         </span>
                         <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
@@ -4030,7 +4121,7 @@ export const App = () => {
                     </div>
 
                     {splitLines(entryForm.pasos).length ? (
-                      <div className="neon-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                      <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                           Pasos
                         </h3>
@@ -4045,7 +4136,7 @@ export const App = () => {
                     {entryForm.comandos.some(
                       (command) => command.label.trim() || command.value.trim(),
                     ) ? (
-                      <div className="neon-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+                      <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                           Comandos y parametros
                         </h3>
@@ -4082,7 +4173,7 @@ export const App = () => {
             </div>
           ) : modalState.type === 'category' ? (
             <div className="flex h-full items-center justify-center p-4">
-              <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900" style={categoryThemeVars}>
+              <div className="modal-shell w-full max-w-2xl rounded-3xl border border-slate-200 shadow-2xl dark:border-slate-800" style={categoryThemeVars}>
                 <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -4203,7 +4294,7 @@ export const App = () => {
             </div>
           ) : (
             <div className="flex h-full items-center justify-center p-4">
-              <div className="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900" style={entryThemeVars}>
+              <div className="modal-shell w-full max-w-4xl rounded-3xl border border-slate-200 shadow-2xl dark:border-slate-800" style={entryThemeVars}>
                 <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -4339,7 +4430,7 @@ export const App = () => {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                          Comandos y parámetros sugeridos
+                      Comandos y parámetros sugeridos
                         </p>
                         <button
                           type="button"
@@ -4358,7 +4449,7 @@ export const App = () => {
                           }
                           className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
                         >
-                          Añadir fila
+                            Añadir fila
                         </button>
                       </div>
 
@@ -4481,15 +4572,15 @@ export const App = () => {
       ) : null}
 
       {deleteConfirmationEntry ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="modal-shell w-full max-w-md rounded-3xl border border-slate-200 p-5 shadow-2xl dark:border-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Confirmar borrado
             </h3>
             <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">
               ¿Estás seguro de que deseas mover esta ficha a la papelera?
             </p>
-            <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+            <p className="soft-subpanel mt-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-800 dark:text-slate-100">
               {deleteConfirmationEntry.titulo}
             </p>
             <div className="mt-5 flex flex-wrap justify-end gap-3">
@@ -4513,15 +4604,15 @@ export const App = () => {
       ) : null}
 
       {deleteConfirmationCategory ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-800 dark:bg-slate-900">
+        <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="modal-shell w-full max-w-md rounded-3xl border border-slate-200 p-5 shadow-2xl dark:border-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Confirmar borrado de sección
             </h3>
             <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-200">
               Esta acción eliminará la sección y sus fichas asociadas.
             </p>
-            <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+            <p className="soft-subpanel mt-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-800 dark:border-slate-800 dark:text-slate-100">
               {deleteConfirmationCategory.categoryName} ·{' '}
               {deleteConfirmationCategory.entryCount} ficha
               {deleteConfirmationCategory.entryCount === 1 ? '' : 's'}

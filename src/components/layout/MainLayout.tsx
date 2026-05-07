@@ -47,12 +47,12 @@ export function MainLayout({
   };
 
   const defaultSidebarContent = (
-    <div>
-      <p className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">
+    <section className="sidebar-panel rounded-[1.7rem] border border-slate-200/80 p-4 dark:border-slate-800">
+      <p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-slate-500 dark:text-slate-300">
         {customization.externalToolsTitle}
       </p>
       <nav aria-label="Herramientas externas">
-        <ul className="app-scrollbar max-h-72 space-y-1 overflow-y-auto pr-1">
+        <ul className="app-scrollbar max-h-72 space-y-2 overflow-y-auto pr-1">
           {customization.externalTools.map((tool) => (
             <li key={tool.name}>
               <a
@@ -60,7 +60,7 @@ export function MainLayout({
                 target="_blank"
                 rel="noreferrer"
                 onClick={closeSidebar}
-                className="inline-flex w-full items-start gap-3 rounded-lg px-2 py-1.5 text-sm leading-5 text-slate-600 transition-all duration-200 hover:bg-slate-100 hover:text-sky-700 dark:text-slate-200 dark:hover:bg-slate-800/50 dark:hover:text-white"
+                className="sidebar-link-card inline-flex w-full items-start gap-3 rounded-2xl border border-slate-200/80 px-3 py-2.5 text-sm leading-5 text-slate-600 transition-all duration-200 hover:border-sky-200 hover:text-sky-700 dark:border-slate-800 dark:text-slate-200 dark:hover:border-sky-400/20 dark:hover:text-white"
               >
                 <span>{tool.name}</span>
                 <span
@@ -74,16 +74,16 @@ export function MainLayout({
           ))}
         </ul>
       </nav>
-    </div>
+    </section>
   );
 
   const mobileSidebarPanel = (
-    <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto">
-      <div className="bg-slate-50/85 p-4 backdrop-blur supports-[backdrop-filter]:bg-slate-50/70 dark:bg-slate-900/80 dark:supports-[backdrop-filter]:bg-slate-900/70">
+    <div className="sidebar-shell app-scrollbar min-h-0 flex-1 overflow-y-auto">
+      <div className="p-4">
         <IdentityWidget customization={customization} />
       </div>
 
-      <div className="app-scrollbar border-t border-slate-100 p-4 dark:border-slate-800">
+      <div className="app-scrollbar border-t border-slate-200/70 p-4 dark:border-slate-800/90">
         <div className="space-y-6">
           {defaultSidebarContent}
           {sidebarContent}
@@ -93,12 +93,12 @@ export function MainLayout({
   );
 
   const desktopSidebarPanel = (
-    <div className="flex flex-col">
-      <div className="bg-slate-50/85 p-4 backdrop-blur supports-[backdrop-filter]:bg-slate-50/70 dark:bg-slate-900/80 dark:supports-[backdrop-filter]:bg-slate-900/70">
+    <div className="sidebar-shell flex h-full flex-col">
+      <div className="p-4">
         <IdentityWidget customization={customization} />
       </div>
 
-      <div className="app-scrollbar border-t border-slate-100 p-4 dark:border-slate-800">
+      <div className="app-scrollbar border-t border-slate-200/70 p-4 dark:border-slate-800/90">
         <div className="space-y-6">
           {defaultSidebarContent}
           {sidebarContent}
@@ -108,7 +108,7 @@ export function MainLayout({
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="app-background min-h-screen text-slate-900 dark:text-slate-100">
       <div className="flex min-h-screen">
         <div
           className={`fixed inset-0 z-40 bg-slate-950/45 transition-opacity duration-200 sm:hidden ${
@@ -119,7 +119,7 @@ export function MainLayout({
         />
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[88vw] max-w-80 flex-col overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950 sm:hidden ${
+          className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[88vw] max-w-80 flex-col overflow-hidden border-r border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/95 sm:hidden ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
           aria-label="Menu lateral movil"
@@ -130,7 +130,7 @@ export function MainLayout({
               type="button"
               onClick={closeSidebar}
               aria-label="Cerrar menu lateral"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-lg text-slate-600 transition-all duration-200 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              className="sidebar-soft-button inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-lg text-slate-600 transition-all duration-200 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300"
             >
               ×
             </button>
@@ -138,12 +138,12 @@ export function MainLayout({
           {mobileSidebarPanel}
         </aside>
 
-        <aside className="hidden w-80 shrink-0 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 sm:block">
+        <aside className="hidden w-80 shrink-0 border-r border-slate-200/80 bg-white/70 backdrop-blur dark:border-slate-800 dark:bg-slate-950/70 sm:block">
           {desktopSidebarPanel}
         </aside>
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 min-h-16 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:bg-slate-950/95 dark:supports-[backdrop-filter]:bg-slate-950/80 sm:px-6">
+          <header className="topbar-shell sticky top-0 z-30 min-h-16 border-b border-slate-200 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:supports-[backdrop-filter]:bg-slate-950/80 sm:px-6">
             {topBarContent ?? (
               <div className="flex h-full flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-4">
@@ -151,7 +151,7 @@ export function MainLayout({
                     type="button"
                     onClick={() => setIsSidebarOpen(true)}
                     aria-label="Abrir menu lateral"
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg text-slate-700 transition-all duration-200 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 sm:hidden"
+                    className="sidebar-soft-button inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-lg text-slate-700 transition-all duration-200 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 sm:hidden"
                   >
                     ☰
                   </button>

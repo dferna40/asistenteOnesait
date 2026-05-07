@@ -4,6 +4,7 @@ import {
   getCategoryColorHex,
   getCategoryTheme,
 } from '../../constants/categoryColors';
+import { copyTextToClipboard } from '../../utils/clipboard';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import type { CategoryColorKey, KnowledgeEntry } from '../../types';
 
@@ -31,22 +32,6 @@ const sensitiveLabelPattern = /\b(password|pass|clave)\b/i;
 const actionButtonBaseClass =
   'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white transition-colors dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900';
 const actionIconClass = 'icon-neon h-5 w-5';
-
-const copyToClipboard = async (text: string) => {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand('copy');
-  document.body.removeChild(textarea);
-};
 
 const isHealthCheckLabel = (label: string) => healthLabelPattern.test(label);
 const isSensitiveLabel = (label: string) => sensitiveLabelPattern.test(label);
@@ -155,6 +140,12 @@ export function ResultCard({
     '--card-glow': hexToRgba(categoryColor, 0.14),
     '--card-ring': hexToRgba(categoryColor, 0.22),
     '--icon-glow': hexToRgba(categoryColor, 0.4),
+    '--section-gradient-accent': hexToRgba(categoryColor, 0.12),
+    '--section-gradient-soft': hexToRgba(categoryColor, 0.06),
+    '--section-gradient-border': hexToRgba(categoryColor, 0.24),
+    '--section-gradient-highlight': hexToRgba(categoryColor, 0.18),
+    '--section-pill-accent': hexToRgba(categoryColor, 0.16),
+    '--section-pill-border': hexToRgba(categoryColor, 0.28),
   } as CSSProperties;
 
   // Recordatorio: Para cualquier logica Java que procese estos parametros de configuracion o acceso, es obligatorio el uso de try-catch-resources para la gestion de excepciones y cierre de flujos.
@@ -243,7 +234,7 @@ export function ResultCard({
 
   return (
     <article
-      className={`neon-card w-full rounded-2xl border border-slate-100 border-l-4 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5 ${categoryStyle.cardAccent}`}
+      className="section-gradient-card neon-card w-full rounded-[1.6rem] border border-slate-200 p-4 shadow-sm transition-all duration-200 sm:p-5"
       data-category-color={categoryColor}
       style={glowStyle}
     >
@@ -256,7 +247,7 @@ export function ResultCard({
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
           <span
-            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${categoryStyle.badge}`}
+            className={`section-gradient-pill inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${categoryStyle.badge}`}
           >
             {entry.categoria}
           </span>
@@ -452,14 +443,14 @@ export function ResultCard({
             </svg>
           </button>
 
-          <span className="w-fit rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
+          <span className="soft-subpanel w-fit rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400">
             {entry.id}
           </span>
         </div>
       </div>
 
       {isCollapsed ? (
-        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-300">
+        <div className="soft-subpanel mt-4 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
           <p className="line-clamp-3 leading-6">
             {previewText || 'Ficha colapsada. Pulsa el icono para volver a verla completa.'}
           </p>
@@ -511,14 +502,14 @@ export function ResultCard({
                   return (
                     <div
                       key={fieldKey}
-                      className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white/90 p-2.5 dark:border-slate-700 dark:bg-slate-950/50 sm:grid-cols-[minmax(96px,120px)_minmax(0,1fr)_auto] sm:items-center"
+                      className="soft-subpanel grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-2.5 dark:border-slate-700 sm:grid-cols-[minmax(96px,120px)_minmax(0,1fr)_auto] sm:items-center"
                     >
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-400">
                         {command.label}
                       </span>
 
                       <div
-                        className={`min-w-0 rounded-lg border bg-slate-50 px-2.5 py-2 font-mono text-xs text-slate-800 transition-all duration-200 dark:bg-slate-900 dark:text-slate-100 ${
+                        className={`min-w-0 rounded-lg border bg-white/75 px-2.5 py-2 font-mono text-xs text-slate-800 transition-all duration-200 dark:bg-slate-950/75 dark:text-slate-100 ${
                           isEditing ? 'shadow-sm' : 'border-slate-200 dark:border-slate-700'
                         }`}
                         style={
@@ -736,7 +727,7 @@ export function ResultCard({
 
                             <button
                               type="button"
-                              onClick={() => copyToClipboard(command.value)}
+                              onClick={() => copyTextToClipboard(command.value)}
                               aria-label={`Copiar ${command.label}`}
                               title={`Copiar ${command.label}`}
                               className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}

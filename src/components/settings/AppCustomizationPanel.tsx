@@ -97,7 +97,7 @@ export function AppCustomizationPanel({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <section className="hero-shell rounded-[2rem] border border-slate-200 p-5 shadow-sm dark:border-slate-800">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-sky-600 dark:text-sky-300">
@@ -113,7 +113,7 @@ export function AppCustomizationPanel({
             </p>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950">
+          <div className="soft-subpanel rounded-3xl border border-slate-200 p-4 dark:border-slate-700">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
               Vista previa
             </p>
@@ -138,7 +138,7 @@ export function AppCustomizationPanel({
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Branding y portada
             </h3>
@@ -148,7 +148,7 @@ export function AppCustomizationPanel({
                 <input
                   value={formState.appName}
                   onChange={(event) => updateField('appName', event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
                 />
               </label>
 
@@ -157,7 +157,7 @@ export function AppCustomizationPanel({
                 <input
                   value={formState.heroTitle}
                   onChange={(event) => updateField('heroTitle', event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
                 />
               </label>
 
@@ -169,7 +169,7 @@ export function AppCustomizationPanel({
                     updateField('heroDescription', event.target.value)
                   }
                   rows={4}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
                 />
               </label>
 
@@ -181,13 +181,13 @@ export function AppCustomizationPanel({
                     updateField('reminderText', event.target.value)
                   }
                   rows={3}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
                 />
               </label>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                 Herramientas del menu lateral
@@ -195,7 +195,7 @@ export function AppCustomizationPanel({
               <button
                 type="button"
                 onClick={handleAddTool}
-                className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700"
+                  className="rounded-xl border border-emerald-500/60 bg-emerald-500/12 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/18 dark:text-emerald-300"
               >
                 Anadir enlace
               </button>
@@ -205,14 +205,14 @@ export function AppCustomizationPanel({
               {formState.externalTools.map((tool, index) => (
                 <div
                   key={tool.id}
-                  className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]"
+                  className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]"
                 >
                   <input
                     value={tool.name}
                     onChange={(event) =>
                       updateExternalTool(tool.id, 'name', event.target.value)
                     }
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
                     placeholder={`Nombre del enlace ${index + 1}`}
                   />
                   <input
@@ -220,13 +220,13 @@ export function AppCustomizationPanel({
                     onChange={(event) =>
                       updateExternalTool(tool.id, 'url', event.target.value)
                     }
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
                     placeholder="https://..."
                   />
                   <button
                     type="button"
                     onClick={() => handleRemoveTool(tool.id)}
-                    className="rounded-xl border border-rose-600 bg-rose-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:border-rose-700 hover:bg-rose-700"
+                    className="rounded-xl border border-rose-500/60 bg-rose-500/12 px-3 py-2.5 text-sm font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-500/18 dark:text-rose-300"
                   >
                     Quitar
                   </button>
@@ -237,7 +237,7 @@ export function AppCustomizationPanel({
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Icono del aplicativo
             </h3>
@@ -256,20 +256,20 @@ export function AppCustomizationPanel({
                 onChange={(event) =>
                   updateField('appIconDataUrl', event.target.value)
                 }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
                 placeholder="O pega aqui una URL o Data URL del icono"
               />
               <button
                 type="button"
                 onClick={() => updateField('appIconDataUrl', '')}
-                className="w-fit rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                className="sidebar-soft-button w-fit rounded-2xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"
               >
                 Quitar icono
               </button>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Textos del menu lateral
             </h3>

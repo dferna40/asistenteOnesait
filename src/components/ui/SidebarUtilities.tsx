@@ -109,9 +109,9 @@ export function SidebarUtilities({
   return (
     <>
       <div className="space-y-6">
-        <section className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+        <section className="sidebar-panel rounded-[1.7rem] border border-slate-200/80 p-4 dark:border-slate-800">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-200">
+            <h3 className="text-xs font-black uppercase tracking-[0.24em] text-slate-500 dark:text-slate-200">
               {customization.devToolsSectionTitle}
             </h3>
           </div>
@@ -125,7 +125,7 @@ export function SidebarUtilities({
                 <button
                   type="button"
                   onClick={() => setExpandedTool('json')}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:text-white"
+                  className="sidebar-soft-button inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:text-white"
                   title="Expandir JSON Formatter"
                   aria-label="Expandir JSON Formatter"
                 >
@@ -136,7 +136,7 @@ export function SidebarUtilities({
                 value={jsonInput}
                 onChange={(event) => setJsonInput(event.target.value)}
                 rows={5}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-slate-500"
+                className="sidebar-link-card w-full rounded-xl border border-slate-200/80 px-3 py-2.5 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:text-white dark:focus:border-slate-500"
                 placeholder='{"clave":"valor"}'
               />
               {jsonResult.error ? (
@@ -144,7 +144,7 @@ export function SidebarUtilities({
                   {jsonResult.error}
                 </p>
               ) : jsonResult.value ? (
-                <pre className="overflow-x-auto rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <pre className="sidebar-link-card overflow-x-auto rounded-xl border border-slate-200/80 px-3 py-2.5 text-xs text-slate-700 dark:border-slate-700 dark:text-slate-100">
                   {jsonResult.value}
                 </pre>
               ) : null}
@@ -158,7 +158,7 @@ export function SidebarUtilities({
                 <button
                   type="button"
                   onClick={() => setExpandedTool('sql')}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:text-white"
+                  className="sidebar-soft-button inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-700 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:text-white"
                   title="Expandir SQL Beautifier"
                   aria-label="Expandir SQL Beautifier"
                 >
@@ -169,11 +169,11 @@ export function SidebarUtilities({
                 value={sqlInput}
                 onChange={(event) => setSqlInput(event.target.value)}
                 rows={5}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-slate-500"
+                className="sidebar-link-card w-full rounded-xl border border-slate-200/80 px-3 py-2.5 font-mono text-xs text-slate-800 outline-none transition focus:border-slate-400 dark:border-slate-700 dark:text-white dark:focus:border-slate-500"
                 placeholder="select * from tabla where id = 1"
               />
               {formattedSql ? (
-                <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
+                <pre className="sidebar-link-card overflow-x-auto whitespace-pre-wrap rounded-xl border border-slate-200/80 px-3 py-2.5 text-xs text-slate-700 dark:border-slate-700 dark:text-slate-100">
                   {formattedSql}
                 </pre>
               ) : null}
@@ -181,8 +181,8 @@ export function SidebarUtilities({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/40">
-          <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-200">
+        <section className="sidebar-panel rounded-[1.7rem] border border-slate-200/80 p-4 dark:border-slate-800">
+          <h3 className="text-xs font-black uppercase tracking-[0.24em] text-slate-500 dark:text-slate-200">
             {customization.backupSectionTitle}
           </h3>
           <div className="mt-3 grid gap-2">
@@ -213,8 +213,8 @@ export function SidebarUtilities({
         <section
           className={`rounded-2xl border p-3 ${
             trashHasItems
-              ? 'border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/20'
-              : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/40'
+              ? 'sidebar-panel border-red-200 bg-red-50 dark:border-red-900/60 dark:bg-red-950/20'
+              : 'sidebar-panel border-slate-200/80 bg-white dark:border-slate-800'
           }`}
         >
           <div className="flex items-center justify-between gap-2">
@@ -263,7 +263,7 @@ export function SidebarUtilities({
               trashEntries.map((entry) => (
                 <div
                   key={entry.id}
-                  className="rounded-xl border border-red-100 bg-white p-2.5 dark:border-red-900/40 dark:bg-slate-950/60"
+                  className="sidebar-link-card rounded-xl border border-red-100 p-2.5 dark:border-red-900/40"
                 >
                   <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
                     {entry.titulo}
@@ -274,7 +274,7 @@ export function SidebarUtilities({
                   <button
                     type="button"
                     onClick={() => onRestoreEntry(entry.id)}
-                    className="mt-2 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:border-red-300 hover:text-red-700 dark:border-red-900/40 dark:bg-slate-900 dark:text-red-300"
+                    className="sidebar-soft-button mt-2 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:border-red-300 hover:text-red-700 dark:border-red-900/40 dark:text-red-300"
                   >
                     Restaurar
                   </button>

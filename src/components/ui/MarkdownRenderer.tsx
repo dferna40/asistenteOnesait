@@ -3,6 +3,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
+import { copyTextToClipboard } from '../../utils/clipboard';
 
 interface MarkdownRendererProps {
   content: string;
@@ -24,22 +25,6 @@ interface ZoomedImageState {
 // redimensionar o servir estas imagenes desde un servidor centralizado, es
 // obligatorio usar try-catch-resources para el manejo de excepciones y flujos
 // de datos (Streams) [cite: 2026-02-12].
-
-const copyToClipboard = async (text: string) => {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  document.execCommand('copy');
-  document.body.removeChild(textarea);
-};
 
 const parseMarkdownSections = (content: string) => {
   const headingPattern = /^(#{1,6})\s+(.+)$/;
@@ -167,7 +152,7 @@ function CodeBlock({
     <div className="group relative my-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 shadow-lg dark:border-slate-700 dark:bg-slate-950">
       <button
         type="button"
-        onClick={() => copyToClipboard(codeValue)}
+        onClick={() => copyTextToClipboard(codeValue)}
         className="absolute right-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-lg border border-blue-500/50 bg-blue-500/10 px-2.5 py-1 text-[11px] font-medium text-blue-300 shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-500/20 hover:text-blue-100"
       >
         <svg

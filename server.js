@@ -24,6 +24,27 @@ const allowedOrigins = new Set([
 fs.mkdirSync(imagesDirectory, { recursive: true });
 fs.mkdirSync(backupsDirectory, { recursive: true });
 
+const formatTimestamp = () =>
+  new Intl.DateTimeFormat('es-ES', {
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    month: '2-digit',
+    second: '2-digit',
+    year: 'numeric',
+  }).format(new Date());
+
+const logServerEvent = (scope, message, details) => {
+  const prefix = `[${formatTimestamp()}] [${scope}]`;
+
+  if (details) {
+    console.log(`${prefix} ${message}`, details);
+    return;
+  }
+
+  console.log(`${prefix} ${message}`);
+};
+
 const storage = multer.diskStorage({
   destination: (_request, _file, callback) => {
     callback(null, imagesDirectory);
@@ -51,8 +72,25 @@ app.use(
 );
 app.use(express.json());
 app.use('/images', express.static(imagesDirectory));
+app.use((request, response, next) => {
+  const startedAt = Date.now();
+
+  logServerEvent('HTTP', `${request.method} ${request.originalUrl}`, {
+    ip: request.ip,
+  });
+
+  response.on('finish', () => {
+    logServerEvent(
+      'HTTP',
+      `${request.method} ${request.originalUrl} -> ${response.statusCode} en ${Date.now() - startedAt} ms`,
+    );
+  });
+
+  next();
+});
 
 app.get('/health', (_request, response) => {
+  logServerEvent('HEALTH', 'Health check respondido con OK.');
   response.json({ ok: true });
 });
 
@@ -60,6 +98,7 @@ app.post('/save-manual', async (request, response) => {
   const manualEntries = request.body;
 
   if (!Array.isArray(manualEntries)) {
+    logServerEvent('SAVE', 'Peticion rechazada: body no valido para guardado.');
     response.status(400).json({
       error: 'El cuerpo de la peticion debe ser un array de entradas.',
     });
@@ -67,6 +106,10 @@ app.post('/save-manual', async (request, response) => {
   }
 
   try {
+    logServerEvent('SAVE', 'Inicio de persistencia de manual.', {
+      totalEntradas: manualEntries.length,
+    });
+
     const backupTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupFilePath = path.join(
       backupsDirectory,
@@ -75,6 +118,7 @@ app.post('/save-manual', async (request, response) => {
 
     try {
       await fs.promises.copyFile(manualFilePath, backupFilePath);
+      logServerEvent('SAVE', 'Backup previo generado.', { backupFilePath });
     } catch (error) {
       const fileMissing =
         error instanceof Error &&
@@ -84,6 +128,11 @@ app.post('/save-manual', async (request, response) => {
       if (!fileMissing) {
         throw error;
       }
+
+      logServerEvent(
+        'SAVE',
+        'No existia manual previo; se omite la copia de seguridad inicial.',
+      );
     }
 
     // Si esta logica de escritura en disco se traslada a Java, es obligatorio
@@ -96,10 +145,16 @@ app.post('/save-manual', async (request, response) => {
       'utf-8',
     );
 
-    console.log('💾 Manual actualizado en el disco correctamente');
+    logServerEvent('SAVE', 'Manual actualizado en disco correctamente.', {
+      manualFilePath,
+      totalEntradas: manualEntries.length,
+    });
     response.status(200).json({ ok: true });
   } catch (error) {
-    console.error('No se pudo guardar manual.json en disco.', error);
+    console.error(
+      `[${formatTimestamp()}] [SAVE] No se pudo guardar manual.json en disco.`,
+      error,
+    );
     response.status(500).json({
       error: 'No se pudo guardar manual.json en disco.',
     });
@@ -107,12 +162,19 @@ app.post('/save-manual', async (request, response) => {
 });
 
 app.post('/upload', upload.single('image'), (request, response) => {
-  console.log('📸 Recibida petición de subida...');
+  logServerEvent('UPLOAD', 'Recibida peticion de subida de imagen.');
 
   if (!request.file) {
+    logServerEvent('UPLOAD', 'La subida ha llegado sin archivo adjunto.');
     response.status(400).json({ error: 'No se ha recibido ningun archivo.' });
     return;
   }
+
+  logServerEvent('UPLOAD', 'Imagen almacenada correctamente.', {
+    filename: request.file.filename,
+    originalName: request.file.originalname,
+    size: request.file.size,
+  });
 
   response.status(201).json({
     filename: request.file.filename,
@@ -121,5 +183,11 @@ app.post('/upload', upload.single('image'), (request, response) => {
 });
 
 app.listen(port, () => {
-  console.log('\x1b[36m%s\x1b[0m', '🚀 Servidor de imágenes listo en el puerto 3001');
+  logServerEvent('BOOT', 'Servidor de imagenes y persistencia iniciado.', {
+    allowedOrigins: Array.from(allowedOrigins),
+    backupsDirectory,
+    imagesDirectory,
+    manualFilePath,
+    port,
+  });
 });
