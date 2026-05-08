@@ -7,6 +7,7 @@ $serverPidPath = Join-Path $runtimeDir 'server.pid'
 $serverLogPath = Join-Path $logsDir 'server.stdout.log'
 $serverErrorLogPath = Join-Path $logsDir 'server.stderr.log'
 $launcherLogPath = Join-Path $logsDir 'launcher.log'
+$serverBootstrapPath = Join-Path $runtimeDir 'start-server.cmd'
 $distIndexPath = Join-Path $projectRoot 'dist\index.html'
 $appUrl = 'http://127.0.0.1:3001'
 $serverUrl = 'http://127.0.0.1:3001/health'
@@ -168,37 +169,34 @@ function Start-HiddenProcess {
     }
   }
 
-  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-  $startInfo.FileName = $nodeExecutable
-  $startInfo.Arguments = 'server.js'
-  $startInfo.WorkingDirectory = $projectRoot
-  $startInfo.UseShellExecute = $false
-  $startInfo.CreateNoWindow = $true
-  $startInfo.RedirectStandardOutput = $true
-  $startInfo.RedirectStandardError = $true
-  $startInfo.EnvironmentVariables['APP_PORT'] = '3001'
-  $startInfo.EnvironmentVariables['APP_SERVE_STATIC'] = 'true'
+  $bootstrapContent = @"
+@echo off
+set "APP_PORT=3001"
+set "APP_SERVE_STATIC=true"
+cd /d "$projectRoot"
+"$nodeExecutable" server.js 1>>"$StandardOutputLogPath" 2>>"$StandardErrorLogPath"
+"@
 
-  $process = New-Object System.Diagnostics.Process
-  $process.StartInfo = $startInfo
-  $process.Start() | Out-Null
-  $process.BeginOutputReadLine()
-  $process.BeginErrorReadLine()
-  $process.add_OutputDataReceived({
-    param($sender, $eventArgs)
-    if ($eventArgs.Data) {
-      Add-Content -LiteralPath $StandardOutputLogPath -Value $eventArgs.Data
-    }
-  })
-  $process.add_ErrorDataReceived({
-    param($sender, $eventArgs)
-    if ($eventArgs.Data) {
-      Add-Content -LiteralPath $StandardErrorLogPath -Value $eventArgs.Data
-    }
-  })
-  Write-LauncherLog "Servidor lanzado con PID inicial $($process.Id)"
+  try {
+    Set-Content -LiteralPath $serverBootstrapPath -Value $bootstrapContent -Encoding ASCII
+    $process = Start-Process `
+      -FilePath 'cmd.exe' `
+      -ArgumentList '/c', 'start', '""', '/min', $serverBootstrapPath `
+      -WorkingDirectory $projectRoot `
+      -WindowStyle Hidden `
+      -PassThru
+  } catch {
+    Write-LauncherLog "No se pudo lanzar el wrapper del servidor: $($_.Exception.Message)"
+    throw
+  }
+
+  Write-LauncherLog "Wrapper de arranque lanzado con PID inicial $($process.Id)"
 
   for ($attempt = 0; $attempt -lt 15; $attempt++) {
+    if ($process.HasExited) {
+      Write-LauncherLog "El wrapper del servidor termino con ExitCode $($process.ExitCode). Se sigue comprobando el puerto."
+    }
+
     $listeningProcessId = Get-ListeningProcessIdForPort -Port 3001
     if ($listeningProcessId) {
       Set-Content -LiteralPath $PidFile -Value $listeningProcessId -Encoding ASCII

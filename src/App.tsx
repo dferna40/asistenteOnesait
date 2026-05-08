@@ -1352,6 +1352,33 @@ const loadImageDimensions = (dataUrl: string) =>
     image.src = dataUrl;
   });
 
+const rasterizeImageDataUrl = (dataUrl: string) =>
+  new Promise<{ dataUrl: string; width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        reject(new Error('No se pudo preparar el canvas para el PDF.'));
+        return;
+      }
+
+      context.drawImage(image, 0, 0, width, height);
+      resolve({
+        dataUrl: canvas.toDataURL('image/png'),
+        height,
+        width,
+      });
+    };
+    image.onerror = () => reject(new Error('No se pudo rasterizar la imagen para el PDF.'));
+    image.src = dataUrl;
+  });
+
 const resolvePdfImageAsset = async (source: string) => {
   const response = await fetch(resolvePdfImageUrl(source));
 
@@ -1755,7 +1782,9 @@ export const App = () => {
           }),
         });
 
-        const payload = (await response.json()) as {
+        const payload = (await response
+          .json()
+          .catch(() => ({}))) as {
           currentRevision?: string;
           error?: string;
           revision?: string;
@@ -1786,14 +1815,19 @@ export const App = () => {
         if (!isCancelled) {
           const isSaveConflict =
             error instanceof Error && error.message === 'save-conflict';
+          const isNetworkError =
+            error instanceof TypeError ||
+            (error instanceof Error && error.message === 'Failed to fetch');
 
-          setServerHealthState(isSaveConflict ? 'online' : 'offline');
+          setServerHealthState(isSaveConflict ? 'online' : isNetworkError ? 'offline' : 'online');
           setHasSaveConflict(isSaveConflict);
           setSaveSyncState('error');
           setSaveToast({
             message: isSaveConflict
               ? 'Se ha detectado otra instancia con cambios guardados. Recarga o importa antes de volver a guardar para no sobrescribir datos.'
-              : 'Error de conexión con el servidor. Por favor, descarga el JSON manualmente para no perder los cambios.',
+              : isNetworkError
+                ? 'Error de conexión con el servidor. Por favor, descarga el JSON manualmente para no perder los cambios.'
+                : 'El servidor sigue activo, pero ha fallado el guardado. Revisa los logs o vuelve a intentarlo.',
             tone: 'error',
           });
         }
@@ -2013,10 +2047,25 @@ export const App = () => {
       const pageWidth = 210;
       const pageHeight = 297;
       const contentWidth = pageWidth - margin * 2;
+      const footerHeight = 14;
+      const contentBottomLimit = pageHeight - margin - footerHeight;
       let cursorY = margin;
+      const footerIconSource =
+        customization.appIconDataUrl.trim() || defaultPrysmaIconDataUrl;
+      const footerIconAsset = await (async () => {
+        try {
+          if (footerIconSource.startsWith('data:')) {
+            return await rasterizeImageDataUrl(footerIconSource);
+          }
+
+          return await resolvePdfImageAsset(footerIconSource);
+        } catch {
+          return null;
+        }
+      })();
 
       const ensureSpace = (height: number) => {
-        if (cursorY + height <= pageHeight - margin) {
+        if (cursorY + height <= contentBottomLimit) {
           return;
         }
 
@@ -2507,7 +2556,7 @@ export const App = () => {
 
         while (currentIndex < renderedLines.length) {
           const currentLanguageBadgeHeight = language && isFirstChunk ? 8 : 0;
-          const availableHeight = pageHeight - margin - cursorY - 6;
+          const availableHeight = contentBottomLimit - cursorY - 6;
           let maxLinesForChunk = Math.floor(
             (availableHeight - blockPaddingY * 2 - currentLanguageBadgeHeight - 2) /
               lineHeight,
@@ -2945,10 +2994,55 @@ export const App = () => {
         });
       }
 
+      const totalPages = pdf.getNumberOfPages();
+      const footerDividerY = pageHeight - margin - footerHeight + 1.5;
+      const footerBaselineY = pageHeight - margin - 3.5;
+      const footerIconSize = 5.5;
+
+      for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+        pdf.setPage(pageNumber);
+        pdf.setDrawColor(226, 232, 240);
+        pdf.setLineWidth(0.25);
+        pdf.line(margin, footerDividerY, pageWidth - margin, footerDividerY);
+
+        let footerTextX = margin;
+
+        if (footerIconAsset) {
+          const footerIconFormat = footerIconAsset.dataUrl.includes('image/jpeg')
+            ? 'JPEG'
+            : 'PNG';
+
+          pdf.addImage(
+            footerIconAsset.dataUrl,
+            footerIconFormat,
+            margin,
+            footerBaselineY - footerIconSize + 0.4,
+            footerIconSize,
+            footerIconSize,
+          );
+          footerTextX += footerIconSize + 2.5;
+        }
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(71, 85, 105);
+        pdf.text('Documentación generada con Prysma', footerTextX, footerBaselineY);
+
+        if (totalPages > 1) {
+          pdf.text(`Página ${pageNumber}`, pageWidth - margin, footerBaselineY, {
+            align: 'right',
+          });
+        }
+      }
+
   // A partir de ahora, para el cÃ³digo que pueda generar alguna excepciÃ³n, siempre debo usar try-catch-resources en Java para garantizar el cierre seguro de los flujos del archivo PDF generado.
       pdf.save(`${entry.id}.pdf`);
     } catch (error) {
       console.error('No se pudo exportar la ficha a PDF.', error);
+      setSaveToast({
+        message: 'No se pudo exportar la ficha a PDF. Revisa la consola o vuelve a intentarlo.',
+        tone: 'error',
+      });
     } finally {
       setExportEntryId('');
     }

@@ -21,6 +21,53 @@ interface ZoomedImageState {
   src: string;
 }
 
+function MarkdownImage({
+  alt = '',
+  onImageClick,
+  src = '',
+}: {
+  alt?: string;
+  onImageClick: (image: ZoomedImageState) => void;
+  src?: string;
+}) {
+  const [hasLoadError, setHasLoadError] = useState(false);
+
+  if (!src || hasLoadError) {
+    return (
+      <div className="my-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/90 px-4 py-6 text-center dark:border-slate-700 dark:bg-slate-900/60">
+        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Imagen no encontrada
+        </p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {src || 'La referencia de la imagen está vacía o el archivo ya no existe.'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        onImageClick({
+          alt,
+          src,
+        })
+      }
+      className="my-4 block w-full rounded-2xl text-left transition-all duration-300 ease-in-out"
+    >
+      <img
+        src={src}
+        alt={alt}
+        onError={() => setHasLoadError(true)}
+        className="max-h-[300px] max-w-full rounded-2xl object-contain shadow-sm transition-all duration-300 ease-in-out hover:shadow-md"
+        loading="lazy"
+        style={{ cursor: 'zoom-in' }}
+      />
+    </button>
+  );
+}
+
 // Si en el futuro se implementa un microservicio en Java para procesar,
 // redimensionar o servir estas imagenes desde un servidor centralizado, es
 // obligatorio usar try-catch-resources para el manejo de excepciones y flujos
@@ -218,23 +265,11 @@ const createMarkdownComponents = (
     <h4 {...props} className="mt-5 text-base font-semibold text-slate-900 dark:text-slate-100" />
   ),
   img: (props: ComponentProps<'img'>) => (
-    <button
-      type="button"
-      onClick={() =>
-        onImageClick({
-          alt: props.alt ?? '',
-          src: props.src ?? '',
-        })
-      }
-      className="my-4 block w-full rounded-2xl text-left transition-all duration-300 ease-in-out"
-    >
-      <img
-        {...props}
-        className="max-h-[300px] max-w-full rounded-2xl object-contain shadow-sm transition-all duration-300 ease-in-out hover:shadow-md"
-        loading="lazy"
-        style={{ cursor: 'zoom-in' }}
-      />
-    </button>
+    <MarkdownImage
+      alt={props.alt ?? ''}
+      src={props.src ?? ''}
+      onImageClick={onImageClick}
+    />
   ),
   li: (props: ComponentProps<'li'>) => (
     <li {...props} className="whitespace-pre-wrap leading-7 text-slate-700 dark:text-slate-200 marker:text-slate-500 dark:marker:text-slate-300" />

@@ -135,6 +135,91 @@ const normalizeEndpointTarget = (value) => {
   return null;
 };
 
+const imageReferencePattern = /!\[[^\]]*]\((\/images\/[^)\s]+)\)/g;
+
+const collectMarkdownImagePaths = (content) => {
+  if (typeof content !== 'string' || !content.trim()) {
+    return [];
+  }
+
+  return Array.from(content.matchAll(imageReferencePattern), (match) => match[1]);
+};
+
+const collectReferencedImageFilenames = (manualData) => {
+  const referencedImageFilenames = new Set();
+  const contentContainers = [
+    ...(Array.isArray(manualData?.entries) ? manualData.entries : []),
+    ...(Array.isArray(manualData?.templates) ? manualData.templates : []),
+    ...(Array.isArray(manualData?.trash) ? manualData.trash : []),
+  ];
+
+  contentContainers.forEach((item) => {
+    collectMarkdownImagePaths(item?.contenido).forEach((imagePath) => {
+      const imageFilename = path.basename(imagePath);
+
+      if (imageFilename) {
+        referencedImageFilenames.add(imageFilename);
+      }
+    });
+  });
+
+  return referencedImageFilenames;
+};
+
+const cleanupOrphanedImages = async (imagesDirectory, manualData) => {
+  if (!fs.existsSync(imagesDirectory)) {
+    logServerEvent('IMAGES', 'No existe el directorio de imagenes; se omite la limpieza.', {
+      imagesDirectory,
+    });
+    return;
+  }
+
+  const referencedImageFilenames = collectReferencedImageFilenames(manualData);
+  const storedImageEntries = await fs.promises.readdir(imagesDirectory, {
+    withFileTypes: true,
+  });
+
+  const removableImages = storedImageEntries.filter((entry) => {
+    if (!entry.isFile()) {
+      return false;
+    }
+
+    if (entry.name.startsWith('.')) {
+      return false;
+    }
+
+    return !referencedImageFilenames.has(entry.name);
+  });
+
+  for (const imageEntry of removableImages) {
+    const imageFilePath = path.join(imagesDirectory, imageEntry.name);
+
+    try {
+      await fs.promises.unlink(imageFilePath);
+      logServerEvent('IMAGES', 'Imagen huerfana eliminada del disco.', {
+        imageFilePath,
+      });
+    } catch (error) {
+      const fileMissing =
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT';
+
+      if (fileMissing) {
+        logServerEvent('IMAGES', 'La imagen huerfana ya no existia en disco.', {
+          imageFilePath,
+        });
+        continue;
+      }
+
+      console.error(
+        `[${formatTimestamp()}] [IMAGES] No se pudo eliminar una imagen huerfana.`,
+        error,
+      );
+    }
+  }
+};
+
 export const startServer = async ({
   allowedOrigins,
   appDataDir,
@@ -357,6 +442,8 @@ export const startServer = async ({
         JSON.stringify(manualData, null, 2),
         'utf-8',
       );
+
+      await cleanupOrphanedImages(runtimePaths.imagesDirectory, manualData);
 
       logServerEvent('SAVE', 'Manual actualizado en disco correctamente.', {
         manualFilePath: runtimePaths.manualFilePath,

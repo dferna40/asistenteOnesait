@@ -1,301 +1,435 @@
-[
-  {
-    "id": "uml-lock",
-    "titulo": "Protocolo SVN Lock",
-    "categoria": "UML",
-    "contenido": "Pasos Update -> Lock -> Diseno para evitar conflictos sobre artefactos UML compartidos.",
-    "pasos": [
-      "Hacer Update del proyecto antes de tocar el diagrama.",
-      "Aplicar Lock sobre el archivo UML en SVN.",
-      "Realizar el diseno y liberar el Lock cuando termine la edicion."
-    ],
-    "tags": [
-      "uml",
-      "svn",
-      "lock",
-      "diseno",
-      "update"
-    ],
-    "comandos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
+{
+  "categories": [
+    {
+      "name": "UML",
+      "description": "Protocolos de diseno, MagicDraw y bloqueos en SVN.",
+      "color": "amber"
+    },
+    {
+      "name": "UI",
+      "description": "Arquitectura de capas NPA, literales y componentes.",
+      "color": "indigo"
+    },
+    {
+      "name": "Entorno",
+      "description": "Accesos remotos, puertos y rutas de configuracion local.",
+      "color": "blue"
+    },
+    {
+      "name": "General",
+      "description": "Guias de iTeams, gestion de tags y despliegues.",
+      "color": "teal"
+    },
+    {
+      "name": "Seguros",
+      "description": "Glosario de negocio y conceptos especificos del ecosistema Prysma.",
+      "color": "rose"
+    },
+    {
+      "name": "Accesos",
+      "description": "Credenciales de correo, SSH, Oracle y portales corporativos.",
+      "color": "violet"
+    },
+    {
+      "name": "Batch",
+      "description": "Procesos, tablas de configuracion y comandos SQL.",
+      "color": "emerald"
+    }
+  ],
+  "deletedCategories": [],
+  "entries": [
+    {
+      "id": "uml-lock",
+      "titulo": "Protocolo SVN Lock",
+      "categoria": "UML",
+      "contenido": "Pasos Update -> Lock -> Diseno para evitar conflictos sobre artefactos UML compartidos.",
+      "pasos": [
+        "Hacer Update del proyecto antes de tocar el diagrama.",
+        "Aplicar Lock sobre el archivo UML en SVN.",
+        "Realizar el diseno y liberar el Lock cuando termine la edicion."
+      ],
+      "tags": [
+        "uml",
+        "svn",
+        "lock",
+        "diseno",
+        "update"
+      ],
+      "comandos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "categoria": "UI",
+      "comandos": [],
+      "contenido": "Division de responsabilidades en los proyectos NPA.\n\n\nWhat is Lorem Ipsum?\nLorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.\n\nWhy do we use it?\nIt is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like).\n\n\nWhere does it come from?\nContrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of \"de Finibus Bonorum et Malorum\" (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, \"Lorem ipsum dolor sit amet..\", comes from a line in section 1.10.32.\n\nWhat is Lorem Ipsum?\nLorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.\n\nWhy do we use it?\nIt is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like).\n\n\nWhere does it come from?\nContrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of \"de Finibus Bonorum et Malorum\" (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, \"Lorem ipsum dolor sit amet..\", comes from a line in section 1.10.32.\n\nWhat is Lorem Ipsum?\nLorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.\n\nWhy do we use it?\nIt is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like).\n\n\nWhere does it come from?\nContrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of \"de Finibus Bonorum et Malorum\" (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, \"Lorem ipsum dolor sit amet..\", comes from a line in section 1.10.32.\n\nWhat is Lorem Ipsum?\nLorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum.\n\nWhy do we use it?\nIt is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English. Many desktop publishing packages and web page editors now use Lorem Ipsum as their default model text, and a search for 'lorem ipsum' will uncover many web sites still in their infancy. Various versions have evolved over the years, sometimes by accident, sometimes on purpose (injected humour and the like).\n\n\nWhere does it come from?\nContrary to popular belief, Lorem Ipsum is not simply random text. It has roots in a piece of classical Latin literature from 45 BC, making it over 2000 years old. Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia, looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum passage, and going through the cites of the word in classical literature, discovered the undoubtable source. Lorem Ipsum comes from sections 1.10.32 and 1.10.33 of \"de Finibus Bonorum et Malorum\" (The Extremes of Good and Evil) by Cicero, written in 45 BC. This book is a treatise on the theory of ethics, very popular during the Renaissance. The first line of Lorem Ipsum, \"Lorem ipsum dolor sit amet..\", comes from a line in section 1.10.32.",
+      "id": "arch-npa-capas",
+      "pasos": [
+        "Proyecto-ca: Capa de presentacion y controladores.",
+        "Proyecto-co: Capa de negocio y servicios.",
+        "Proyecto sin sufijo: Entidades, DAOs y mapeo de datos."
+      ],
+      "tags": [
+        "arquitectura",
+        "npa",
+        "capas",
+        "organizacion"
+      ],
+      "titulo": "Arquitectura NPA: Capas",
+      "isPinned": false,
+      "updatedAt": "2026-05-08T22:49:37.561Z"
+    },
+    {
+      "categoria": "Entorno",
+      "comandos": [
+        {
+          "label": "Entorno Raiz",
+          "value": "C:\\EntornoOnesait"
+        },
+        {
+          "label": "Repo Maven",
+          "value": "C:\\EntornoOnesait\\LocalRepoM3"
+        },
+        {
+          "label": "JBoss Home",
+          "value": "C:\\EntornoOnesait\\EAP-7.4.0"
+        }
+      ],
+      "contenido": "Ubicaciones clave en C:\\EntornoOnesait para el desarrollo diario.\n\n\n1. Primer elemento- Elemento de lista\t\t\tdsfds\nwwww.google.com \n\n1. Primer elemento1.\n2. Segundo elemento\n\n## Nueva seccion",
+      "id": "entorno-local-rutas",
+      "pasos": [],
+      "tags": [
+        "rutas",
+        "jboss",
+        "maven",
+        "local"
+      ],
+      "titulo": "Rutas Criticas Locales",
+      "isPinned": false,
+      "updatedAt": "2026-05-07T09:55:39.587Z"
+    },
+    {
+      "id": "ui-literales",
+      "titulo": "Cambio de Literales",
+      "categoria": "UI",
+      "contenido": "Ruta y protocolo para modificar textos en la interfaz.",
+      "pasos": [
+        "Localizar el XML en npa-catalogos_servicios\\xml.",
+        "Modificar el literal respetando el formato.",
+        "Realizar el despliegue para refrescar la cache."
+      ],
+      "tags": [
+        "literales",
+        "textos",
+        "xml",
+        "interfaz"
+      ],
+      "comandos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "id": "iteams-despliegue",
+      "titulo": "Protocolo iTeams",
+      "categoria": "General",
+      "contenido": "Pasos para solicitar subidas y gestionar Tags.",
+      "pasos": [
+        "Generar el Tag correspondiente a la tarea.",
+        "Solicitar la subida a traves de iTeams.",
+        "Verificar el merge una vez completado."
+      ],
+      "tags": [
+        "iteams",
+        "merge",
+        "tag",
+        "despliegue"
+      ],
+      "comandos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "id": "glosario-seguros-base",
+      "titulo": "Glosario de Seguros y Negocio",
+      "categoria": "Seguros",
+      "contenido": "Conceptos clave del negocio asegurador y términos específicos del proyecto RGA.",
+      "pasos": [
+        "Póliza: Contrato de seguro que une al cliente con la compañía.",
+        "Recibo: Documento que justifica el pago de la prima (importante en flujos Batch).",
+        "Taller: Nombre interno para referirse a la Base de Datos (BBDD).",
+        "BO: Terminal financiero o Back Office utilizado para operativas de negocio."
+      ],
+      "tags": [
+        "seguros",
+        "negocio",
+        "glosario",
+        "rga",
+        "conceptos"
+      ],
+      "comandos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "id": "acc-ssh-oracle",
+      "titulo": "Sistemas: SSH y Oracle",
+      "categoria": "Accesos",
+      "contenido": "Credenciales para acceso a servidores vía SSH y bases de datos Oracle.",
+      "comandos": [
+        {
+          "label": "User SSH",
+          "value": "davidfr"
+        },
+        {
+          "label": "Pass SSH",
+          "value": "RGA"
+        },
+        {
+          "label": "User Oracle",
+          "value": "davidfr"
+        },
+        {
+          "label": "Pass Oracle",
+          "value": "cambiar"
+        }
+      ],
+      "tags": [
+        "ssh",
+        "oracle",
+        "db",
+        "servidor"
+      ],
+      "pasos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "id": "acc-cezanne",
+      "titulo": "Cezanne Keapps (Portal)",
+      "categoria": "Accesos",
+      "contenido": "Acceso al portal del empleado de Keapps para gestión de RRHH.",
+      "comandos": [
+        {
+          "label": "Usuario",
+          "value": "david_fernandez@keapps.es"
+        },
+        {
+          "label": "Password",
+          "value": "Oculus2048"
+        }
+      ],
+      "tags": [
+        "cezanne",
+        "keapps",
+        "portal",
+        "rrhh"
+      ],
+      "pasos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "id": "acc-keapps-mail",
+      "titulo": "Correo Electrónico Keapps",
+      "categoria": "Accesos",
+      "contenido": "Acceso al servicio de correo corporativo de Keapps.",
+      "comandos": [
+        {
+          "label": "Usuario",
+          "value": "david.fernandez@keapps.es"
+        },
+        {
+          "label": "Password",
+          "value": "K-12403301e-2026"
+        }
+      ],
+      "tags": [
+        "correo",
+        "keapps",
+        "webmail"
+      ],
+      "pasos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "id": "acc-indra-mail",
+      "titulo": "Correo Electrónico Indra",
+      "categoria": "Accesos",
+      "contenido": "Acceso al correo corporativo de Indra (Outlook).",
+      "comandos": [
+        {
+          "label": "Usuario",
+          "value": "dfernandezra@eservicios.indra.es"
+        },
+        {
+          "label": "Password",
+          "value": "Oculus2048"
+        }
+      ],
+      "tags": [
+        "correo",
+        "indra",
+        "outlook",
+        "login"
+      ],
+      "pasos": [],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "id": "env-int1",
+      "titulo": "Entorno INT1",
+      "categoria": "Entorno",
+      "contenido": "URL de escritorio y puertos del entorno INT1 para acceso remoto y validaciones basicas.",
+      "pasos": [
+        "Abrir la URL de escritorio remoto de INT1.",
+        "Verificar que los puertos de acceso y servicios esten disponibles.",
+        "Confirmar conectividad antes de lanzar pruebas."
+      ],
+      "comandos": [
+        {
+          "label": "Puerto escritorio",
+          "value": "3389"
+        },
+        {
+          "label": "Puerto aplicacion",
+          "value": "8080"
+        }
+      ],
+      "tags": [
+        "int1",
+        "entorno",
+        "url",
+        "puertos",
+        "escritorio"
+      ],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    },
+    {
+      "id": "batch-config",
+      "titulo": "Configuracion Batch",
+      "categoria": "Batch",
+      "contenido": "Tablas BAT_TRABAJO_CONFIG y BAT_SUBTRABAJO_CONFIG usadas para revisar la configuracion batch.",
+      "pasos": [
+        "Consultar BAT_TRABAJO_CONFIG para localizar el trabajo principal.",
+        "Revisar BAT_SUBTRABAJO_CONFIG para validar dependencias y orden.",
+        "Documentar cualquier cambio antes de desplegar."
+      ],
+      "comandos": [
+        {
+          "label": "Tabla trabajo",
+          "value": "SELECT * FROM BAT_TRABAJO_CONFIG;"
+        },
+        {
+          "label": "Tabla subtrabajo",
+          "value": "SELECT * FROM BAT_SUBTRABAJO_CONFIG;"
+        }
+      ],
+      "tags": [
+        "batch",
+        "configuracion",
+        "tablas",
+        "sql",
+        "trabajos"
+      ],
+      "isPinned": false,
+      "updatedAt": "2026-05-06T17:35:38.551Z"
+    }
+  ],
+  "settings": {
+    "customization": {
+      "appIconDataUrl": "",
+      "appName": "Prysma",
+      "backupSectionTitle": "Backup",
+      "companyUsersLabel": "Usuarios por Compania",
+      "creatorCredit": "Creado por David Fernández Ramírez",
+      "devToolsSectionTitle": "DevTools",
+      "externalTools": [
+        {
+          "id": "jira-indra",
+          "name": "Jira Indra",
+          "url": "https://jira.indra.es/secure/Dashboard.jspa"
+        },
+        {
+          "id": "iteams",
+          "name": "iTeams",
+          "url": "http://10.22.206.214:8180/ione-gestion-configuracion/CULogin/LoginAceptar.do?&SESSION_CLIENT_STATE=1777993003974#"
+        },
+        {
+          "id": "onesait-local",
+          "name": "Escritorio Onesait Local",
+          "url": "http://localhost.npa.com:8080/npa-escritorio"
+        },
+        {
+          "id": "onesait-int1",
+          "name": "Escritorio Onesait INT1",
+          "url": "https://acdc-int1.caja.rural:8543/npa-escritorio"
+        },
+        {
+          "id": "onesait-int2",
+          "name": "Escritorio Onesait INT2",
+          "url": "https://acdc-int2.caja.rural:8543/npa-escritorio"
+        },
+        {
+          "id": "onesait-uat",
+          "name": "Escritorio Onesait UAT",
+          "url": "https://acdc-uat.caja.rural:8643/npa-escritorio"
+        },
+        {
+          "id": "onesait-pre",
+          "name": "Escritorio Onesait PRE",
+          "url": "https://acdc-pre.caja.rural:8443/npa-escritorio"
+        },
+        {
+          "id": "correo-indra",
+          "name": "Correo corporativo Indra",
+          "url": "https://outlook.cloud.microsoft/mail/"
+        },
+        {
+          "id": "correo-keapps",
+          "name": "Correo corporativo Keapps",
+          "url": "https://serviciodecorreo.es/?_task=mail&_mbox=INBOX"
+        },
+        {
+          "id": "word-365",
+          "name": "Word 365",
+          "url": "https://word.cloud.microsoft/"
+        },
+        {
+          "id": "excel-365",
+          "name": "Excel 365",
+          "url": "https://excel.cloud.microsoft/?wdOrigin=OFFICECOM-WEB.APPGALLERY"
+        },
+        {
+          "id": "cezanne-keapps",
+          "name": "Cezanne Keapps",
+          "url": "https://w3.cezanneondemand.com/CezanneHR/-/KEAPPS/view/9ebaad0a-8ad5-4d97-b2f1-e5d179149a81?ce=3&et=4d8970cb-6164-4162-b780-4574ff852be1&n=6c5063b4-8307-4f55-b968-ddc3e36e154d"
+        },
+        {
+          "id": "wiki-onesait-general",
+          "name": "Wiki Onesait general",
+          "url": "#"
+        },
+        {
+          "id": "wiki-onesait-5",
+          "name": "Wiki Onesait 5.0",
+          "url": "#"
+        }
+      ],
+      "externalToolsTitle": "Herramientas Externas",
+      "globalPasswordLabel": "Password",
+      "globalRgaTitle": "Global Prysma",
+      "globalUserLabel": "Usuario",
+      "heroDescription": "Tu centro de conocimiento inteligente: Organiza guias de trabajo, revisa el estado de tus sistemas y genera manuales profesionales listos para compartir.",
+      "heroTitle": "Ecosistema de Conocimiento",
+      "reminderText": "Para cualquier implementacion Java que gestione excepciones, utiliza siempre try-catch-resources para garantizar la seguridad del codigo.",
+      "sidebarIdentityTitle": "Escritorio",
+      "trashSectionTitle": "Papelera"
+    },
+    "darkMode": true
   },
-  {
-    "id": "arch-npa-capas",
-    "titulo": "Arquitectura NPA: Capas",
-    "categoria": "UI",
-    "contenido": "Division de responsabilidades en los proyectos NPA.",
-    "pasos": [
-      "Proyecto-ca: Capa de presentacion y controladores.",
-      "Proyecto-co: Capa de negocio y servicios.",
-      "Proyecto sin sufijo: Entidades, DAOs y mapeo de datos."
-    ],
-    "tags": [
-      "arquitectura",
-      "npa",
-      "capas",
-      "organizacion"
-    ],
-    "comandos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "categoria": "Entorno",
-    "comandos": [
-      {
-        "label": "Entorno Raiz",
-        "value": "C:\\EntornoOnesait"
-      },
-      {
-        "label": "Repo Maven",
-        "value": "C:\\EntornoOnesait\\LocalRepoM3"
-      },
-      {
-        "label": "JBoss Home",
-        "value": "C:\\EntornoOnesait\\EAP-7.4.0"
-      }
-    ],
-    "contenido": "Ubicaciones clave en C:\\EntornoOnesait para el desarrollo diario.\n\n\n1. Primer elemento- Elemento de lista\t\t\tdsfds\nwwww.google.com \n\n1. Primer elemento1.\n2. Segundo elemento\n\n## Nueva seccion",
-    "id": "entorno-local-rutas",
-    "pasos": [],
-    "tags": [
-      "rutas",
-      "jboss",
-      "maven",
-      "local"
-    ],
-    "titulo": "Rutas Criticas Locales",
-    "isPinned": false,
-    "updatedAt": "2026-05-07T09:55:39.587Z"
-  },
-  {
-    "id": "ui-literales",
-    "titulo": "Cambio de Literales",
-    "categoria": "UI",
-    "contenido": "Ruta y protocolo para modificar textos en la interfaz.",
-    "pasos": [
-      "Localizar el XML en npa-catalogos_servicios\\xml.",
-      "Modificar el literal respetando el formato.",
-      "Realizar el despliegue para refrescar la cache."
-    ],
-    "tags": [
-      "literales",
-      "textos",
-      "xml",
-      "interfaz"
-    ],
-    "comandos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "id": "iteams-despliegue",
-    "titulo": "Protocolo iTeams",
-    "categoria": "General",
-    "contenido": "Pasos para solicitar subidas y gestionar Tags.",
-    "pasos": [
-      "Generar el Tag correspondiente a la tarea.",
-      "Solicitar la subida a traves de iTeams.",
-      "Verificar el merge una vez completado."
-    ],
-    "tags": [
-      "iteams",
-      "merge",
-      "tag",
-      "despliegue"
-    ],
-    "comandos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "id": "glosario-seguros-base",
-    "titulo": "Glosario de Seguros y Negocio",
-    "categoria": "Seguros",
-    "contenido": "Conceptos clave del negocio asegurador y términos específicos del proyecto RGA.",
-    "pasos": [
-      "Póliza: Contrato de seguro que une al cliente con la compañía.",
-      "Recibo: Documento que justifica el pago de la prima (importante en flujos Batch).",
-      "Taller: Nombre interno para referirse a la Base de Datos (BBDD).",
-      "BO: Terminal financiero o Back Office utilizado para operativas de negocio."
-    ],
-    "tags": [
-      "seguros",
-      "negocio",
-      "glosario",
-      "rga",
-      "conceptos"
-    ],
-    "comandos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "id": "acc-ssh-oracle",
-    "titulo": "Sistemas: SSH y Oracle",
-    "categoria": "Accesos",
-    "contenido": "Credenciales para acceso a servidores vía SSH y bases de datos Oracle.",
-    "comandos": [
-      {
-        "label": "User SSH",
-        "value": "davidfr"
-      },
-      {
-        "label": "Pass SSH",
-        "value": "RGA"
-      },
-      {
-        "label": "User Oracle",
-        "value": "davidfr"
-      },
-      {
-        "label": "Pass Oracle",
-        "value": "cambiar"
-      }
-    ],
-    "tags": [
-      "ssh",
-      "oracle",
-      "db",
-      "servidor"
-    ],
-    "pasos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "id": "acc-cezanne",
-    "titulo": "Cezanne Keapps (Portal)",
-    "categoria": "Accesos",
-    "contenido": "Acceso al portal del empleado de Keapps para gestión de RRHH.",
-    "comandos": [
-      {
-        "label": "Usuario",
-        "value": "david_fernandez@keapps.es"
-      },
-      {
-        "label": "Password",
-        "value": "Oculus2048"
-      }
-    ],
-    "tags": [
-      "cezanne",
-      "keapps",
-      "portal",
-      "rrhh"
-    ],
-    "pasos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "id": "acc-keapps-mail",
-    "titulo": "Correo Electrónico Keapps",
-    "categoria": "Accesos",
-    "contenido": "Acceso al servicio de correo corporativo de Keapps.",
-    "comandos": [
-      {
-        "label": "Usuario",
-        "value": "david.fernandez@keapps.es"
-      },
-      {
-        "label": "Password",
-        "value": "K-12403301e-2026"
-      }
-    ],
-    "tags": [
-      "correo",
-      "keapps",
-      "webmail"
-    ],
-    "pasos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "id": "acc-indra-mail",
-    "titulo": "Correo Electrónico Indra",
-    "categoria": "Accesos",
-    "contenido": "Acceso al correo corporativo de Indra (Outlook).",
-    "comandos": [
-      {
-        "label": "Usuario",
-        "value": "dfernandezra@eservicios.indra.es"
-      },
-      {
-        "label": "Password",
-        "value": "Oculus2048"
-      }
-    ],
-    "tags": [
-      "correo",
-      "indra",
-      "outlook",
-      "login"
-    ],
-    "pasos": [],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "id": "env-int1",
-    "titulo": "Entorno INT1",
-    "categoria": "Entorno",
-    "contenido": "URL de escritorio y puertos del entorno INT1 para acceso remoto y validaciones basicas.",
-    "pasos": [
-      "Abrir la URL de escritorio remoto de INT1.",
-      "Verificar que los puertos de acceso y servicios esten disponibles.",
-      "Confirmar conectividad antes de lanzar pruebas."
-    ],
-    "comandos": [
-      {
-        "label": "Puerto escritorio",
-        "value": "3389"
-      },
-      {
-        "label": "Puerto aplicacion",
-        "value": "8080"
-      }
-    ],
-    "tags": [
-      "int1",
-      "entorno",
-      "url",
-      "puertos",
-      "escritorio"
-    ],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  },
-  {
-    "id": "batch-config",
-    "titulo": "Configuracion Batch",
-    "categoria": "Batch",
-    "contenido": "Tablas BAT_TRABAJO_CONFIG y BAT_SUBTRABAJO_CONFIG usadas para revisar la configuracion batch.",
-    "pasos": [
-      "Consultar BAT_TRABAJO_CONFIG para localizar el trabajo principal.",
-      "Revisar BAT_SUBTRABAJO_CONFIG para validar dependencias y orden.",
-      "Documentar cualquier cambio antes de desplegar."
-    ],
-    "comandos": [
-      {
-        "label": "Tabla trabajo",
-        "value": "SELECT * FROM BAT_TRABAJO_CONFIG;"
-      },
-      {
-        "label": "Tabla subtrabajo",
-        "value": "SELECT * FROM BAT_SUBTRABAJO_CONFIG;"
-      }
-    ],
-    "tags": [
-      "batch",
-      "configuracion",
-      "tablas",
-      "sql",
-      "trabajos"
-    ],
-    "isPinned": false,
-    "updatedAt": "2026-05-06T17:35:38.551Z"
-  }
-]
+  "templates": [],
+  "trash": []
+}

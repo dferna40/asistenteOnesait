@@ -117,9 +117,11 @@ const ensureDesktopServer = async () => {
     return null;
   }
 
-  logDesktopEvent('Iniciando servidor embebido.', { desktopPort });
+  logDesktopEvent('Iniciando servidor embebido sobre el almacenamiento compartido del proyecto.', {
+    desktopPort,
+    sourceRoot: projectRoot,
+  });
   return startServer({
-    appDataDir: app.getPath('userData'),
     port: desktopPort,
     serveStatic: true,
     sourceRoot: projectRoot,
