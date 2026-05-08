@@ -34,6 +34,7 @@ export interface AppCustomizationSettings {
   appName: string;
   backupSectionTitle: string;
   companyUsersLabel: string;
+  creatorCredit: string;
   devToolsSectionTitle: string;
   externalTools: ExternalToolLink[];
   externalToolsTitle: string;

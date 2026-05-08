@@ -185,6 +185,17 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                Crédito de autoría
+                <input
+                  value={formState.creatorCredit}
+                  onChange={(event) =>
+                    updateField('creatorCredit', event.target.value)
+                  }
+                  className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
+                />
+              </label>
+
+              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                 Recordatorio principal
                 <textarea
                   value={formState.reminderText}

@@ -68,6 +68,7 @@ export const defaultAppCustomization: AppCustomizationSettings = {
   appName: 'Prysma',
   backupSectionTitle: 'Backup',
   companyUsersLabel: 'Usuarios por Compania',
+  creatorCredit: 'Creado por David Fernández Ramírez',
   devToolsSectionTitle: 'DevTools',
   externalTools: defaultExternalTools,
   externalToolsTitle: 'Herramientas Externas',

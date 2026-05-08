@@ -75,6 +75,24 @@ const defaultCategoryMetadata: Record<
 };
 
 const getCurrentIsoDate = () => new Date().toISOString();
+const defaultPrysmaIconDataUrl = (() => {
+  const iconSvg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+      <defs>
+        <linearGradient id="prysma-favicon-gradient" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#38bdf8" />
+          <stop offset="0.52" stop-color="#06b6d4" />
+          <stop offset="1" stop-color="#0f766e" />
+        </linearGradient>
+      </defs>
+      <path d="M32 6 52 18v28L32 58 12 46V18L32 6Z" fill="url(#prysma-favicon-gradient)" stroke="rgba(255,255,255,0.82)" stroke-width="1.5"/>
+      <path d="M32 6v52M12 18l20 12 20-12M12 46l20-16 20 16" stroke="rgba(255,255,255,0.35)" stroke-width="1.2" stroke-linejoin="round"/>
+      <path d="M25 20.5h10.5c4.1 0 7 2.4 7 6.3 0 4.4-3 6.9-7.8 6.9H30v9.3h-5V20.5Zm5 4.3v4.8h5c1.8 0 2.9-.9 2.9-2.4 0-1.5-1.1-2.4-2.9-2.4h-5Z" fill="white"/>
+    </svg>
+  `;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(iconSvg)}`;
+})();
 
 interface EntryFormState {
   categoryColor: CategoryColorKey;
@@ -1403,12 +1421,25 @@ export const App = () => {
   const [serverHealthState, setServerHealthState] =
     useState<ServerHealthState>('checking');
 
-  useEffect(() => {
-    document.title = 'Prysma | Ecosistema de Conocimiento';
-  }, []);
   const manualServerRevisionRef = useRef('');
   const shouldPersistToServerRef = useRef(false);
   const customization = manualData.settings.customization;
+
+  useEffect(() => {
+    document.title = 'Prysma | Ecosistema de Conocimiento';
+
+    const faviconHref =
+      customization.appIconDataUrl.trim() || defaultPrysmaIconDataUrl;
+    let faviconElement = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+
+    if (!faviconElement) {
+      faviconElement = document.createElement('link');
+      faviconElement.rel = 'icon';
+      document.head.appendChild(faviconElement);
+    }
+
+    faviconElement.href = faviconHref;
+  }, [customization.appIconDataUrl]);
 
   const categoryMap = useMemo(
     () =>
@@ -4361,7 +4392,6 @@ export const App = () => {
                     <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
                       {customization.heroDescription}
                     </p>
-
                     <div className="mt-5 flex flex-wrap gap-2.5">
                       <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-200">
                         Manuales versionados
