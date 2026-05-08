@@ -42,7 +42,7 @@ if ($electronProcess.HasExited) {
 
   [System.Windows.MessageBox]::Show(
     "Electron se ha cerrado justo despues de arrancar.`n`nRevisa este log:`n$desktopLogPath`n`nUltimas lineas:`n$desktopLog",
-    'Asistente de Conocimiento',
+    'Prysma',
     'OK',
     'Warning'
   ) | Out-Null

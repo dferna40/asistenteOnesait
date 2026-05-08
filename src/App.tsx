@@ -70,7 +70,7 @@ const defaultCategoryMetadata: Record<
   },
   Seguros: {
     color: 'rose',
-    description: 'Glosario de negocio y conceptos especificos de RGA.',
+    description: 'Glosario de negocio y conceptos especificos del ecosistema Prysma.',
   },
 };
 
@@ -1402,6 +1402,10 @@ export const App = () => {
   const [redoStack, setRedoStack] = useState<UndoSnapshot[]>([]);
   const [serverHealthState, setServerHealthState] =
     useState<ServerHealthState>('checking');
+
+  useEffect(() => {
+    document.title = 'Prysma | Ecosistema de Conocimiento';
+  }, []);
   const manualServerRevisionRef = useRef('');
   const shouldPersistToServerRef = useRef(false);
   const customization = manualData.settings.customization;
@@ -3519,7 +3523,7 @@ export const App = () => {
 
     downloadJsonFile(
       backupPayload,
-      `RGA_Backup_${new Date().toISOString().slice(0, 10)}.json`,
+      `Prysma_Backup_${new Date().toISOString().slice(0, 10)}.json`,
     );
   };
 
@@ -4985,10 +4989,10 @@ export const App = () => {
                               }))
                             }
                             className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                            placeholder="oracle, producción, incidencia, rga"
+                            placeholder="oracle, producción, incidencia, prysma"
                           />
                           <p className="text-xs font-normal leading-5 text-slate-500 dark:text-slate-400">
-                            Usa de 2 a 5 tags cortos para búsqueda, separados por comas. Convención recomendada: tecnología, entorno, tipo de tarea y sistema o negocio. Ejemplo: oracle, producción, incidencia, rga.
+                            Usa de 2 a 5 tags cortos para búsqueda, separados por comas. Convención recomendada: tecnología, entorno, tipo de tarea y sistema o negocio. Ejemplo: oracle, producción, incidencia, prysma.
                           </p>
                         </label>
                       </div>

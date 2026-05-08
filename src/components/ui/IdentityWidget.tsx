@@ -171,7 +171,7 @@ export function IdentityWidget({ customization }: IdentityWidgetProps) {
                       : 'Credencial oculta',
                   )
                 }
-                aria-label="Copiar usuario Global RGA"
+                aria-label="Copiar usuario Global Prysma"
                 title="Copiar usuario"
                 className="sidebar-soft-button inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm text-slate-600 transition-all duration-200 hover:text-violet-700 dark:text-slate-200 dark:hover:text-white"
               >
@@ -219,7 +219,7 @@ export function IdentityWidget({ customization }: IdentityWidgetProps) {
                       : 'Credencial oculta',
                   )
                 }
-                aria-label="Copiar password Global RGA"
+                aria-label="Copiar password Global Prysma"
                 title="Copiar password"
                 className="sidebar-soft-button inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm text-slate-600 transition-all duration-200 hover:text-violet-700 dark:text-slate-200 dark:hover:text-white"
               >

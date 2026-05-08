@@ -1,4 +1,4 @@
-# Asistente Onesait
+# Prysma
 
 Aplicacion local de apoyo al trabajo diario para centralizar conocimiento operativo: entornos, accesos, procedimientos, comandos, plantillas y documentacion tecnica en Markdown.
 
@@ -110,8 +110,8 @@ Como cerrar:
 
 Arranque recomendado para uso diario en navegador:
 
-- [Abrir Asistente.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.vbs)
-- [Abrir Asistente.cmd](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.cmd)
+- [Abrir Prysma.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma.vbs)
+- [Abrir Prysma.cmd](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma.cmd)
 
 Que hace:
 
@@ -122,8 +122,8 @@ Que hace:
 
 Como cerrar correctamente:
 
-- [Cerrar Asistente.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.vbs)
-- [Cerrar Asistente.cmd](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.cmd)
+- [Cerrar Prysma.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma.vbs)
+- [Cerrar Prysma.cmd](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma.cmd)
 
 Importante:
 
@@ -140,8 +140,8 @@ npm run desktop
 
 Pero para uso normal en Windows se recomienda:
 
-- [Abrir Asistente Electron.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente%20Electron.vbs)
-- [Abrir Asistente Electron.cmd](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente%20Electron.cmd)
+- [Abrir Prysma Electron.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma%20Electron.vbs)
+- [Abrir Prysma Electron.cmd](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma%20Electron.cmd)
 
 Que hace:
 
@@ -151,8 +151,8 @@ Que hace:
 
 Como cerrar correctamente:
 
-- [Cerrar Asistente Electron.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente%20Electron.vbs)
-- [Cerrar Asistente Electron.cmd](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente%20Electron.cmd)
+- [Cerrar Prysma Electron.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma%20Electron.vbs)
+- [Cerrar Prysma Electron.cmd](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma%20Electron.cmd)
 
 Importante:
 
@@ -181,15 +181,15 @@ npm run desktop
 
 ### Uso diario en navegador
 
-1. Ejecuta [Abrir Asistente.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente.vbs)
+1. Ejecuta [Abrir Prysma.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma.vbs)
 2. Trabaja normalmente
-3. Cierra con [Cerrar Asistente.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente.vbs)
+3. Cierra con [Cerrar Prysma.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma.vbs)
 
 ### Uso diario en escritorio
 
-1. Ejecuta [Abrir Asistente Electron.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Asistente%20Electron.vbs)
+1. Ejecuta [Abrir Prysma Electron.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma%20Electron.vbs)
 2. Trabaja normalmente
-3. Cierra con [Cerrar Asistente Electron.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Asistente%20Electron.vbs)
+3. Cierra con [Cerrar Prysma Electron.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma%20Electron.vbs)
 
 ### Cuando cambies codigo
 

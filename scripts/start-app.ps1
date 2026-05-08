@@ -27,7 +27,7 @@ function Write-LauncherLog {
 if (-not (Test-Path -LiteralPath $distIndexPath)) {
   [System.Windows.MessageBox]::Show(
     "No existe la version compilada de la aplicacion.`n`nFalta este archivo:`n$distIndexPath",
-    'Asistente de Conocimiento',
+    'Prysma',
     'OK',
     'Warning'
   ) | Out-Null
@@ -231,7 +231,7 @@ for ($attempt = 0; $attempt -lt $maxAttempts; $attempt++) {
 
     [System.Windows.MessageBox]::Show(
       "La aplicacion ha arrancado, pero no se ha podido abrir el navegador automaticamente.`n`nAbre manualmente esta URL:`n$appUrl",
-      'Asistente de Conocimiento',
+      'Prysma',
       'OK',
       'Warning'
     ) | Out-Null
@@ -244,7 +244,7 @@ for ($attempt = 0; $attempt -lt $maxAttempts; $attempt++) {
 
 [System.Windows.MessageBox]::Show(
   "La aplicacion no ha arrancado a tiempo.`n`nRevisa estos logs:`n$serverLogPath`n$serverErrorLogPath",
-  'Asistente de Conocimiento',
+  'Prysma',
   'OK',
   'Warning'
 ) | Out-Null

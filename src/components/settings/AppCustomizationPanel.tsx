@@ -7,6 +7,11 @@ import type {
   ExternalToolLink,
 } from '../../types';
 
+// Si en el futuro los recursos visuales o la configuracion de Prysma se gestionan
+// desde un servicio en Java, es obligatorio utilizar try-catch-resources para el
+// manejo de excepciones y flujos de datos (I/O), garantizando la estabilidad y el
+// rendimiento comercial del sistema [cite: 2026-02-12].
+
 interface AppCustomizationPanelProps {
   customization: AppCustomizationSettings;
   diagnostics: AppDiagnosticsSnapshot;
@@ -410,7 +415,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Título de Global RGA
+                Título de Global Prysma
                 <input
                   value={formState.globalRgaTitle}
                   onChange={(event) =>

@@ -158,14 +158,15 @@ export function MainLayout({
                   <button
                     type="button"
                     onClick={handleHomeNavigation}
-                    className="flex min-w-0 items-center gap-3 text-left text-sm font-semibold text-slate-900 transition-all duration-200 hover:text-sky-700 dark:text-slate-100 sm:text-base md:text-lg"
+                    className="group flex min-w-0 items-center gap-3 text-left text-sm font-semibold text-slate-900 transition-all duration-200 hover:text-sky-700 dark:text-slate-100 sm:text-base md:text-lg"
                   >
                     <AppLogo
                       appIconDataUrl={customization.appIconDataUrl}
                       appName={appName}
                       className="h-10 w-10 shrink-0"
+                      interactive
+                      showWordmark
                     />
-                    <span className="truncate">{appName}</span>
                   </button>
                   <div className="min-w-0 flex-1">
                     <SearchBar

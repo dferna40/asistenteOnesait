@@ -1,5 +1,11 @@
 import type { AppCustomizationSettings, ExternalToolLink } from '../types';
 
+const legacyAppNames = new Set([
+  'Asistente Onesait',
+  'Asistente Onesite RGA',
+  'Asistente Supervivencia RGA',
+]);
+
 export const defaultExternalTools: ExternalToolLink[] = [
   { id: 'jira-indra', name: 'Jira Indra', url: 'https://jira.indra.es/secure/Dashboard.jspa' },
   {
@@ -59,18 +65,18 @@ export const defaultExternalTools: ExternalToolLink[] = [
 
 export const defaultAppCustomization: AppCustomizationSettings = {
   appIconDataUrl: '',
-  appName: 'Asistente Onesite RGA',
+  appName: 'Prysma',
   backupSectionTitle: 'Backup',
   companyUsersLabel: 'Usuarios por Compania',
   devToolsSectionTitle: 'DevTools',
   externalTools: defaultExternalTools,
   externalToolsTitle: 'Herramientas Externas',
   globalPasswordLabel: 'Password',
-  globalRgaTitle: 'Global RGA',
+  globalRgaTitle: 'Global Prysma',
   globalUserLabel: 'Usuario',
   heroDescription:
     'Tu centro de conocimiento inteligente: Organiza guias de trabajo, revisa el estado de tus sistemas y genera manuales profesionales listos para compartir.',
-  heroTitle: 'Ecosistema de Conocimiento RGA',
+  heroTitle: 'Ecosistema de Conocimiento',
   reminderText:
     'Para cualquier implementacion Java que gestione excepciones, utiliza siempre try-catch-resources para garantizar la seguridad del codigo.',
   sidebarIdentityTitle: 'Escritorio',
@@ -95,9 +101,15 @@ export const normalizeCustomization = (
       )
     : defaultExternalTools;
 
+  const normalizedAppName = customization?.appName?.trim();
+
   return {
     ...defaultAppCustomization,
     ...customization,
+    appName:
+      normalizedAppName && !legacyAppNames.has(normalizedAppName)
+        ? normalizedAppName
+        : defaultAppCustomization.appName,
     externalTools: mergedExternalTools,
   };
 };

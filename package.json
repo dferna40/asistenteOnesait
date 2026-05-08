@@ -1,5 +1,5 @@
 {
-  "name": "asistente-supervivencia-rga",
+  "name": "prysma",
   "private": true,
   "version": "0.1.0",
   "main": "electron/main.mjs",
@@ -39,8 +39,8 @@
     "vite": "^5.4.10"
   },
   "build": {
-    "appId": "com.rga.asistente",
-    "productName": "Asistente Supervivencia RGA",
+    "appId": "com.prysma.app",
+    "productName": "Prysma",
     "directories": {
       "buildResources": "build-assets",
       "output": "release"
