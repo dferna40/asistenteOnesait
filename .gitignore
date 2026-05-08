@@ -52,4 +52,6 @@ Thumbs.db
 *.pid
 backups/
 tmp-userdata/
-public/images/
+public/images/*
+!public/images/.gitkeep
+src/data/manual.local.json
