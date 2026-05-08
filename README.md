@@ -1,4 +1,4 @@
-# Prysma
+﻿# Prysma
 
 Aplicacion local de apoyo al trabajo diario para centralizar conocimiento operativo: entornos, accesos, procedimientos, comandos, plantillas y documentacion tecnica en Markdown.
 
@@ -37,17 +37,17 @@ La aplicacion puede usarse de tres maneras:
 
 ## Estructura principal
 
-- [src/App.tsx](C:/Desarrollo/asistenteOnesait/src/App.tsx): logica principal de la aplicacion
-- [src/main.tsx](C:/Desarrollo/asistenteOnesait/src/main.tsx): bootstrap del frontend y captura de errores de render
-- [src/components](C:/Desarrollo/asistenteOnesait/src/components): componentes y paneles
-- [src/hooks/useSearch.ts](C:/Desarrollo/asistenteOnesait/src/hooks/useSearch.ts): busqueda, prefijos y filtros
-- [src/types/index.ts](C:/Desarrollo/asistenteOnesait/src/types/index.ts): tipos del dominio
-- [src/data/manual.json](C:/Desarrollo/asistenteOnesait/src/data/manual.json): manual base inicial
-- [server.js](C:/Desarrollo/asistenteOnesait/server.js): persistencia, backups, subida de imagenes y comprobaciones
-- [electron/main.mjs](C:/Desarrollo/asistenteOnesait/electron/main.mjs): arranque de la variante Electron
-- [scripts/start-app.ps1](C:/Desarrollo/asistenteOnesait/scripts/start-app.ps1): arranque del modo web compilado
-- [scripts/start-electron.ps1](C:/Desarrollo/asistenteOnesait/scripts/start-electron.ps1): arranque del modo Electron
-- [scripts/stop-app.ps1](C:/Desarrollo/asistenteOnesait/scripts/stop-app.ps1): cierre de servidores e instancias locales
+- [src/App.tsx](src/App.tsx): logica principal de la aplicacion
+- [src/main.tsx](src/main.tsx): bootstrap del frontend y captura de errores de render
+- [src/components](src/components): componentes y paneles
+- [src/hooks/useSearch.ts](src/hooks/useSearch.ts): busqueda, prefijos y filtros
+- [src/types/index.ts](src/types/index.ts): tipos del dominio
+- [src/data/manual.json](src/data/manual.json): manual base inicial
+- [server.js](server.js): persistencia, backups, subida de imagenes y comprobaciones
+- [electron/main.mjs](electron/main.mjs): arranque de la variante Electron
+- [scripts/start-app.ps1](scripts/start-app.ps1): arranque del modo web compilado
+- [scripts/start-electron.ps1](scripts/start-electron.ps1): arranque del modo Electron
+- [scripts/stop-app.ps1](scripts/stop-app.ps1): cierre de servidores e instancias locales
 
 ## Requisitos
 
@@ -110,8 +110,8 @@ Como cerrar:
 
 Arranque recomendado para uso diario en navegador:
 
-- [Abrir Prysma.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma.vbs)
-- [Abrir Prysma.cmd](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma.cmd)
+- [Abrir Prysma.vbs](Abrir%20Prysma.vbs)
+- [Abrir Prysma.cmd](Abrir%20Prysma.cmd)
 
 Que hace:
 
@@ -122,8 +122,8 @@ Que hace:
 
 Como cerrar correctamente:
 
-- [Cerrar Prysma.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma.vbs)
-- [Cerrar Prysma.cmd](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma.cmd)
+- [Cerrar Prysma.vbs](Cerrar%20Prysma.vbs)
+- [Cerrar Prysma.cmd](Cerrar%20Prysma.cmd)
 
 Importante:
 
@@ -140,8 +140,8 @@ npm run desktop
 
 Pero para uso normal en Windows se recomienda:
 
-- [Abrir Prysma Electron.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma%20Electron.vbs)
-- [Abrir Prysma Electron.cmd](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma%20Electron.cmd)
+- [Abrir Prysma Electron.vbs](Abrir%20Prysma%20Electron.vbs)
+- [Abrir Prysma Electron.cmd](Abrir%20Prysma%20Electron.cmd)
 
 Que hace:
 
@@ -151,8 +151,8 @@ Que hace:
 
 Como cerrar correctamente:
 
-- [Cerrar Prysma Electron.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma%20Electron.vbs)
-- [Cerrar Prysma Electron.cmd](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma%20Electron.cmd)
+- [Cerrar Prysma Electron.vbs](Cerrar%20Prysma%20Electron.vbs)
+- [Cerrar Prysma Electron.cmd](Cerrar%20Prysma%20Electron.cmd)
 
 Importante:
 
@@ -181,15 +181,15 @@ npm run desktop
 
 ### Uso diario en navegador
 
-1. Ejecuta [Abrir Prysma.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma.vbs)
+1. Ejecuta [Abrir Prysma.vbs](Abrir%20Prysma.vbs)
 2. Trabaja normalmente
-3. Cierra con [Cerrar Prysma.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma.vbs)
+3. Cierra con [Cerrar Prysma.vbs](Cerrar%20Prysma.vbs)
 
 ### Uso diario en escritorio
 
-1. Ejecuta [Abrir Prysma Electron.vbs](C:/Desarrollo/asistenteOnesait/Abrir%20Prysma%20Electron.vbs)
+1. Ejecuta [Abrir Prysma Electron.vbs](Abrir%20Prysma%20Electron.vbs)
 2. Trabaja normalmente
-3. Cierra con [Cerrar Prysma Electron.vbs](C:/Desarrollo/asistenteOnesait/Cerrar%20Prysma%20Electron.vbs)
+3. Cierra con [Cerrar Prysma Electron.vbs](Cerrar%20Prysma%20Electron.vbs)
 
 ### Cuando cambies codigo
 
@@ -222,7 +222,7 @@ Responsabilidades principales:
 
 ### Backend
 
-El backend local en [server.js](C:/Desarrollo/asistenteOnesait/server.js) se encarga de:
+El backend local en [server.js](server.js) se encarga de:
 
 - leer el manual desde disco
 - guardar el manual completo
@@ -468,11 +468,11 @@ npm run desktop:portable
 
 Si algo falla, revisa:
 
-- [launcher.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/launcher.log)
-- [electron-launcher.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/electron-launcher.log)
-- [server.stdout.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/server.stdout.log)
-- [server.stderr.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/server.stderr.log)
-- [desktop-runtime.log](C:/Desarrollo/asistenteOnesait/.runtime/electron-userdata/desktop-runtime.log)
+- [launcher.log](.runtime/logs/launcher.log)
+- [electron-launcher.log](.runtime/logs/electron-launcher.log)
+- [server.stdout.log](.runtime/logs/server.stdout.log)
+- [server.stderr.log](.runtime/logs/server.stderr.log)
+- [desktop-runtime.log](.runtime/electron-userdata/desktop-runtime.log)
 
 ## Solucion de problemas
 
@@ -492,7 +492,7 @@ Prueba:
 
 Nota:
 
-- [src/main.tsx](C:/Desarrollo/asistenteOnesait/src/main.tsx) incluye una captura de errores de render para evitar pantallas completamente mudas
+- [src/main.tsx](src/main.tsx) incluye una captura de errores de render para evitar pantallas completamente mudas
 
 ### El modo navegador no abre la interfaz
 
@@ -501,7 +501,7 @@ Comprueba:
 - que exista `dist/index.html`
 - que `npm run build` se haya ejecutado
 - que el backend responda en `3001`
-- el contenido de [launcher.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/launcher.log)
+- el contenido de [launcher.log](.runtime/logs/launcher.log)
 
 ### Electron no muestra la ventana
 
@@ -509,8 +509,8 @@ Comprueba:
 
 - que `dist` este actualizado
 - que no haya otra instancia previa
-- el contenido de [electron-launcher.log](C:/Desarrollo/asistenteOnesait/.runtime/logs/electron-launcher.log)
-- el contenido de [desktop-runtime.log](C:/Desarrollo/asistenteOnesait/.runtime/electron-userdata/desktop-runtime.log)
+- el contenido de [electron-launcher.log](.runtime/logs/electron-launcher.log)
+- el contenido de [desktop-runtime.log](.runtime/electron-userdata/desktop-runtime.log)
 
 ### El guardado falla
 
@@ -549,13 +549,13 @@ No subas:
 - `tmp-userdata/`
 - `public/images/`
 
-Eso ya esta cubierto por [.gitignore](C:/Desarrollo/asistenteOnesait/.gitignore).
+Eso ya esta cubierto por [.gitignore](.gitignore).
 
 ## Seguridad
 
 Recomendaciones:
 
-- no subas credenciales reales a [src/data/manual.json](C:/Desarrollo/asistenteOnesait/src/data/manual.json)
+- no subas credenciales reales a [src/data/manual.json](src/data/manual.json)
 - no subas backups locales
 - no subas imagenes operativas temporales
 - usa copias privadas si el contenido incluye accesos reales
@@ -582,3 +582,5 @@ El proyecto ya incluye:
 - sanitizacion mas avanzada de secretos
 - sincronizacion multiusuario real
 - exportaciones mas ricas
+
+
