@@ -46,6 +46,35 @@ const createAllowedOrigins = (port) =>
     `http://127.0.0.1:${port}`,
   ]);
 
+const normalizeStorageKey = (value) => {
+  const normalizedValue =
+    typeof value === 'string'
+      ? value
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+      : '';
+
+  return normalizedValue || 'sin-categoria';
+};
+
+const buildBlockStoragePaths = (baseDirectory) => {
+  const runtimeDataDirectory = path.resolve(baseDirectory);
+  const entriesDirectory = path.join(runtimeDataDirectory, 'entries');
+
+  return {
+    categoriesFilePath: path.join(runtimeDataDirectory, 'categories.json'),
+    entriesDirectory,
+    runtimeDataDirectory,
+    settingsFilePath: path.join(runtimeDataDirectory, 'settings.json'),
+    templatesFilePath: path.join(runtimeDataDirectory, 'templates.json'),
+    trashFilePath: path.join(runtimeDataDirectory, 'trash.json'),
+  };
+};
+
 const resolveRuntimePaths = ({
   appDataDir,
   sourceRoot = projectRoot,
@@ -53,66 +82,248 @@ const resolveRuntimePaths = ({
 } = {}) => {
   const bundledManualFilePath = path.resolve(sourceRoot, 'src', 'data', 'manual.json');
   const localManualFilePath = path.resolve(sourceRoot, 'src', 'data', 'manual.local.json');
+  const sourceRuntimeDataDirectory = path.resolve(sourceRoot, 'src', 'data', 'runtime');
+  const sourceBlockStoragePaths = buildBlockStoragePaths(sourceRuntimeDataDirectory);
 
   if (!appDataDir) {
     return {
       backupsDirectory: path.resolve(sourceRoot, 'backups'),
       bundledManualFilePath,
       imagesDirectory: path.resolve(sourceRoot, 'public', 'images'),
+      legacyManualFilePath: localManualFilePath,
       manualFilePath: localManualFilePath,
       staticDistDirectory: staticDistDir ?? path.resolve(sourceRoot, 'dist'),
+      ...sourceBlockStoragePaths,
     };
   }
+
+  const appRuntimeDataDirectory = path.resolve(appDataDir, 'data');
+  const appBlockStoragePaths = buildBlockStoragePaths(appRuntimeDataDirectory);
 
   return {
     backupsDirectory: path.resolve(appDataDir, 'backups'),
     bundledManualFilePath,
     imagesDirectory: path.resolve(appDataDir, 'images'),
+    legacyManualFilePath: path.resolve(appDataDir, 'manual.json'),
     manualFilePath: path.resolve(appDataDir, 'manual.json'),
     staticDistDirectory: staticDistDir ?? path.resolve(sourceRoot, 'dist'),
+    ...appBlockStoragePaths,
   };
 };
 
-const ensureRuntimeFiles = async ({
-  backupsDirectory,
-  bundledManualFilePath,
-  imagesDirectory,
-  manualFilePath,
-}) => {
-  await fs.promises.mkdir(imagesDirectory, { recursive: true });
-  await fs.promises.mkdir(backupsDirectory, { recursive: true });
+const writeJsonFile = async (filePath, payload) => {
+  await fs.promises.writeFile(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+};
 
-  if (!fs.existsSync(manualFilePath) && fs.existsSync(bundledManualFilePath)) {
-    await fs.promises.copyFile(bundledManualFilePath, manualFilePath);
-    logServerEvent('BOOT', 'Manual inicial copiado al directorio de trabajo.', {
-      manualFilePath,
-    });
+const readJsonFile = async (filePath) => {
+  const rawFile = await fs.promises.readFile(filePath, 'utf-8');
+
+  return JSON.parse(rawFile);
+};
+
+const hasBlockStorage = (runtimePaths) =>
+  fs.existsSync(runtimePaths.categoriesFilePath) &&
+  fs.existsSync(runtimePaths.settingsFilePath) &&
+  fs.existsSync(runtimePaths.templatesFilePath) &&
+  fs.existsSync(runtimePaths.trashFilePath) &&
+  fs.existsSync(runtimePaths.entriesDirectory);
+
+const groupEntriesByCategory = (entries) => {
+  const entriesByCategory = new Map();
+
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    const categoryName =
+      typeof entry?.categoria === 'string' && entry.categoria.trim()
+        ? entry.categoria.trim()
+        : 'Sin categoria';
+    const storageKey = normalizeStorageKey(categoryName);
+
+    if (!entriesByCategory.has(storageKey)) {
+      entriesByCategory.set(storageKey, []);
+    }
+
+    entriesByCategory.get(storageKey).push(entry);
+  });
+
+  return entriesByCategory;
+};
+
+const writeBlockManualData = async (
+  runtimePaths,
+  manualData,
+  { syncLegacySnapshot = true } = {},
+) => {
+  await fs.promises.mkdir(runtimePaths.runtimeDataDirectory, { recursive: true });
+  await fs.promises.mkdir(runtimePaths.entriesDirectory, { recursive: true });
+
+  await Promise.all([
+    writeJsonFile(runtimePaths.categoriesFilePath, manualData.categories ?? []),
+    writeJsonFile(runtimePaths.settingsFilePath, manualData.settings ?? {}),
+    writeJsonFile(runtimePaths.templatesFilePath, manualData.templates ?? []),
+    writeJsonFile(runtimePaths.trashFilePath, manualData.trash ?? []),
+  ]);
+
+  const entriesByCategory = groupEntriesByCategory(manualData.entries);
+  const nextEntryFileNames = new Set();
+
+  for (const [storageKey, categoryEntries] of entriesByCategory.entries()) {
+    const entryFileName = `${storageKey}.json`;
+    const entryFilePath = path.join(runtimePaths.entriesDirectory, entryFileName);
+
+    nextEntryFileNames.add(entryFileName);
+    await writeJsonFile(entryFilePath, categoryEntries);
+  }
+
+  const existingEntryFiles = fs.existsSync(runtimePaths.entriesDirectory)
+    ? await fs.promises.readdir(runtimePaths.entriesDirectory, {
+        withFileTypes: true,
+      })
+    : [];
+
+  for (const entryFile of existingEntryFiles) {
+    if (!entryFile.isFile() || path.extname(entryFile.name) !== '.json') {
+      continue;
+    }
+
+    if (nextEntryFileNames.has(entryFile.name)) {
+      continue;
+    }
+
+    await fs.promises.unlink(path.join(runtimePaths.entriesDirectory, entryFile.name));
+  }
+
+  if (syncLegacySnapshot && runtimePaths.legacyManualFilePath) {
+    await writeJsonFile(runtimePaths.legacyManualFilePath, manualData);
   }
 };
 
-const readManualFile = async (manualFilePath, bundledManualFilePath) => {
-  const candidateFilePath = fs.existsSync(manualFilePath)
-    ? manualFilePath
-    : bundledManualFilePath;
+const readLegacyOrBundledManualFile = async (runtimePaths) => {
+  const candidateFilePath = fs.existsSync(runtimePaths.legacyManualFilePath)
+    ? runtimePaths.legacyManualFilePath
+    : runtimePaths.bundledManualFilePath;
 
-  const rawManual = await fs.promises.readFile(candidateFilePath, 'utf-8');
-
-  return JSON.parse(rawManual);
+  return readJsonFile(candidateFilePath);
 };
 
-const getManualRevision = async (manualFilePath, bundledManualFilePath) => {
-  const candidateFilePath = fs.existsSync(manualFilePath)
-    ? manualFilePath
-    : bundledManualFilePath;
-  const stats = await fs.promises.stat(candidateFilePath);
+const readBlockManualFile = async (runtimePaths) => {
+  const [
+    categories,
+    settings,
+    templates,
+    trash,
+  ] = await Promise.all([
+    readJsonFile(runtimePaths.categoriesFilePath),
+    readJsonFile(runtimePaths.settingsFilePath),
+    readJsonFile(runtimePaths.templatesFilePath),
+    readJsonFile(runtimePaths.trashFilePath),
+  ]);
 
-  return `${stats.mtimeMs}-${stats.size}`;
+  const entryFiles = await fs.promises.readdir(runtimePaths.entriesDirectory, {
+    withFileTypes: true,
+  });
+  const entryFilePaths = entryFiles
+    .filter((entryFile) => entryFile.isFile() && path.extname(entryFile.name) === '.json')
+    .map((entryFile) => path.join(runtimePaths.entriesDirectory, entryFile.name));
+  const entryChunks = await Promise.all(entryFilePaths.map((entryFilePath) => readJsonFile(entryFilePath)));
+
+  return {
+    categories: Array.isArray(categories) ? categories : [],
+    deletedCategories: [],
+    entries: entryChunks.flatMap((entryChunk) => (Array.isArray(entryChunk) ? entryChunk : [])),
+    settings: settings && typeof settings === 'object' ? settings : {},
+    templates: Array.isArray(templates) ? templates : [],
+    trash: Array.isArray(trash) ? trash : [],
+  };
 };
 
-const readManualPayload = async (manualFilePath, bundledManualFilePath) => ({
-  data: await readManualFile(manualFilePath, bundledManualFilePath),
-  revision: await getManualRevision(manualFilePath, bundledManualFilePath),
+const readManualFile = async (runtimePaths) => {
+  if (hasBlockStorage(runtimePaths)) {
+    return readBlockManualFile(runtimePaths);
+  }
+
+  return readLegacyOrBundledManualFile(runtimePaths);
+};
+
+const listRevisionFiles = async (runtimePaths) => {
+  if (hasBlockStorage(runtimePaths)) {
+    const entryFiles = await fs.promises.readdir(runtimePaths.entriesDirectory, {
+      withFileTypes: true,
+    });
+
+    return [
+      runtimePaths.categoriesFilePath,
+      runtimePaths.settingsFilePath,
+      runtimePaths.templatesFilePath,
+      runtimePaths.trashFilePath,
+      ...entryFiles
+        .filter((entryFile) => entryFile.isFile() && path.extname(entryFile.name) === '.json')
+        .map((entryFile) => path.join(runtimePaths.entriesDirectory, entryFile.name)),
+    ];
+  }
+
+  return [
+    fs.existsSync(runtimePaths.legacyManualFilePath)
+      ? runtimePaths.legacyManualFilePath
+      : runtimePaths.bundledManualFilePath,
+  ];
+};
+
+const getManualRevision = async (runtimePaths) => {
+  const revisionFiles = await listRevisionFiles(runtimePaths);
+  const fileStats = await Promise.all(
+    revisionFiles.map(async (filePath) => {
+      const stats = await fs.promises.stat(filePath);
+
+      return {
+        mtimeMs: stats.mtimeMs,
+        size: stats.size,
+      };
+    }),
+  );
+  const totalSize = fileStats.reduce((sum, fileStat) => sum + fileStat.size, 0);
+  const latestModifiedAt = fileStats.reduce(
+    (maxValue, fileStat) => Math.max(maxValue, fileStat.mtimeMs),
+    0,
+  );
+
+  return `${latestModifiedAt}-${totalSize}-${revisionFiles.length}`;
+};
+
+const readManualPayload = async (runtimePaths) => ({
+  data: await readManualFile(runtimePaths),
+  revision: await getManualRevision(runtimePaths),
 });
+
+const ensureRuntimeFiles = async (runtimePaths) => {
+  await fs.promises.mkdir(runtimePaths.imagesDirectory, { recursive: true });
+  await fs.promises.mkdir(runtimePaths.backupsDirectory, { recursive: true });
+  await fs.promises.mkdir(runtimePaths.runtimeDataDirectory, { recursive: true });
+  await fs.promises.mkdir(runtimePaths.entriesDirectory, { recursive: true });
+
+  if (hasBlockStorage(runtimePaths)) {
+    return;
+  }
+
+  const canUseLegacyManual = fs.existsSync(runtimePaths.legacyManualFilePath);
+  const canUseBundledManual = fs.existsSync(runtimePaths.bundledManualFilePath);
+
+  if (!canUseLegacyManual && !canUseBundledManual) {
+    return;
+  }
+
+  const sourceManualData = await readLegacyOrBundledManualFile(runtimePaths);
+  await writeBlockManualData(runtimePaths, sourceManualData, {
+    syncLegacySnapshot: canUseLegacyManual,
+  });
+
+  logServerEvent('BOOT', 'Persistencia por bloques preparada correctamente.', {
+    source:
+      canUseLegacyManual && fs.existsSync(runtimePaths.legacyManualFilePath)
+        ? runtimePaths.legacyManualFilePath
+        : runtimePaths.bundledManualFilePath,
+    runtimeDataDirectory: runtimePaths.runtimeDataDirectory,
+  });
+};
 
 const normalizeEndpointTarget = (value) => {
   const trimmedValue = typeof value === 'string' ? value.trim() : '';
@@ -294,13 +505,11 @@ export const startServer = async ({
 
   app.get('/manual', async (_request, response) => {
     try {
-      const manualPayload = await readManualPayload(
-        runtimePaths.manualFilePath,
-        runtimePaths.bundledManualFilePath,
-      );
+      const manualPayload = await readManualPayload(runtimePaths);
 
       logServerEvent('LOAD', 'Manual cargado correctamente.', {
-        manualFilePath: runtimePaths.manualFilePath,
+        runtimeDataDirectory: runtimePaths.runtimeDataDirectory,
+        legacyManualFilePath: runtimePaths.legacyManualFilePath,
       });
 
       response.status(200).json(manualPayload);
@@ -382,10 +591,7 @@ export const startServer = async ({
 
     try {
       if (expectedRevision) {
-        const currentRevision = await getManualRevision(
-          runtimePaths.manualFilePath,
-          runtimePaths.bundledManualFilePath,
-        );
+        const currentRevision = await getManualRevision(runtimePaths);
 
         if (currentRevision !== expectedRevision) {
           logServerEvent('SAVE', 'Conflicto de revision detectado al guardar.', {
@@ -420,7 +626,8 @@ export const startServer = async ({
       );
 
       try {
-        await fs.promises.copyFile(runtimePaths.manualFilePath, backupFilePath);
+        const currentManualSnapshot = await readManualFile(runtimePaths);
+        await writeJsonFile(backupFilePath, currentManualSnapshot);
         logServerEvent('SAVE', 'Backup previo generado.', { backupFilePath });
       } catch (error) {
         const fileMissing =
@@ -442,16 +649,13 @@ export const startServer = async ({
       // el uso de try-catch-resources para el manejo de FileWriter,
       // BufferedWriter y otros flujos de salida, garantizando el cierre seguro de
       // descriptores en JBoss.
-      await fs.promises.writeFile(
-        runtimePaths.manualFilePath,
-        JSON.stringify(manualData, null, 2),
-        'utf-8',
-      );
+      await writeBlockManualData(runtimePaths, manualData);
 
       await cleanupOrphanedImages(runtimePaths.imagesDirectory, manualData);
 
       logServerEvent('SAVE', 'Manual actualizado en disco correctamente.', {
-        manualFilePath: runtimePaths.manualFilePath,
+        runtimeDataDirectory: runtimePaths.runtimeDataDirectory,
+        legacyManualFilePath: runtimePaths.legacyManualFilePath,
         totalCategorias: Array.isArray(manualData.categories)
           ? manualData.categories.length
           : 0,
@@ -463,10 +667,7 @@ export const startServer = async ({
       });
       response.status(200).json({
         ok: true,
-        revision: await getManualRevision(
-          runtimePaths.manualFilePath,
-          runtimePaths.bundledManualFilePath,
-        ),
+        revision: await getManualRevision(runtimePaths),
       });
     } catch (error) {
       console.error(
@@ -515,8 +716,9 @@ export const startServer = async ({
         allowedOrigins: Array.from(resolvedAllowedOrigins),
         backupsDirectory: runtimePaths.backupsDirectory,
         imagesDirectory: runtimePaths.imagesDirectory,
-        manualFilePath: runtimePaths.manualFilePath,
+        legacyManualFilePath: runtimePaths.legacyManualFilePath,
         port,
+        runtimeDataDirectory: runtimePaths.runtimeDataDirectory,
         serveStatic,
         staticDistDirectory: runtimePaths.staticDistDirectory,
       });

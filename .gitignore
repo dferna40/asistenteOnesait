@@ -55,3 +55,4 @@ tmp-userdata/
 public/images/*
 !public/images/.gitkeep
 src/data/manual.local.json
+src/data/runtime/
