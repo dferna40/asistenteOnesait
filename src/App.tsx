@@ -4105,7 +4105,7 @@ export const App = () => {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(downloadUrl);
     window.alert(
-      'Guia: este archivo ya sale con el manual completo. Sustituyelo en src/data/manual.json para convertirlo en la nueva base del asistente.',
+      'Guia: este archivo ya sale con el manual completo. Si quieres conservarlo solo en tu equipo, sustituyelo en src/data/manual.local.json.',
     );
   };
 

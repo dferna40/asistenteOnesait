@@ -52,13 +52,14 @@ const resolveRuntimePaths = ({
   staticDistDir,
 } = {}) => {
   const bundledManualFilePath = path.resolve(sourceRoot, 'src', 'data', 'manual.json');
+  const localManualFilePath = path.resolve(sourceRoot, 'src', 'data', 'manual.local.json');
 
   if (!appDataDir) {
     return {
       backupsDirectory: path.resolve(sourceRoot, 'backups'),
       bundledManualFilePath,
       imagesDirectory: path.resolve(sourceRoot, 'public', 'images'),
-      manualFilePath: bundledManualFilePath,
+      manualFilePath: localManualFilePath,
       staticDistDirectory: staticDistDir ?? path.resolve(sourceRoot, 'dist'),
     };
   }
