@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
+import type { FormEvent } from 'react';
 import { AppLogo } from '../ui/AppLogo';
 import type {
   AppCustomizationSettings,
@@ -76,28 +76,12 @@ export function AppCustomizationPanel({
     );
   };
 
-  const handleIconFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ''));
-      reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
-      reader.readAsDataURL(file);
-    });
-
-    updateField('appIconDataUrl', dataUrl);
-    event.target.value = '';
-  };
-
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSave({
       ...formState,
+      appIconDataUrl: customization.appIconDataUrl,
+      appName: customization.appName,
       externalTools: formState.externalTools.map((tool, index) => ({
         id: tool.id.trim() || `external-tool-${index + 1}`,
         name: tool.name.trim() || `Enlace ${index + 1}`,
@@ -112,15 +96,15 @@ export function AppCustomizationPanel({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.24em] text-sky-600 dark:text-sky-300">
-              Configuración general
+              Configuracion general
             </p>
             <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
               Personaliza la experiencia general
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Desde aquí puedes ajustar el nombre de la aplicación, los textos
-              principales, el recordatorio destacado, el contenido del lateral y
-              el icono, sin sobrecargar la interfaz con controles dispersos.
+              Desde aqui puedes ajustar los textos principales, el recordatorio
+              destacado y el contenido del lateral, sin sobrecargar la interfaz
+              con controles dispersos.
             </p>
           </div>
 
@@ -130,16 +114,16 @@ export function AppCustomizationPanel({
             </p>
             <div className="mt-3 flex items-center gap-3">
               <AppLogo
-                appIconDataUrl={formState.appIconDataUrl}
-                appName={formState.appName}
+                appIconDataUrl={customization.appIconDataUrl}
+                appName={customization.appName}
                 className="h-14 w-14"
               />
               <div className="min-w-0">
                 <p className="truncate text-base font-bold text-slate-900 dark:text-white">
-                  {formState.appName || 'Nombre de la aplicación'}
+                  {customization.appName}
                 </p>
                 <p className="truncate text-sm text-slate-500 dark:text-slate-300">
-                  {formState.heroTitle || 'Título principal'}
+                  {formState.heroTitle || 'Titulo principal'}
                 </p>
               </div>
             </div>
@@ -155,16 +139,7 @@ export function AppCustomizationPanel({
             </h3>
             <div className="mt-4 grid gap-4">
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Nombre de la aplicación
-                <input
-                  value={formState.appName}
-                  onChange={(event) => updateField('appName', event.target.value)}
-                  className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Título principal
+                Titulo principal
                 <input
                   value={formState.heroTitle}
                   onChange={(event) => updateField('heroTitle', event.target.value)}
@@ -173,7 +148,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Descripción principal
+                Descripcion principal
                 <textarea
                   value={formState.heroDescription}
                   onChange={(event) =>
@@ -185,7 +160,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Crédito de autoría
+                Credito de autoria
                 <input
                   value={formState.creatorCredit}
                   onChange={(event) =>
@@ -212,14 +187,14 @@ export function AppCustomizationPanel({
           <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Herramientas del menú lateral
+                Herramientas del menu lateral
               </h3>
               <button
                 type="button"
                 onClick={handleAddTool}
-                  className="rounded-xl border border-emerald-500/60 bg-emerald-500/12 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/18 dark:text-emerald-300"
+                className="rounded-xl border border-emerald-500/60 bg-emerald-500/12 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/18 dark:text-emerald-300"
               >
-                Añadir acceso
+                Anadir acceso
               </button>
             </div>
 
@@ -261,11 +236,11 @@ export function AppCustomizationPanel({
         <div className="space-y-6">
           <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Diagnóstico rápido
+              Diagnostico rapido
             </h3>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Resumen del estado operativo actual, la sincronización del manual y
-              la salud general de la sesión.
+              Resumen del estado operativo actual, la sincronizacion del manual y
+              la salud general de la sesion.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
@@ -294,7 +269,7 @@ export function AppCustomizationPanel({
               </div>
               <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
-                  Revisión activa
+                  Revision activa
                 </p>
                 <p className="mt-1 break-all text-sm font-medium text-slate-900 dark:text-slate-100">
                   {diagnostics.revisionLabel}
@@ -338,7 +313,7 @@ export function AppCustomizationPanel({
                   {diagnostics.approximateSizeKb} KB aprox.
                 </p>
                 <p className="text-sm text-slate-700 dark:text-slate-200">
-                  Último guardado: {diagnostics.lastSavedAt || 'sin registro'}
+                  Ultimo guardado: {diagnostics.lastSavedAt || 'sin registro'}
                 </p>
                 <p
                   className={`text-sm ${
@@ -357,43 +332,11 @@ export function AppCustomizationPanel({
 
           <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Icono de la aplicación
-            </h3>
-            <div className="mt-4 flex flex-col gap-4">
-              <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 dark:text-sky-300">
-                Subir icono
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleIconFileChange}
-                  className="hidden"
-                />
-              </label>
-              <input
-                value={formState.appIconDataUrl}
-                onChange={(event) =>
-                  updateField('appIconDataUrl', event.target.value)
-                }
-                className="themed-field w-full rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950/90 dark:text-white"
-                placeholder="O pega aquí una URL o Data URL del icono"
-              />
-              <button
-                type="button"
-                onClick={() => updateField('appIconDataUrl', '')}
-                className="sidebar-soft-button w-fit rounded-2xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200"
-              >
-                Quitar icono
-              </button>
-            </div>
-          </div>
-
-          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Textos del menu lateral
             </h3>
             <div className="mt-4 grid gap-4">
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Título de herramientas externas
+                Titulo de herramientas externas
                 <input
                   value={formState.externalToolsTitle}
                   onChange={(event) =>
@@ -404,7 +347,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Título del bloque de escritorio
+                Titulo del bloque de escritorio
                 <input
                   value={formState.sidebarIdentityTitle}
                   onChange={(event) =>
@@ -426,7 +369,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Título de Global Prysma
+                Titulo de Global Prysma
                 <input
                   value={formState.globalRgaTitle}
                   onChange={(event) =>
@@ -459,7 +402,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Título de DevTools
+                Titulo de DevTools
                 <input
                   value={formState.devToolsSectionTitle}
                   onChange={(event) =>
@@ -470,7 +413,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Título de Backup
+                Titulo de Backup
                 <input
                   value={formState.backupSectionTitle}
                   onChange={(event) =>
@@ -481,7 +424,7 @@ export function AppCustomizationPanel({
               </label>
 
               <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Título de Papelera
+                Titulo de Papelera
                 <input
                   value={formState.trashSectionTitle}
                   onChange={(event) =>

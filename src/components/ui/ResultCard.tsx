@@ -11,6 +11,7 @@ import type { CategoryColorKey, KnowledgeEntry } from '../../types';
 interface ResultCardProps {
   activeTags?: string[];
   categoryColorKey?: CategoryColorKey;
+  compact?: boolean;
   entry: KnowledgeEntry;
   onCommandSave: (
     entryId: string,
@@ -135,6 +136,7 @@ const getCommandValueTone = (value: string) => {
 export function ResultCard({
   activeTags = [],
   categoryColorKey = 'slate',
+  compact = false,
   entry,
   onCommandSave,
   onDeleteEntry,
@@ -155,8 +157,8 @@ export function ResultCard({
   const formattedUpdatedAt = formatUpdatedAt(entry.updatedAt);
   const collapsedPreview = buildCollapsedPreview(entry.contenido);
   const previewText =
-    collapsedPreview.length > 180
-      ? `${collapsedPreview.slice(0, 180).trim()}...`
+    collapsedPreview.length > (compact ? 120 : 180)
+      ? `${collapsedPreview.slice(0, compact ? 120 : 180).trim()}...`
       : collapsedPreview;
   const glowStyle = {
     '--card-glow': hexToRgba(categoryColor, 0.14),
@@ -293,7 +295,11 @@ export function ResultCard({
 
   return (
     <article
-      className="section-gradient-card neon-card w-full rounded-[1.6rem] border border-slate-200 p-4 shadow-sm transition-all duration-200 sm:p-5"
+      className={`section-gradient-card neon-card w-full border border-slate-200 shadow-sm transition-all duration-200 ${
+        compact
+          ? 'rounded-[1.35rem] p-3.5 sm:p-4'
+          : 'rounded-[1.6rem] p-4 sm:p-5'
+      }`}
       data-category-color={categoryColor}
       style={glowStyle}
     >
@@ -303,24 +309,32 @@ export function ResultCard({
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
+      <div className={`flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between ${compact ? 'gap-2.5' : 'gap-3'}`}>
+        <div className={`min-w-0 ${compact ? 'space-y-1.5' : 'space-y-2'}`}>
           <span
-            className={`section-gradient-pill inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${categoryStyle.badge}`}
+            className={`section-gradient-pill inline-flex rounded-full border font-semibold uppercase ${categoryStyle.badge} ${
+              compact
+                ? 'px-2.5 py-0.5 text-[10px] tracking-[0.14em]'
+                : 'px-3 py-1 text-xs tracking-[0.16em]'
+            }`}
           >
             {entry.categoria}
           </span>
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 sm:text-xl">
+          <h3 className={`font-semibold text-slate-900 dark:text-slate-100 ${
+            compact ? 'text-base sm:text-lg leading-6' : 'text-lg sm:text-xl'
+          }`}>
             {entry.titulo}
           </h3>
           {entry.tags.length ? (
-            <div className="flex flex-wrap gap-2">
-              {entry.tags.map((tag) => (
+            <div className={`flex flex-wrap ${compact ? 'gap-1.5' : 'gap-2'}`}>
+              {(compact ? entry.tags.slice(0, 4) : entry.tags).map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => onTagClick?.(tag)}
-                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium lowercase transition-colors ${
+                  className={`inline-flex rounded-full border font-medium lowercase transition-colors ${
+                    compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'
+                  } ${
                     activeTags.includes(tag.toLowerCase())
                       ? 'border-sky-400 bg-sky-100 text-sky-800 dark:border-sky-400/70 dark:bg-sky-500/20 dark:text-sky-200'
                       : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-sky-500/50 dark:hover:bg-sky-500/10 dark:hover:text-sky-300'
@@ -330,6 +344,11 @@ export function ResultCard({
                   #{tag}
                 </button>
               ))}
+              {compact && entry.tags.length > 4 ? (
+                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+                  +{entry.tags.length - 4}
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -502,18 +521,24 @@ export function ResultCard({
             </svg>
           </button>
 
-          <span className="soft-subpanel w-fit rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400">
+          <span className={`soft-subpanel w-fit rounded-lg border border-slate-200 font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 ${
+            compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'
+          }`}>
             {entry.id}
           </span>
         </div>
       </div>
 
       {isCollapsed ? (
-        <div className="soft-subpanel mt-4 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300">
-          <p className="line-clamp-3 leading-6">
+        <div className={`soft-subpanel rounded-xl border border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-300 ${
+          compact ? 'mt-3 px-3 py-2.5 text-[13px]' : 'mt-4 px-4 py-3 text-sm'
+        }`}>
+          <p className={`${compact ? 'line-clamp-2 leading-5' : 'line-clamp-3 leading-6'}`}>
             {previewText || 'Ficha colapsada. Pulsa el icono para volver a verla completa.'}
           </p>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+          <div className={`flex flex-wrap gap-2 font-medium text-slate-500 dark:text-slate-400 ${
+            compact ? 'mt-2 text-[11px]' : 'mt-3 text-xs'
+          }`}>
             {entry.pasos?.length ? <span>{entry.pasos.length} paso{entry.pasos.length === 1 ? '' : 's'}</span> : null}
             {entry.comandos?.length ? (
               <span>{entry.comandos.length} comando{entry.comandos.length === 1 ? '' : 's'}</span>

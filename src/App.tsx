@@ -35,7 +35,9 @@ import type {
 const STORAGE_KEY = 'knowledge-manual-state-v2';
 const LEGACY_COMMAND_STORAGE_KEY = 'result-card-command-overrides';
 const ASSISTANT_VERSION = '1.0.0';
+const HOME_PINNED_ENTRY_PREVIEW_LIMIT = 4;
 const defaultSettings: AppSettings = {
+  compactMode: false,
   customization: defaultAppCustomization,
   darkMode: false,
 };
@@ -151,6 +153,11 @@ interface CategoryDeleteConfirmationState {
 interface BackupImportState {
   fileName: string;
   importedManualData: ManualData;
+}
+
+interface SectionPdfExportState {
+  categoryName: string;
+  selectedEntryIds: string[];
 }
 
 interface BackupImportSummary {
@@ -296,6 +303,7 @@ const normalizeTemplate = (template: EntryTemplate): EntryTemplate => ({
         value: command.value,
       }))
       .filter((command) => command.label.length > 0) ?? [],
+  isFavorite: Boolean(template.isFavorite),
   name: template.name.trim(),
   pasos: template.pasos?.map((step) => step.trim()).filter(Boolean) ?? [],
   tags: template.tags?.map((tag) => tag.trim().toLowerCase()).filter(Boolean) ?? [],
@@ -1399,15 +1407,52 @@ const resolvePdfImageAsset = async (source: string) => {
   };
 };
 
+const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = '';
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+};
+
+const resolvePdfFontUrl = (fileName: string) => {
+  if (typeof window === 'undefined') {
+    return `http://localhost:3001/fonts/${fileName}`;
+  }
+
+  return `${window.location.origin}/fonts/${fileName}`;
+};
+
+const loadPdfFontBase64 = async (fileName: string) => {
+  const response = await fetch(resolvePdfFontUrl(fileName));
+
+  if (!response.ok) {
+    throw new Error(`No se pudo cargar la fuente ${fileName}.`);
+  }
+
+  const buffer = await response.arrayBuffer();
+  return arrayBufferToBase64(buffer);
+};
+
 export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [showAllQuickAccessEntries, setShowAllQuickAccessEntries] = useState(false);
+  const [templateSearchTerm, setTemplateSearchTerm] = useState('');
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState('');
+  const [showFavoriteTemplatesOnly, setShowFavoriteTemplatesOnly] = useState(false);
+  const [collapsedHomeCategories, setCollapsedHomeCategories] = useState<string[]>([]);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('');
   const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
   const [resultSortMode, setResultSortMode] =
     useState<ResultSortMode>('pinned-latest');
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [activeView, setActiveView] = useState<'home' | 'settings'>('home');
+  const [activeView, setActiveView] = useState<'home' | 'settings' | 'templates'>('home');
   const initialManualSnapshotRef = useRef<StoredManualSnapshot>(
     getFallbackManualSnapshot(),
   );
@@ -1426,15 +1471,25 @@ export const App = () => {
   );
   const [backupImportState, setBackupImportState] =
     useState<BackupImportState | null>(null);
+  const [sectionPdfExportState, setSectionPdfExportState] =
+    useState<SectionPdfExportState | null>(null);
   const [formError, setFormError] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const topContentRef = useRef<HTMLElement | null>(null);
+  const resultsSectionRef = useRef<HTMLDivElement | null>(null);
+  const templatesSectionRef = useRef<HTMLDivElement | null>(null);
+  const homeCategoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const templateEditorPaneRef = useRef<HTMLDivElement | null>(null);
+  const entryEditorFormPaneRef = useRef<HTMLDivElement | null>(null);
+  const entryEditorPreviewPaneRef = useRef<HTMLDivElement | null>(null);
   const [deleteConfirmationEntryId, setDeleteConfirmationEntryId] = useState('');
   const [deleteConfirmationCategory, setDeleteConfirmationCategory] =
     useState<CategoryDeleteConfirmationState | null>(null);
   const [exportEntryId, setExportEntryId] = useState('');
+  const [exportSectionCategoryName, setExportSectionCategoryName] = useState('');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [saveToast, setSaveToast] = useState<SaveToastState | null>(null);
   const [saveSyncState, setSaveSyncState] = useState<SaveSyncState>('idle');
@@ -1450,7 +1505,60 @@ export const App = () => {
 
   const manualServerRevisionRef = useRef('');
   const shouldPersistToServerRef = useRef(false);
+  const hasMountedRef = useRef(false);
   const customization = manualData.settings.customization;
+  const isCompactViewEnabled = manualData.settings.compactMode;
+
+  const scrollViewportToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'auto',
+    });
+  };
+
+  const isEditableElementFocused = () => {
+    const activeElement = document.activeElement as HTMLElement | null;
+
+    if (!activeElement) {
+      return false;
+    }
+
+    const tagName = activeElement.tagName.toLowerCase();
+    return (
+      tagName === 'input' ||
+      tagName === 'textarea' ||
+      tagName === 'select' ||
+      activeElement.isContentEditable
+    );
+  };
+
+  const focusResultsSection = () => {
+    window.requestAnimationFrame(() => {
+      if (isEditableElementFocused()) {
+        return;
+      }
+
+      resultsSectionRef.current?.scrollIntoView({
+        behavior: 'auto',
+        block: 'start',
+      });
+      resultsSectionRef.current?.focus({ preventScroll: true });
+    });
+  };
+
+  const focusTemplatesSection = () => {
+    window.requestAnimationFrame(() => {
+      if (isEditableElementFocused()) {
+        return;
+      }
+
+      templatesSectionRef.current?.scrollIntoView({
+        behavior: 'auto',
+        block: 'start',
+      });
+      templatesSectionRef.current?.focus({ preventScroll: true });
+    });
+  };
 
   useEffect(() => {
     document.title = 'Prysma | Ecosistema de Conocimiento';
@@ -1524,6 +1632,80 @@ export const App = () => {
       ),
     [manualData.entries],
   );
+  const visibleQuickAccessEntries = useMemo(
+    () =>
+      showAllQuickAccessEntries
+        ? quickAccessEntries
+        : quickAccessEntries.slice(0, HOME_PINNED_ENTRY_PREVIEW_LIMIT),
+    [quickAccessEntries, showAllQuickAccessEntries],
+  );
+  const sortedTemplates = useMemo(
+    () =>
+      [...manualData.templates].sort((firstTemplate, secondTemplate) =>
+        firstTemplate.name.localeCompare(secondTemplate.name, 'es'),
+      ),
+    [manualData.templates],
+  );
+  const favoriteTemplates = useMemo(
+    () => sortedTemplates.filter((template) => template.isFavorite),
+    [sortedTemplates],
+  );
+  const filteredTemplates = useMemo(() => {
+    const normalizedTemplateSearchTerm = normalizeComparableText(templateSearchTerm);
+
+    return sortedTemplates.filter((template) => {
+      if (
+        templateCategoryFilter &&
+        template.categoria?.toLowerCase() !== templateCategoryFilter.toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (showFavoriteTemplatesOnly && !template.isFavorite) {
+        return false;
+      }
+
+      if (!normalizedTemplateSearchTerm) {
+        return true;
+      }
+
+      const searchableFields = [
+        template.name,
+        template.titulo,
+        template.categoria ?? '',
+        template.contenido,
+        template.tags.join(' '),
+        (template.pasos ?? []).join(' '),
+        (template.comandos ?? [])
+          .map((command) => `${command.label} ${command.value}`)
+          .join(' '),
+      ];
+
+      return searchableFields.some((field) =>
+        normalizeComparableText(field).includes(normalizedTemplateSearchTerm),
+      );
+    });
+  }, [
+    showFavoriteTemplatesOnly,
+    sortedTemplates,
+    templateCategoryFilter,
+    templateSearchTerm,
+  ]);
+  const sectionPdfEntries = useMemo(
+    () =>
+      sectionPdfExportState
+        ? manualData.entries
+            .filter(
+              (entry) =>
+                entry.categoria.toLowerCase() ===
+                sectionPdfExportState.categoryName.toLowerCase(),
+            )
+            .sort((firstEntry, secondEntry) =>
+              firstEntry.titulo.localeCompare(secondEntry.titulo, 'es'),
+            )
+        : [],
+    [manualData.entries, sectionPdfExportState],
+  );
   const restorableTrashCategories = useMemo<TrashCategorySummary[]>(() => {
     const trashCategoryMap = new Map<string, TrashCategorySummary>();
 
@@ -1576,6 +1758,68 @@ export const App = () => {
   }, [manualData.settings.darkMode]);
 
   useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    if (modalState?.type === 'entry') {
+      window.requestAnimationFrame(() => {
+        entryEditorFormPaneRef.current?.scrollTo({
+          top: 0,
+          behavior: 'auto',
+        });
+        entryEditorPreviewPaneRef.current?.scrollTo({
+          top: 0,
+          behavior: 'auto',
+        });
+      });
+      return;
+    }
+
+    if (modalState?.type === 'template') {
+      window.requestAnimationFrame(() => {
+        templateEditorPaneRef.current?.scrollTo({
+          top: 0,
+          behavior: 'auto',
+        });
+      });
+      return;
+    }
+
+    if (modalState) {
+      scrollViewportToTop();
+      return;
+    }
+
+    if (activeView === 'settings') {
+      scrollViewportToTop();
+      return;
+    }
+
+    if (activeView === 'templates') {
+      focusTemplatesSection();
+      return;
+    }
+
+    if (hasActiveFilters) {
+      focusResultsSection();
+      return;
+    }
+
+    scrollViewportToTop();
+  }, [
+    activeView,
+    hasActiveFilters,
+    modalState,
+    debouncedSearchTerm,
+    activeCategoryFilter,
+    activeTagFilters,
+    showPinnedOnly,
+    resultSortMode,
+  ]);
+
+  useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
     }, 220);
@@ -1598,6 +1842,12 @@ export const App = () => {
       window.clearTimeout(timeoutId);
     };
   }, [saveToast]);
+
+  useEffect(() => {
+    if (quickAccessEntries.length <= HOME_PINNED_ENTRY_PREVIEW_LIMIT && showAllQuickAccessEntries) {
+      setShowAllQuickAccessEntries(false);
+    }
+  }, [quickAccessEntries.length, showAllQuickAccessEntries]);
 
   useEffect(() => {
     const handleClipboardCopy = (
@@ -1807,7 +2057,7 @@ export const App = () => {
           setSaveSyncState('saved');
           setLastSavedAt(formatSavedAtTime());
           setSaveToast({
-            message: 'Cambios guardados permanentemente en el archivo.',
+            message: 'Cambios guardados y sincronizados con disco.',
             tone: 'success',
           });
         }
@@ -1824,10 +2074,10 @@ export const App = () => {
           setSaveSyncState('error');
           setSaveToast({
             message: isSaveConflict
-              ? 'Se ha detectado otra instancia con cambios guardados. Recarga o importa antes de volver a guardar para no sobrescribir datos.'
+              ? 'Otra instancia ha guardado cambios antes que esta. Recarga desde disco o importa antes de volver a guardar.'
               : isNetworkError
-                ? 'Error de conexión con el servidor. Por favor, descarga el JSON manualmente para no perder los cambios.'
-                : 'El servidor sigue activo, pero ha fallado el guardado. Revisa los logs o vuelve a intentarlo.',
+                ? 'No se pudo sincronizar con el servidor. Si necesitas asegurar los cambios, exporta el JSON antes de cerrar.'
+                : 'El servidor sigue activo, pero no ha podido guardar en disco. Revisa los logs o vuelve a intentarlo.',
             tone: 'error',
           });
         }
@@ -1997,6 +2247,16 @@ export const App = () => {
     }));
   };
 
+  const toggleCompactMode = () => {
+    updateManualData((currentManualData) => ({
+      ...currentManualData,
+      settings: {
+        ...currentManualData.settings,
+        compactMode: !currentManualData.settings.compactMode,
+      },
+    }));
+  };
+
   const handleCommandSave = (
     entryId: string,
     commandLabel: string,
@@ -2037,12 +2297,57 @@ export const App = () => {
     }));
   };
 
-  const handleExportEntryPdf = async (entry: KnowledgeEntry) => {
-    setExportEntryId(entry.id);
+  const exportEntriesToPdf = async (
+    entries: KnowledgeEntry[],
+    fileName: string,
+    options: {
+      documentSubtitle?: string;
+      documentTitle?: string;
+    } = {},
+  ) => {
+    if (!entries.length) {
+      return;
+    }
+
+    setExportEntryId(entries.length === 1 ? entries[0].id : `section:${fileName}`);
 
     try {
       const { jsPDF } = await import('jspdf');
       const pdf = new jsPDF({ format: 'a4', orientation: 'portrait', unit: 'mm' });
+      let useEmbeddedPdfFonts = false;
+
+      try {
+        const [regularFont, boldFont, italicFont, boldItalicFont] = await Promise.all([
+          loadPdfFontBase64('prysma-pdf-regular.ttf'),
+          loadPdfFontBase64('prysma-pdf-bold.ttf'),
+          loadPdfFontBase64('prysma-pdf-italic.ttf'),
+          loadPdfFontBase64('prysma-pdf-bolditalic.ttf'),
+        ]);
+
+        pdf.addFileToVFS('prysma-pdf-regular.ttf', regularFont);
+        pdf.addFont('prysma-pdf-regular.ttf', 'PrysmaPdf', 'normal');
+        pdf.addFileToVFS('prysma-pdf-bold.ttf', boldFont);
+        pdf.addFont('prysma-pdf-bold.ttf', 'PrysmaPdf', 'bold');
+        pdf.addFileToVFS('prysma-pdf-italic.ttf', italicFont);
+        pdf.addFont('prysma-pdf-italic.ttf', 'PrysmaPdf', 'italic');
+        pdf.addFileToVFS('prysma-pdf-bolditalic.ttf', boldItalicFont);
+        pdf.addFont('prysma-pdf-bolditalic.ttf', 'PrysmaPdf', 'bolditalic');
+        useEmbeddedPdfFonts = true;
+      } catch (fontError) {
+        console.warn('No se pudieron cargar las fuentes Unicode del PDF.', fontError);
+      }
+
+      const getPdfTextFont = () => (useEmbeddedPdfFonts ? 'PrysmaPdf' : 'helvetica');
+      const getPdfCodeFont = () => (useEmbeddedPdfFonts ? 'PrysmaPdf' : 'courier');
+      const getPdfFontStyle = (
+        style: 'bold' | 'normal' | 'italic' | 'bolditalic' = 'normal',
+      ) => {
+        if (!useEmbeddedPdfFonts && style === 'bolditalic') {
+          return 'bold';
+        }
+
+        return style;
+      };
       const margin = 15;
       const pageWidth = 210;
       const pageHeight = 297;
@@ -2088,7 +2393,13 @@ export const App = () => {
         const lineGap = options.lineGap ?? 1.6;
         const maxWidth = options.maxWidth ?? contentWidth;
         const x = options.x ?? margin;
-        pdf.setFont('helvetica', options.fontStyle ?? 'normal');
+        pdf.setFont(
+          getPdfTextFont(),
+          getPdfFontStyle(
+            (options.fontStyle as 'bold' | 'normal' | 'italic' | 'bolditalic') ??
+              'normal',
+          ),
+        );
         pdf.setFontSize(fontSize);
         pdf.setTextColor(...(options.color ?? [30, 41, 59]));
         const lines = pdf.splitTextToSize(text, maxWidth) as string[];
@@ -2132,7 +2443,10 @@ export const App = () => {
         });
 
         const measurePieceWidth = (piece: PdfInlineSegment) => {
-          pdf.setFont('helvetica', piece.type === 'link' ? 'normal' : baseFontStyle);
+          pdf.setFont(
+            getPdfTextFont(),
+            getPdfFontStyle(piece.type === 'link' ? 'normal' : baseFontStyle),
+          );
           pdf.setFontSize(fontSize);
           return pdf.getTextWidth(piece.text);
         };
@@ -2204,7 +2518,10 @@ export const App = () => {
             const isLink = piece.type === 'link' && piece.href;
             const pieceColor = isLink ? [37, 99, 235] as [number, number, number] : baseColor;
 
-            pdf.setFont('helvetica', isLink ? 'normal' : baseFontStyle);
+            pdf.setFont(
+              getPdfTextFont(),
+              getPdfFontStyle(isLink ? 'normal' : baseFontStyle),
+            );
             pdf.setFontSize(fontSize);
             pdf.setTextColor(...pieceColor);
             pdf.text(piece.text, cursorX, lineY);
@@ -2281,7 +2598,7 @@ export const App = () => {
         pdf.setDrawColor(203, 213, 225);
         pdf.setFillColor(248, 250, 252);
         pdf.roundedRect(margin, cursorY, contentWidth, placeholderHeight, 2, 2, 'FD');
-        pdf.setFont('helvetica', 'italic');
+        pdf.setFont(getPdfTextFont(), getPdfFontStyle('italic'));
         pdf.setFontSize(10);
         pdf.setTextColor(100, 116, 139);
         pdf.text(label, margin + 4, cursorY + 11);
@@ -2344,7 +2661,7 @@ export const App = () => {
           return -1;
         };
         const measureSegmentWidth = (segment: PdfCodeSegment) => {
-          pdf.setFont('courier', segment.fontStyle);
+          pdf.setFont(getPdfCodeFont(), getPdfFontStyle(segment.fontStyle));
           pdf.setFontSize(fontSize);
           return pdf.getTextWidth(segment.text);
         };
@@ -2587,7 +2904,7 @@ export const App = () => {
           if (language && isFirstChunk) {
             pdf.setFillColor(226, 232, 240);
             pdf.roundedRect(margin + blockPaddingX, cursorY + 3, 16, 5, 1.5, 1.5, 'F');
-            pdf.setFont('helvetica', 'bold');
+            pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
             pdf.setFontSize(7);
             pdf.setTextColor(71, 85, 105);
             pdf.text(language.toUpperCase(), margin + blockPaddingX + 1.5, cursorY + 6.7);
@@ -2599,7 +2916,7 @@ export const App = () => {
             const lineY = textY + lineIndex * lineHeight;
 
             lineSegments.forEach((segment) => {
-              pdf.setFont('courier', segment.fontStyle);
+              pdf.setFont(getPdfCodeFont(), getPdfFontStyle(segment.fontStyle));
               pdf.setFontSize(fontSize);
               pdf.setTextColor(...segment.color);
               pdf.text(segment.text, cursorX, lineY);
@@ -2624,7 +2941,7 @@ export const App = () => {
           const textWidth = Math.max(24, pageWidth - margin - textX);
           const segments = parsePdfInlineSegments(item.text);
           const measurePieceWidth = (piece: PdfInlineSegment) => {
-            pdf.setFont('helvetica', 'normal');
+            pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
             pdf.setFontSize(10);
             return pdf.getTextWidth(piece.text);
           };
@@ -2699,7 +3016,7 @@ export const App = () => {
           const itemHeight = lines.length * lineHeight + 2;
 
           ensureSpace(itemHeight + itemGap);
-          pdf.setFont('helvetica', 'bold');
+          pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
           pdf.setFontSize(10);
           pdf.setTextColor(51, 65, 85);
           pdf.text(item.marker, itemX, cursorY + 4);
@@ -2713,7 +3030,7 @@ export const App = () => {
               const pieceColor = isLink ? [37, 99, 235] as [number, number, number] : [15, 23, 42] as [number, number, number];
               const pieceWidth = measurePieceWidth(piece);
 
-              pdf.setFont('helvetica', 'normal');
+              pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
               pdf.setFontSize(10);
               pdf.setTextColor(...pieceColor);
               pdf.text(piece.text, cursorX, lineY);
@@ -2778,7 +3095,10 @@ export const App = () => {
             pdf.setDrawColor(203, 213, 225);
             pdf.rect(cellX, cursorY, columnWidth, rowHeight, 'FD');
 
-            pdf.setFont('helvetica', rowIndex === 0 ? 'bold' : 'normal');
+            pdf.setFont(
+              getPdfTextFont(),
+              getPdfFontStyle(rowIndex === 0 ? 'bold' : 'normal'),
+            );
             pdf.setFontSize(fontSize);
             pdf.setTextColor(rowIndex === 0 ? 30 : 15, rowIndex === 0 ? 41 : 23, rowIndex === 0 ? 59 : 42);
             pdf.text(
@@ -2855,16 +3175,56 @@ export const App = () => {
         }
       };
 
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(18);
-      pdf.setTextColor(15, 23, 42);
-      const titleLines = pdf.splitTextToSize(entry.titulo, contentWidth) as string[];
-      const titleLineHeight = 18 * 0.3528 * 1.6;
-      ensureSpace(titleLines.length * titleLineHeight + 8);
-      pdf.text(titleLines, margin, cursorY);
-      cursorY += titleLines.length * titleLineHeight + 8;
+      if (options.documentTitle) {
+        pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
+        pdf.setFontSize(20);
+        pdf.setTextColor(15, 23, 42);
+        const documentTitleLines = pdf.splitTextToSize(
+          options.documentTitle,
+          contentWidth,
+        ) as string[];
+        const documentTitleLineHeight = 20 * 0.3528 * 1.55;
+        ensureSpace(documentTitleLines.length * documentTitleLineHeight + 10);
+        pdf.text(documentTitleLines, margin, cursorY);
+        cursorY += documentTitleLines.length * documentTitleLineHeight + 3;
 
-      for (const block of parsePdfContentBlocks(entry.contenido)) {
+        if (options.documentSubtitle) {
+          pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
+          pdf.setFontSize(10.5);
+          pdf.setTextColor(71, 85, 105);
+          const subtitleLines = pdf.splitTextToSize(
+            options.documentSubtitle,
+            contentWidth,
+          ) as string[];
+          const subtitleLineHeight = 10.5 * 0.3528 * 1.55;
+          ensureSpace(subtitleLines.length * subtitleLineHeight + 10);
+          pdf.text(subtitleLines, margin, cursorY);
+          cursorY += subtitleLines.length * subtitleLineHeight + 7;
+        } else {
+          cursorY += 5;
+        }
+
+        pdf.setDrawColor(226, 232, 240);
+        pdf.line(margin, cursorY, pageWidth - margin, cursorY);
+        cursorY += 7;
+      }
+
+      for (const [entryIndex, entry] of entries.entries()) {
+        if (entryIndex > 0) {
+          pdf.addPage();
+          cursorY = margin;
+        }
+
+        pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
+        pdf.setFontSize(18);
+        pdf.setTextColor(15, 23, 42);
+        const titleLines = pdf.splitTextToSize(entry.titulo, contentWidth) as string[];
+        const titleLineHeight = 18 * 0.3528 * 1.6;
+        ensureSpace(titleLines.length * titleLineHeight + 8);
+        pdf.text(titleLines, margin, cursorY);
+        cursorY += titleLines.length * titleLineHeight + 8;
+
+        for (const block of parsePdfContentBlocks(entry.contenido)) {
         if (block.type === 'code') {
           writeCodeBlock(block.content, block.language);
           continue;
@@ -2953,45 +3313,46 @@ export const App = () => {
 
           await writeMarkdownLine(line);
         }
-      }
+        }
 
-      if (entry.pasos?.length) {
-        writeSectionTitle('Pasos');
-        entry.pasos.forEach((step, index) => {
-          writeText(`${index + 1}. ${step}`);
-        });
-      }
+        if (entry.pasos?.length) {
+          writeSectionTitle('Pasos');
+          entry.pasos.forEach((step, index) => {
+            writeText(`${index + 1}. ${step}`);
+          });
+        }
 
-      if (entry.comandos?.length) {
-        writeSectionTitle('Parametros y comandos utiles');
-        const labelWidth = 55;
-        const valueWidth = contentWidth - labelWidth;
-        const rowGap = 2;
+        if (entry.comandos?.length) {
+          writeSectionTitle('Parametros y comandos utiles');
+          const labelWidth = 55;
+          const valueWidth = contentWidth - labelWidth;
+          const rowGap = 2;
 
-        entry.comandos.forEach((command) => {
-          pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(10);
-          const labelLines = pdf.splitTextToSize(command.label, labelWidth - 4) as string[];
-          pdf.setFont('courier', 'normal');
-          pdf.setFontSize(10);
-          const valueLines = pdf.splitTextToSize(command.value, valueWidth - 6) as string[];
-          const rowHeight = Math.max(labelLines.length, valueLines.length) * (10 * 0.3528 * 1.6) + 6;
-          ensureSpace(rowHeight + rowGap);
+          entry.comandos.forEach((command) => {
+            pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
+            pdf.setFontSize(10);
+            const labelLines = pdf.splitTextToSize(command.label, labelWidth - 4) as string[];
+            pdf.setFont(getPdfCodeFont(), getPdfFontStyle('normal'));
+            pdf.setFontSize(10);
+            const valueLines = pdf.splitTextToSize(command.value, valueWidth - 6) as string[];
+            const rowHeight = Math.max(labelLines.length, valueLines.length) * (10 * 0.3528 * 1.6) + 6;
+            ensureSpace(rowHeight + rowGap);
 
-          pdf.setTextColor(71, 85, 105);
-          pdf.setFont('helvetica', 'bold');
-          pdf.text(labelLines, margin, cursorY + 5);
+            pdf.setTextColor(71, 85, 105);
+            pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
+            pdf.text(labelLines, margin, cursorY + 5);
 
-          pdf.setFillColor(248, 250, 252);
-          pdf.setDrawColor(226, 232, 240);
-          pdf.roundedRect(margin + labelWidth, cursorY, valueWidth, rowHeight, 1.5, 1.5, 'FD');
+            pdf.setFillColor(248, 250, 252);
+            pdf.setDrawColor(226, 232, 240);
+            pdf.roundedRect(margin + labelWidth, cursorY, valueWidth, rowHeight, 1.5, 1.5, 'FD');
 
-          pdf.setTextColor(15, 23, 42);
-          pdf.setFont('courier', 'normal');
-          pdf.text(valueLines, margin + labelWidth + 3, cursorY + 5);
+            pdf.setTextColor(15, 23, 42);
+            pdf.setFont(getPdfCodeFont(), getPdfFontStyle('normal'));
+            pdf.text(valueLines, margin + labelWidth + 3, cursorY + 5);
 
-          cursorY += rowHeight + rowGap;
-        });
+            cursorY += rowHeight + rowGap;
+          });
+        }
       }
 
       const totalPages = pdf.getNumberOfPages();
@@ -3023,7 +3384,7 @@ export const App = () => {
           footerTextX += footerIconSize + 2.5;
         }
 
-        pdf.setFont('helvetica', 'normal');
+        pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
         pdf.setFontSize(8.5);
         pdf.setTextColor(71, 85, 105);
         pdf.text('Documentación generada con Prysma', footerTextX, footerBaselineY);
@@ -3036,7 +3397,7 @@ export const App = () => {
       }
 
   // A partir de ahora, para el cÃ³digo que pueda generar alguna excepciÃ³n, siempre debo usar try-catch-resources en Java para garantizar el cierre seguro de los flujos del archivo PDF generado.
-      pdf.save(`${entry.id}.pdf`);
+      pdf.save(fileName);
     } catch (error) {
       console.error('No se pudo exportar la ficha a PDF.', error);
       setSaveToast({
@@ -3045,6 +3406,109 @@ export const App = () => {
       });
     } finally {
       setExportEntryId('');
+    }
+  };
+
+  const handleExportEntryPdf = async (entry: KnowledgeEntry) => {
+    await exportEntriesToPdf([entry], `${entry.id}.pdf`);
+    setSaveToast({
+      message: `PDF generado para "${entry.titulo}".`,
+      tone: 'success',
+    });
+  };
+
+  const openSectionPdfExportModal = (categoryName: string) => {
+    const categoryEntries = manualData.entries
+      .filter(
+        (entry) => entry.categoria.toLowerCase() === categoryName.toLowerCase(),
+      )
+      .sort((firstEntry, secondEntry) =>
+        firstEntry.titulo.localeCompare(secondEntry.titulo, 'es'),
+      );
+
+    if (!categoryEntries.length) {
+      setSaveToast({
+        message: 'Esta sección no tiene fichas para exportar a PDF.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    setSectionPdfExportState({
+      categoryName,
+      selectedEntryIds: categoryEntries.map((entry) => entry.id),
+    });
+  };
+
+  const closeSectionPdfExportModal = () => {
+    setSectionPdfExportState(null);
+  };
+
+  const handleToggleSectionPdfEntry = (entryId: string) => {
+    setSectionPdfExportState((currentState) => {
+      if (!currentState) {
+        return currentState;
+      }
+
+      const nextSelectedEntryIds = currentState.selectedEntryIds.includes(entryId)
+        ? currentState.selectedEntryIds.filter((currentEntryId) => currentEntryId !== entryId)
+        : [...currentState.selectedEntryIds, entryId];
+
+      return {
+        ...currentState,
+        selectedEntryIds: nextSelectedEntryIds,
+      };
+    });
+  };
+
+  const handleExportSectionPdf = async () => {
+    if (!sectionPdfExportState) {
+      return;
+    }
+
+    const selectedEntries = manualData.entries
+      .filter(
+        (entry) =>
+          entry.categoria.toLowerCase() ===
+            sectionPdfExportState.categoryName.toLowerCase() &&
+          sectionPdfExportState.selectedEntryIds.includes(entry.id),
+      )
+      .sort((firstEntry, secondEntry) =>
+        firstEntry.titulo.localeCompare(secondEntry.titulo, 'es'),
+      );
+
+    if (!selectedEntries.length) {
+      setSaveToast({
+        message: 'Selecciona al menos una ficha antes de generar el PDF de la sección.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    setExportSectionCategoryName(sectionPdfExportState.categoryName);
+    closeSectionPdfExportModal();
+
+    try {
+      const sectionDescription =
+        categoryMap.get(sectionPdfExportState.categoryName.toLowerCase())
+          ?.description ?? '';
+
+      await exportEntriesToPdf(
+        selectedEntries,
+        `seccion-${slugify(sectionPdfExportState.categoryName)}.pdf`,
+        {
+          documentTitle: sectionPdfExportState.categoryName,
+          documentSubtitle:
+            sectionDescription ||
+            `${selectedEntries.length} ficha${selectedEntries.length === 1 ? '' : 's'} seleccionada${selectedEntries.length === 1 ? '' : 's'}`,
+        },
+      );
+      setSaveToast({
+        message: `PDF generado para la sección ${sectionPdfExportState.categoryName} con ${selectedEntries.length} ficha${selectedEntries.length === 1 ? '' : 's'}.`,
+        tone: 'success',
+      });
+    } finally {
+      setExportSectionCategoryName('');
     }
   };
 
@@ -3290,6 +3754,12 @@ export const App = () => {
     }
 
     updateManualData((currentManualData) => {
+      const originalTemplate = originalTemplateId
+        ? currentManualData.templates.find(
+            (template) => template.id === originalTemplateId,
+          )
+        : undefined;
+
       const nextId = ensureUniqueEntryId(
         templateForm.id || `plantilla-${trimmedName}`,
         currentManualData.templates.map((template) => ({
@@ -3308,6 +3778,7 @@ export const App = () => {
           .filter((command) => command.label.length > 0),
         contenido: trimmedContent,
         id: nextId,
+        isFavorite: originalTemplate?.isFavorite ?? false,
         name: trimmedName,
         pasos: splitLines(templateForm.pasos),
         tags: normalizeTags(templateForm.tags),
@@ -3340,6 +3811,21 @@ export const App = () => {
     }));
 
     closeModal();
+  };
+
+  const handleToggleFavoriteTemplate = (templateId: string) => {
+    updateManualData((currentManualData) => ({
+      ...currentManualData,
+      templates: currentManualData.templates.map((template) =>
+        template.id === templateId
+          ? {
+              ...template,
+              isFavorite: !template.isFavorite,
+              updatedAt: getCurrentIsoDate(),
+            }
+          : template,
+      ),
+    }));
   };
 
   const handleApplySelectedTemplate = () => {
@@ -3802,6 +4288,172 @@ export const App = () => {
   const handleOpenSettingsView = () => {
     setActiveView('settings');
   };
+  const handleOpenTemplatesView = () => {
+    setActiveView('templates');
+  };
+  const handleToggleHomeCategoryCollapse = (categoryName: string) => {
+    setCollapsedHomeCategories((currentCollapsedCategories) =>
+      currentCollapsedCategories.includes(categoryName)
+        ? currentCollapsedCategories.filter(
+            (currentCategoryName) => currentCategoryName !== categoryName,
+          )
+        : [...currentCollapsedCategories, categoryName],
+    );
+  };
+
+  const scrollToHomeCategory = (categoryName: string) => {
+    const targetCategoryElement = homeCategoryRefs.current[categoryName];
+
+    if (!targetCategoryElement) {
+      return;
+    }
+
+    if (collapsedHomeCategories.includes(categoryName)) {
+      setCollapsedHomeCategories((currentCollapsedCategories) =>
+        currentCollapsedCategories.filter(
+          (currentCategoryName) => currentCategoryName !== categoryName,
+        ),
+      );
+    }
+
+    window.requestAnimationFrame(() => {
+      targetCategoryElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
+
+  const renderTemplateCard = (
+    template: EntryTemplate,
+    variant: 'catalog' | 'home-favorite' = 'catalog',
+  ) => {
+    const isHomeFavorite = variant === 'home-favorite';
+    const isCompactTemplateCard = isCompactViewEnabled || isHomeFavorite;
+    const visibleTagLimit = isCompactTemplateCard ? 4 : 6;
+
+    return (
+      <div
+        key={template.id}
+        className={`rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
+          isCompactTemplateCard ? 'p-3.5' : 'p-4'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h4
+                className={`truncate font-semibold text-slate-900 dark:text-slate-100 ${
+                  isCompactTemplateCard ? 'text-sm' : 'text-base'
+                }`}
+              >
+                {template.name}
+              </h4>
+              {template.isFavorite ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200">
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    className="h-3.5 w-3.5"
+                  >
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.2 3.693a1 1 0 0 0 .95.69h3.88c.969 0 1.371 1.24.588 1.81l-3.14 2.282a1 1 0 0 0-.364 1.118l1.2 3.694c.3.921-.755 1.688-1.539 1.118l-3.14-2.282a1 1 0 0 0-1.176 0l-3.14 2.282c-.783.57-1.838-.197-1.539-1.118l1.2-3.694a1 1 0 0 0-.364-1.118L2.43 9.12c-.783-.57-.38-1.81.588-1.81h3.88a1 1 0 0 0 .95-.69l1.2-3.693Z" />
+                  </svg>
+                  Favorita
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {template.categoria
+                ? `Sección sugerida: ${template.categoria}`
+                : 'Reutilizable en distintas secciones'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            aria-pressed={template.isFavorite}
+            onClick={() => handleToggleFavoriteTemplate(template.id)}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border ${
+              isCompactTemplateCard ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-xs'
+            } font-medium transition-colors ${
+              template.isFavorite
+                ? 'border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-400 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-200 dark:hover:border-amber-300 dark:hover:bg-amber-500/15'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-sky-400/30 dark:hover:bg-sky-500/10 dark:hover:text-sky-200'
+            }`}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill={template.isFavorite ? 'currentColor' : 'none'}
+              className="h-4 w-4"
+            >
+              <path
+                d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.2 3.693a1 1 0 0 0 .95.69h3.88c.969 0 1.371 1.24.588 1.81l-3.14 2.282a1 1 0 0 0-.364 1.118l1.2 3.694c.3.921-.755 1.688-1.539 1.118l-3.14-2.282a1 1 0 0 0-1.176 0l-3.14 2.282c-.783.57-1.838-.197-1.539-1.118l1.2-3.694a1 1 0 0 0-.364-1.118L2.43 9.12c-.783-.57-.38-1.81.588-1.81h3.88a1 1 0 0 0 .95-.69l1.2-3.693Z"
+                stroke="currentColor"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {template.isFavorite ? 'Quitar' : 'Favorita'}
+          </button>
+        </div>
+
+        {template.tags.length ? (
+          <div className={`mt-3 flex flex-wrap ${isCompactTemplateCard ? 'gap-1.5' : 'gap-2'}`}>
+            {template.tags.slice(0, visibleTagLimit).map((tag) => (
+              <span
+                key={`${template.id}-${tag}`}
+                className={`inline-flex rounded-full border border-slate-200 bg-slate-50 font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 ${
+                  isCompactTemplateCard ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'
+                }`}
+              >
+                #{tag}
+              </span>
+            ))}
+            {template.tags.length > visibleTagLimit ? (
+              <span className={`inline-flex rounded-full border border-slate-200 bg-slate-50 font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400 ${
+                isCompactTemplateCard ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'
+              }`}>
+                +{template.tags.length - visibleTagLimit}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <p
+          className={`mt-3 text-slate-600 dark:text-slate-300 ${
+            isCompactTemplateCard
+              ? 'line-clamp-2 text-[13px] leading-5'
+              : 'line-clamp-3 text-sm leading-6'
+          }`}
+        >
+          {template.contenido}
+        </p>
+
+        <div className={`mt-4 flex flex-wrap ${isCompactTemplateCard ? 'gap-1.5' : 'gap-2'}`}>
+          <button
+            type="button"
+            onClick={() => openCreateEntryWithTemplate(template)}
+            className={`rounded-xl border border-emerald-600 bg-emerald-600 font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500 ${
+              isCompactTemplateCard ? 'px-2.5 py-1.5 text-[11px]' : 'px-3 py-2 text-sm'
+            }`}
+          >
+            Usar en ficha
+          </button>
+          <button
+            type="button"
+            onClick={() => openEditTemplateModal(template)}
+            className={`rounded-xl border border-sky-600 bg-sky-600 font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500 ${
+              isCompactTemplateCard ? 'px-2.5 py-1.5 text-[11px]' : 'px-3 py-2 text-sm'
+            }`}
+          >
+            Editar plantilla
+          </button>
+        </div>
+      </div>
+    );
+  };
   const handleSaveCustomization = (
     nextCustomization: AppCustomizationSettings,
   ) => {
@@ -4097,23 +4749,27 @@ export const App = () => {
     trashCount: manualData.trash.length,
     undoDepth: undoStack.length,
   };
-  const headerActions = (
+  const headerStatus = (
     <>
       <div
-        className={`hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 sm:inline-flex ${serverStatusTone}`}
+        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${serverStatusTone}`}
       >
         {serverStatusLabel}
       </div>
       <div
-        className={`hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 lg:inline-flex ${storageStatusTone}`}
+        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${storageStatusTone}`}
       >
         {storageStatusLabel}
       </div>
       <div
-        className={`hidden rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 xl:inline-flex ${saveStatusTone}`}
+        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${saveStatusTone}`}
       >
         {saveStatusLabel}
       </div>
+    </>
+  );
+  const headerActions = (
+    <>
       <button
         type="button"
         onClick={() => {
@@ -4202,6 +4858,51 @@ export const App = () => {
       </button>
       <button
         type="button"
+        onClick={toggleCompactMode}
+        aria-label={
+          isCompactViewEnabled ? 'Activar vista normal' : 'Activar vista compacta'
+        }
+        title={
+          isCompactViewEnabled ? 'Activar vista normal' : 'Activar vista compacta'
+        }
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border bg-white transition-colors dark:bg-slate-900 ${
+          isCompactViewEnabled
+            ? 'border-cyan-300/70 text-cyan-600 shadow-[0_0_0_4px_rgba(8,145,178,0.12)] dark:border-cyan-400/50 dark:text-cyan-300'
+            : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-white'
+        }`}
+      >
+        {isCompactViewEnabled ? (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            className="h-5 w-5"
+          >
+            <path
+              d="M4 5.25h12M4 10h12M4 14.75h12"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="1.8"
+            />
+          </svg>
+        ) : (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            className="h-5 w-5"
+          >
+            <path
+              d="M4 4.75h5.5v4.5H4v-4.5Zm6.5 0H16v4.5h-5.5v-4.5ZM4 10.75h5.5v4.5H4v-4.5Zm6.5 0H16v4.5h-5.5v-4.5Z"
+              stroke="currentColor"
+              strokeLinejoin="round"
+              strokeWidth="1.4"
+            />
+          </svg>
+        )}
+      </button>
+      <button
+        type="button"
         onClick={handleOpenSettingsView}
         aria-label="Abrir configuración general"
         title="Abrir configuración general"
@@ -4281,12 +4982,13 @@ export const App = () => {
         appName={customization.appName}
         customization={customization}
         headerActions={headerActions}
+        headerStatus={headerStatus}
         searchTerm={searchTerm}
         onSearchTermChange={handleSearchTermChange}
         onHomeClick={clearAllFilters}
         sidebarContent={sidebarContent}
       >
-        <section className="space-y-5 sm:space-y-6">
+        <section ref={topContentRef} className="space-y-5 sm:space-y-6">
           {activeView === 'settings' ? (
             <AppCustomizationPanel
               customization={customization}
@@ -4294,8 +4996,186 @@ export const App = () => {
               onCancel={() => setActiveView('home')}
               onSave={handleSaveCustomization}
             />
+          ) : activeView === 'templates' ? (
+            <div
+              ref={templatesSectionRef}
+              tabIndex={-1}
+              className="space-y-5 outline-none"
+            >
+              <div className="hero-shell animate-fade-in overflow-hidden rounded-[2rem] border border-slate-200 p-5 shadow-sm dark:border-slate-800 sm:p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sky-700 dark:text-sky-300">
+                      Biblioteca de plantillas
+                    </p>
+                    <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                      Plantillas reutilizables
+                    </h2>
+                    <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200">
+                      Crea, edita y organiza las plantillas desde una pantalla propia.
+                      Las favoritas son las únicas que volverán a mostrarse en la home.
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2.5">
+                      <span className="rounded-full border border-slate-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-200">
+                        {sortedTemplates.length} plantilla{sortedTemplates.length === 1 ? '' : 's'}
+                      </span>
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm dark:border-amber-400/20 dark:bg-amber-500/10 dark:text-amber-200">
+                        {favoriteTemplates.length} favorita{favoriteTemplates.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="relative z-10 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={openCreateTemplateModal}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-sky-500/60 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 hover:text-sky-800 dark:border-sky-400/50 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15 dark:hover:text-sky-200"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        className="h-5 w-5"
+                      >
+                        <path
+                          d="M6 3.5h8a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 14 16.5H6A1.5 1.5 0 0 1 4.5 15V5A1.5 1.5 0 0 1 6 3.5Z"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                        />
+                        <path
+                          d="M7.5 7h5M7.5 10h5M7.5 13h3"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      Nueva plantilla
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveView('home')}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
+                    >
+                      Volver a la Home
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <section className="rounded-3xl border border-sky-200 bg-sky-50/80 p-4 shadow-sm dark:border-sky-400/20 dark:bg-sky-500/10">
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-[0.24em] text-sky-700 dark:text-sky-300">
+                      Búsqueda y filtros
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                      Encuentra plantillas por nombre, contenido, sección o favoritas.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold text-sky-800 shadow-sm dark:border-sky-400/30 dark:bg-slate-950/70 dark:text-sky-200">
+                    {filteredTemplates.length} resultado{filteredTemplates.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_220px_auto]">
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Buscar plantilla
+                    <input
+                      value={templateSearchTerm}
+                      onChange={(event) => setTemplateSearchTerm(event.target.value)}
+                      placeholder="Nombre, título, tag o contenido..."
+                      className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Filtrar por sección
+                    <select
+                      value={templateCategoryFilter}
+                      onChange={(event) => setTemplateCategoryFilter(event.target.value)}
+                      className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                    >
+                      <option value="">Todas las secciones</option>
+                      {manualData.categories.map((category) => (
+                        <option key={category.name} value={category.name}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <div className="flex flex-wrap items-end gap-3">
+                    <label className="inline-flex min-h-[46px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={showFavoriteTemplatesOnly}
+                        onChange={(event) => setShowFavoriteTemplatesOnly(event.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                      />
+                      Solo favoritas
+                    </label>
+                    {(templateSearchTerm || templateCategoryFilter || showFavoriteTemplatesOnly) ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTemplateSearchTerm('');
+                          setTemplateCategoryFilter('');
+                          setShowFavoriteTemplatesOnly(false);
+                        }}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
+                      >
+                        Limpiar
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </section>
+
+              {sortedTemplates.length ? (
+                <section className="space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                      Todas las plantillas
+                    </h3>
+                    <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                      Marca como favoritas las que quieras tener a mano en la home
+                    </span>
+                  </div>
+                  {filteredTemplates.length ? (
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {filteredTemplates.map((template) => renderTemplateCard(template))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                      No hay plantillas para la combinación actual de búsqueda y filtros. Usa Limpiar para volver a ver todo el catálogo.
+                    </div>
+                  )}
+                </section>
+              ) : (
+                <section className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900/60">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Aún no hay plantillas
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    Crea la primera plantilla para reutilizar contenido y tener tus
+                    estructuras favoritas siempre a mano.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={openCreateTemplateModal}
+                    className="mt-5 inline-flex items-center gap-2 rounded-2xl border border-sky-600 bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500"
+                  >
+                    Crear primera plantilla
+                  </button>
+                </section>
+              )}
+            </div>
           ) : hasActiveFilters ? (
-            <div className="space-y-4">
+            <div
+              ref={resultsSectionRef}
+              tabIndex={-1}
+              className="space-y-4 outline-none"
+            >
               <div
                 className="hero-shell animate-fade-in overflow-hidden rounded-[2rem] border border-slate-200 p-5 shadow-sm dark:border-slate-800 sm:p-6"
                 style={activeResultThemeVars}
@@ -4309,7 +5189,7 @@ export const App = () => {
                     Resultados
                   </h2>
                   <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                    {results.length} coincidencia{results.length === 1 ? '' : 's'} para{' '}
+                    {results.length} resultado{results.length === 1 ? '' : 's'} para{' '}
                     <span className="font-medium text-slate-800 dark:text-slate-100">
                       {searchTerm.trim().length ? `"${searchTerm}"` : 'los filtros activos'}
                     </span>.
@@ -4425,7 +5305,7 @@ export const App = () => {
               </div>
 
               {sortedResults.length ? (
-                <div className="grid gap-4">
+                <div className="grid gap-3">
                   {sortedResults.map((entry) => {
                     const category = categoryMap.get(entry.categoria.toLowerCase());
 
@@ -4434,6 +5314,7 @@ export const App = () => {
                         activeTags={activeTagFilters}
                         key={entry.id}
                         categoryColorKey={category?.color}
+                        compact={isCompactViewEnabled}
                         entry={entry}
                         onCommandSave={handleCommandSave}
                         onDeleteEntry={handleDeleteEntry}
@@ -4449,11 +5330,14 @@ export const App = () => {
               ) : (
                 <div className="app-surface-shell rounded-[1.8rem] border border-dashed border-slate-300 px-4 py-8 text-center shadow-sm dark:border-slate-700 sm:px-6 sm:py-10">
                   <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    No hemos encontrado coincidencias
+                    No hay resultados para la vista actual
                   </h3>
                   <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                    Prueba con otra palabra clave, cambia los filtros o usa
-                    prefijos como <code>/env</code> o <code>/cmd</code>.
+                    Ajusta la búsqueda, cambia los filtros activos o pulsa{' '}
+                    <span className="font-medium text-slate-700 dark:text-slate-200">
+                      Limpiar filtro
+                    </span>{' '}
+                    para volver al listado completo.
                   </p>
                 </div>
               )}
@@ -4518,7 +5402,7 @@ export const App = () => {
                   <div className="relative z-10 flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={openCreateTemplateModal}
+                      onClick={handleOpenTemplatesView}
                       className="inline-flex items-center gap-2 rounded-2xl border border-sky-500/60 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 hover:text-sky-800 dark:border-sky-400/50 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15 dark:hover:text-sky-200"
                     >
                       <svg
@@ -4539,7 +5423,7 @@ export const App = () => {
                           strokeLinecap="round"
                         />
                       </svg>
-                      Nueva Plantilla
+                      Plantillas
                     </button>
                     <button
                       type="button"
@@ -4608,11 +5492,29 @@ export const App = () => {
 
               {quickAccessEntries.length ? (
                 <section className="mt-6">
-                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
-                    Acceso rápido
-                  </h3>
-                  <div className="mt-3 grid gap-4">
-                    {quickAccessEntries.map((entry) => {
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                        Acceso rápido
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        {quickAccessEntries.length} ficha{quickAccessEntries.length === 1 ? '' : 's'} anclada{quickAccessEntries.length === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                    {quickAccessEntries.length > HOME_PINNED_ENTRY_PREVIEW_LIMIT ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowAllQuickAccessEntries((currentValue) => !currentValue)
+                        }
+                        className="text-xs font-semibold text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                      >
+                        {showAllQuickAccessEntries ? 'Ver menos' : `Ver más (${quickAccessEntries.length - HOME_PINNED_ENTRY_PREVIEW_LIMIT})`}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="mt-3 grid gap-3">
+                    {visibleQuickAccessEntries.map((entry) => {
                       const category = categoryMap.get(entry.categoria.toLowerCase());
 
                       return (
@@ -4620,6 +5522,7 @@ export const App = () => {
                           activeTags={activeTagFilters}
                           key={entry.id}
                           categoryColorKey={category?.color}
+                          compact={isCompactViewEnabled}
                           entry={entry}
                           onCommandSave={handleCommandSave}
                           onDeleteEntry={handleDeleteEntry}
@@ -4635,88 +5538,119 @@ export const App = () => {
                 </section>
               ) : null}
 
-              {manualData.templates.length ? (
+              {sortedTemplates.length ? (
                 <section className="mt-6">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
-                      Plantillas
+                      Plantillas favoritas
                     </h3>
+                    <button
+                      type="button"
+                      onClick={handleOpenTemplatesView}
+                      className="text-xs font-semibold text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                    >
+                      Ver todas
+                    </button>
+                  </div>
+                  {favoriteTemplates.length ? (
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      {favoriteTemplates.map((template) =>
+                        renderTemplateCard(template, 'home-favorite'),
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                      Aún no tienes plantillas favoritas. Entra en la biblioteca de
+                      plantillas y marca las que quieras fijar en esta pantalla.
+                    </div>
+                  )}
+                </section>
+              ) : null}
+
+              {manualData.categories.length ? (
+                <section className="mt-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                        Indice rapido
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Salta directamente a una seccion sin recorrer toda la home.
+                      </p>
+                    </div>
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                      {manualData.templates.length} plantilla{manualData.templates.length === 1 ? '' : 's'}
+                      {manualData.categories.length} seccion
+                      {manualData.categories.length === 1 ? '' : 'es'}
                     </span>
                   </div>
-                  <div className="mt-3 grid gap-4 md:grid-cols-2">
-                    {manualData.templates.map((template) => (
-                      <div
-                        key={template.id}
-                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {manualData.categories.map((category) => (
+                      <button
+                        key={`home-index-${category.name}`}
+                        type="button"
+                        onClick={() => scrollToHomeCategory(category.name)}
+                        className="section-gradient-pill inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium text-slate-800 transition-colors hover:text-slate-900 dark:text-slate-100 dark:hover:text-white"
+                        style={buildThemeVars(category.color)}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h4 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-                              {template.name}
-                            </h4>
-                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                              {template.categoria
-                                ? `Sección sugerida: ${template.categoria}`
-                                : 'Reutilizable en distintas secciones'}
-                            </p>
-                          </div>
-                          <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-                            {template.id}
-                          </span>
-                        </div>
-
-                        {template.tags.length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {template.tags.map((tag) => (
-                              <span
-                                key={`${template.id}-${tag}`}
-                                className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-                          {template.contenido}
-                        </p>
-
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openCreateEntryWithTemplate(template)}
-                            className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
-                          >
-                            Usar en ficha
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openEditTemplateModal(template)}
-                            className="rounded-xl border border-sky-600 bg-sky-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500"
-                          >
-                            Editar plantilla
-                          </button>
-                        </div>
-                      </div>
+                        <span>{category.name}</span>
+                        <span className="rounded-full border border-current/15 bg-white/70 px-2 py-0.5 text-[10px] font-semibold dark:bg-slate-950/70">
+                          {
+                            manualData.entries.filter(
+                              (entry) =>
+                                entry.categoria.toLowerCase() ===
+                                category.name.toLowerCase(),
+                            ).length
+                          }
+                        </span>
+                      </button>
                     ))}
                   </div>
                 </section>
               ) : null}
 
-              <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
+              <div className="mt-6 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                    Secciones principales
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Colapsa o expande tarjetas para reducir ruido visual en la home.
+                  </p>
+                </div>
+                {manualData.categories.length ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollapsedHomeCategories((currentCollapsedCategories) =>
+                        currentCollapsedCategories.length === manualData.categories.length
+                          ? []
+                          : manualData.categories.map((category) => category.name),
+                      )
+                    }
+                    className="text-xs font-semibold text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                  >
+                    {collapsedHomeCategories.length === manualData.categories.length
+                      ? 'Expandir todo'
+                      : 'Colapsar todo'}
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3">
                 {manualData.categories.map((category) => {
                   const theme = getCategoryTheme(category.color);
                   const entryCount = manualData.entries.filter(
                     (entry) =>
                       entry.categoria.toLowerCase() === category.name.toLowerCase(),
                   ).length;
+                  const isCollapsed = collapsedHomeCategories.includes(category.name);
 
                   return (
                     <div
                       key={category.name}
+                      ref={(element) => {
+                        homeCategoryRefs.current[category.name] = element;
+                      }}
                       className={`neon-card section-gradient-card rounded-2xl border p-4 transition-all duration-200 ${theme.chip}`}
                       style={buildThemeVars(category.color)}
                     >
@@ -4729,43 +5663,104 @@ export const App = () => {
                           <span className="section-gradient-pill inline-flex rounded-full border px-3 py-2 text-sm font-medium">
                             {category.name}
                           </span>
-                          <span className="mt-2 block text-[11px] leading-5 text-slate-500 dark:text-slate-300 sm:text-xs sm:leading-5">
-                            {category.description}
-                          </span>
+                          {!isCollapsed ? (
+                            <span className="mt-2 block text-[11px] leading-5 text-slate-500 dark:text-slate-300 sm:text-xs sm:leading-5">
+                              {category.description}
+                            </span>
+                          ) : null}
                           <span className="mt-3 block text-[11px] font-semibold uppercase tracking-[0.16em] text-current/80 dark:text-slate-100">
                             {entryCount} ficha{entryCount === 1 ? '' : 's'}
                           </span>
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => openCategoryModal(category.name)}
-                          aria-label={`Editar sección ${category.name}`}
-                          title={`Editar sección ${category.name}`}
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900"
-                        >
-                          <svg
-                            aria-hidden="true"
-                            viewBox="0 0 20 20"
-                            fill="none"
-                            className="icon-neon h-5 w-5"
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleHomeCategoryCollapse(category.name)}
+                            aria-label={`${isCollapsed ? 'Expandir' : 'Colapsar'} sección ${category.name}`}
+                            title={`${isCollapsed ? 'Expandir' : 'Colapsar'} sección ${category.name}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900"
                           >
-                            <path
-                              d="M10 2.5a1 1 0 0 1 1 1v.6a6.3 6.3 0 0 1 1.8.8l.4-.4a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1 0 1.4l-.4.4c.3.6.6 1.2.8 1.8h.6a1 1 0 0 1 1 1v1.4a1 1 0 0 1-1 1h-.6a6.3 6.3 0 0 1-.8 1.8l.4.4a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4 0l-.4-.4a6.3 6.3 0 0 1-1.8.8v.6a1 1 0 0 1-1 1H8.6a1 1 0 0 1-1-1v-.6a6.3 6.3 0 0 1-1.8-.8l-.4.4a1 1 0 0 1-1.4 0l-1-1a1 1 0 0 1 0-1.4l.4-.4a6.3 6.3 0 0 1-.8-1.8H2a1 1 0 0 1-1-1V9.9a1 1 0 0 1 1-1h.6a6.3 6.3 0 0 1 .8-1.8L3 6.7a1 1 0 0 1 0-1.4l1-1a1 1 0 0 1 1.4 0l.4.4a6.3 6.3 0 0 1 1.8-.8v-.6a1 1 0 0 1 1-1H10Z"
-                              stroke="currentColor"
-                              strokeWidth="1.2"
-                              strokeLinejoin="round"
-                            />
-                            <circle
-                              cx="9.3"
-                              cy="10.6"
-                              r="2.2"
-                              stroke="currentColor"
-                              strokeWidth="1.2"
-                            />
-                          </svg>
-                        </button>
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              className={`h-5 w-5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}
+                            >
+                              <path
+                                d="m6 8 4 4 4-4"
+                                stroke="currentColor"
+                                strokeWidth="1.8"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openCategoryModal(category.name)}
+                            aria-label={`Editar sección ${category.name}`}
+                            title={`Editar sección ${category.name}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              className="icon-neon h-5 w-5"
+                            >
+                              <path
+                                d="M10 2.5a1 1 0 0 1 1 1v.6a6.3 6.3 0 0 1 1.8.8l.4-.4a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1 0 1.4l-.4.4c.3.6.6 1.2.8 1.8h.6a1 1 0 0 1 1 1v1.4a1 1 0 0 1-1 1h-.6a6.3 6.3 0 0 1-.8 1.8l.4.4a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4 0l-.4-.4a6.3 6.3 0 0 1-1.8.8v.6a1 1 0 0 1-1 1H8.6a1 1 0 0 1-1-1v-.6a6.3 6.3 0 0 1-1.8-.8l-.4.4a1 1 0 0 1-1.4 0l-1-1a1 1 0 0 1 0-1.4l.4-.4a6.3 6.3 0 0 1-.8-1.8H2a1 1 0 0 1-1-1V9.9a1 1 0 0 1 1-1h.6a6.3 6.3 0 0 1 .8-1.8L3 6.7a1 1 0 0 1 0-1.4l1-1a1 1 0 0 1 1.4 0l.4.4a6.3 6.3 0 0 1 1.8-.8v-.6a1 1 0 0 1 1-1H10Z"
+                                stroke="currentColor"
+                                strokeWidth="1.2"
+                                strokeLinejoin="round"
+                              />
+                              <circle
+                                cx="9.3"
+                                cy="10.6"
+                                r="2.2"
+                                stroke="currentColor"
+                                strokeWidth="1.2"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
+
+                      {!isCollapsed ? (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openSectionPdfExportModal(category.name)}
+                            disabled={!entryCount || exportSectionCategoryName === category.name}
+                            className="inline-flex items-center gap-2 rounded-xl border border-sky-600 bg-sky-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500 dark:disabled:border-slate-700 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              className="h-4 w-4"
+                            >
+                              <path
+                                d="M5.5 3.5h6.7L15.5 6.8V15a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 15V5A1.5 1.5 0 0 1 5.5 3.5Z"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M12 3.8V7h3.2M7 10h5.5M7 13h4"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            {exportSectionCategoryName === category.name
+                              ? 'Generando PDF...'
+                              : 'PDF de sección'}
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
@@ -4785,6 +5780,132 @@ export const App = () => {
           event.target.value = '';
         }}
       />
+
+      {sectionPdfExportState ? (
+        <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="modal-shell w-full max-w-3xl rounded-3xl border border-slate-200 p-5 shadow-2xl dark:border-slate-800">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  PDF completo de sección
+                </h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+                  Selecciona qué fichas de{' '}
+                  <span className="font-semibold text-slate-800 dark:text-slate-100">
+                    {sectionPdfExportState.categoryName}
+                  </span>{' '}
+                  quieres incluir en el documento.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeSectionPdfExportModal}
+                aria-label="Cerrar selector de PDF por sección"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSectionPdfExportState((currentState) =>
+                      currentState
+                        ? {
+                            ...currentState,
+                            selectedEntryIds: sectionPdfEntries.map((entry) => entry.id),
+                          }
+                        : currentState,
+                    )
+                  }
+                  className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-medium text-sky-800 transition-colors hover:border-sky-400 hover:bg-sky-100 dark:border-sky-400/30 dark:bg-sky-500/10 dark:text-sky-200 dark:hover:border-sky-300 dark:hover:bg-sky-500/15"
+                >
+                  Seleccionar todas
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSectionPdfExportState((currentState) =>
+                      currentState
+                        ? {
+                            ...currentState,
+                            selectedEntryIds: [],
+                          }
+                        : currentState,
+                    )
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-900"
+                >
+                  Deseleccionar todas
+                </button>
+              </div>
+
+              <p className="text-sm text-slate-500 dark:text-slate-300">
+                {sectionPdfExportState.selectedEntryIds.length} de {sectionPdfEntries.length} fichas seleccionadas
+              </p>
+            </div>
+
+            <div className="mt-5 max-h-[50vh] space-y-3 overflow-y-auto pr-1">
+              {sectionPdfEntries.map((entry) => {
+                const isSelected = sectionPdfExportState.selectedEntryIds.includes(entry.id);
+
+                return (
+                  <label
+                    key={entry.id}
+                    className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition-colors ${
+                      isSelected
+                        ? 'border-sky-300 bg-sky-50 dark:border-sky-400/30 dark:bg-sky-500/10'
+                        : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggleSectionPdfEntry(entry.id)}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-slate-900 dark:text-slate-100">
+                          {entry.titulo}
+                        </p>
+                        <span className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+                          {entry.id}
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">
+                        {entry.contenido}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeSectionPdfExportModal}
+                className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleExportSectionPdf();
+                }}
+                className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+              >
+                Generar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {backupImportState ? (
         <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center p-4">
@@ -5004,7 +6125,10 @@ export const App = () => {
               </div>
 
               <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-2">
-                <div className="app-surface-shell min-h-0 overflow-y-auto border-r border-slate-200 dark:border-slate-800">
+                <div
+                  ref={entryEditorFormPaneRef}
+                  className="app-surface-shell min-h-0 overflow-y-auto border-r border-slate-200 dark:border-slate-800"
+                >
                   <div className="space-y-6 p-5 sm:p-6">
                     <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div>
@@ -5355,7 +6479,10 @@ export const App = () => {
                   </div>
                 </div>
 
-                <div className="app-surface-shell min-h-0 overflow-y-auto">
+                <div
+                  ref={entryEditorPreviewPaneRef}
+                  className="app-surface-shell min-h-0 overflow-y-auto"
+                >
                   <div className="space-y-6 p-5 sm:p-6">
                     <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div className="flex flex-wrap items-center gap-3">
@@ -5549,9 +6676,8 @@ export const App = () => {
               </div>
             </div>
           ) : (
-            <div className="flex h-full items-center justify-center p-4">
-              <div className="modal-shell w-full max-w-4xl rounded-3xl border border-slate-200 shadow-2xl dark:border-slate-800" style={entryThemeVars}>
-                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
+            <div className="app-surface-shell flex h-full flex-col" style={entryThemeVars}>
+              <div className="modal-shell flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-6">
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                       {modalState.mode === 'create'
@@ -5563,18 +6689,31 @@ export const App = () => {
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    aria-label="Cerrar modal"
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
-                  >
-                    ×
-                  </button>
-                </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTemplateSave}
+                      className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+                    >
+                      Guardar plantilla
+                    </button>
+                  </div>
+              </div>
 
-                <div className="grid gap-6 px-5 py-5 sm:px-6 sm:py-6 lg:grid-cols-[300px_minmax(0,1fr)]">
-                  <section className="space-y-4">
+              <div
+                ref={templateEditorPaneRef}
+                className="app-surface-shell min-h-0 flex-1 overflow-y-auto"
+              >
+                <div className="mx-auto max-w-7xl space-y-6 p-5 sm:p-6">
+                  <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+                    <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                     <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                       Nombre de la plantilla
                       <input
@@ -5665,9 +6804,9 @@ export const App = () => {
                         placeholder="Un paso por linea"
                       />
                     </label>
-                  </section>
+                    </section>
 
-                  <section className="space-y-4">
+                    <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                     <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                       Contenido base Markdown
                       <textarea
@@ -5793,33 +6932,34 @@ export const App = () => {
                         {formError}
                       </div>
                     ) : null}
-                  </section>
-                </div>
+                    </section>
+                  </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
-                  {modalState.mode === 'edit' && modalState.templateId ? (
+                  <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-2 dark:border-slate-800">
+                    {modalState.mode === 'edit' && modalState.templateId ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTemplate(modalState.templateId!)}
+                        className="mr-auto rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 transition-all duration-200 hover:border-rose-300 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/20"
+                      >
+                        Eliminar plantilla
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={() => handleDeleteTemplate(modalState.templateId!)}
-                      className="mr-auto rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 transition-all duration-200 hover:border-rose-300 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/20"
+                      onClick={closeModal}
+                      className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
                     >
-                      Eliminar plantilla
+                      Cancelar
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={closeModal}
-                    className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleTemplateSave}
-                    className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
-                  >
-                    Guardar plantilla
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleTemplateSave}
+                      className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+                    >
+                      Guardar plantilla
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

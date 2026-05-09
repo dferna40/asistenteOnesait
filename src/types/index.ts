@@ -65,6 +65,7 @@ export interface AppDiagnosticsSnapshot {
 }
 
 export interface AppSettings {
+  compactMode: boolean;
   customization: AppCustomizationSettings;
   darkMode: boolean;
 }
@@ -75,6 +76,7 @@ export interface EntryTemplate {
   titulo: string;
   categoria?: KnowledgeCategory;
   contenido: string;
+  isFavorite?: boolean;
   pasos?: string[];
   comandos?: CommandOption[];
   tags: string[];

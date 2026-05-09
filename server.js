@@ -263,7 +263,11 @@ export const startServer = async ({
       },
     }),
   );
-  app.use(express.json());
+  app.use(
+    express.json({
+      limit: '25mb',
+    }),
+  );
   app.use('/images', express.static(runtimePaths.imagesDirectory));
   app.use((request, response, next) => {
     const startedAt = Date.now();

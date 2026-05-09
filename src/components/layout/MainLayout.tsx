@@ -16,6 +16,7 @@ interface MainLayoutProps {
   customization: AppCustomizationSettings;
   children: ReactNode;
   headerActions?: ReactNode;
+  headerStatus?: ReactNode;
   topBarContent?: ReactNode;
   sidebarContent?: ReactNode;
   searchTerm?: string;
@@ -28,6 +29,7 @@ export function MainLayout({
   customization,
   children,
   headerActions,
+  headerStatus,
   topBarContent,
   sidebarContent,
   searchTerm = '',
@@ -145,8 +147,9 @@ export function MainLayout({
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <header className="topbar-shell sticky top-0 z-30 min-h-16 border-b border-slate-200 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:supports-[backdrop-filter]:bg-slate-950/80 sm:px-6">
             {topBarContent ?? (
-              <div className="flex h-full flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 items-center gap-3 md:gap-4">
+              <div className="flex h-full flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3 md:gap-4">
                   <button
                     type="button"
                     onClick={() => setIsSidebarOpen(true)}
@@ -168,12 +171,6 @@ export function MainLayout({
                       showWordmark
                     />
                   </button>
-                  <div className="min-w-0 flex-1">
-                    <SearchBar
-                      value={activeSearchTerm}
-                      onChange={handleSearchTermChange}
-                    />
-                  </div>
                 </div>
 
                 {headerActions ? (
@@ -181,6 +178,22 @@ export function MainLayout({
                     {headerActions}
                   </div>
                 ) : null}
+                </div>
+
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+                  <div className="min-w-0 flex-1">
+                    <SearchBar
+                      value={activeSearchTerm}
+                      onChange={handleSearchTermChange}
+                    />
+                  </div>
+
+                  {headerStatus ? (
+                    <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                      {headerStatus}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             )}
           </header>
