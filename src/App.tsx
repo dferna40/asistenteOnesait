@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ClipboardEvent as ReactClipboardEvent, CSSProperties } from 'react';
+import { useDeferredValue } from 'react';
 import { AppCustomizationPanel } from './components/settings/AppCustomizationPanel';
 import { MainLayout } from './components/layout/MainLayout';
 import { AppLogo } from './components/ui/AppLogo';
@@ -1526,6 +1527,7 @@ export const App = () => {
   const hasMountedRef = useRef(false);
   const customization = manualData.settings.customization;
   const isCompactViewEnabled = manualData.settings.compactMode;
+  const deferredEntryPreview = useDeferredValue(debouncedEntryPreview);
 
   const scrollViewportToTop = () => {
     window.scrollTo({
@@ -6757,36 +6759,36 @@ export const App = () => {
                     <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div className="flex flex-wrap items-center gap-3">
                         <span className="section-gradient-pill inline-flex rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-700 dark:text-slate-100" style={entryThemeVars}>
-                          {debouncedEntryPreview.categoria || 'Sin categoría'}
+                          {deferredEntryPreview.categoria || 'Sin categoría'}
                         </span>
                         <span className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-                          {debouncedEntryPreview.id || 'id-pendiente'}
+                          {deferredEntryPreview.id || 'id-pendiente'}
                         </span>
                       </div>
 
                       <h2 className="mt-4 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                        {debouncedEntryPreview.titulo || 'Vista previa de la ficha'}
+                        {deferredEntryPreview.titulo || 'Vista previa de la ficha'}
                       </h2>
 
                       <div className="mt-4 text-sm leading-6 text-slate-700 dark:text-slate-200">
-                        <MarkdownRenderer content={debouncedEntryPreview.contenido} />
+                        <MarkdownRenderer content={deferredEntryPreview.contenido} />
                       </div>
                     </div>
 
-                    {splitLines(debouncedEntryPreview.pasos).length ? (
+                    {splitLines(deferredEntryPreview.pasos).length ? (
                       <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                         <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                           Pasos
                         </h3>
                         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-200">
-                          {splitLines(debouncedEntryPreview.pasos).map((step) => (
+                          {splitLines(deferredEntryPreview.pasos).map((step) => (
                             <li key={step}>{step}</li>
                           ))}
                         </ol>
                       </div>
                     ) : null}
 
-                    {debouncedEntryPreview.comandos.some(
+                    {deferredEntryPreview.comandos.some(
                       (command) => command.label.trim() || command.value.trim(),
                     ) ? (
                       <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
@@ -6794,7 +6796,7 @@ export const App = () => {
                           Comandos y parámetros
                         </h3>
                         <div className="mt-3 space-y-2">
-                          {debouncedEntryPreview.comandos
+                          {deferredEntryPreview.comandos
                             .filter(
                               (command) =>
                                 command.label.trim() || command.value.trim(),
