@@ -6,6 +6,7 @@ import { AppLogo } from './components/ui/AppLogo';
 import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
 import { SidebarUtilities } from './components/ui/SidebarUtilities';
+import { ToggleSwitch } from './components/ui/ToggleSwitch';
 import { defaultAppCustomization, normalizeCustomization } from './constants/appCustomization';
 import {
   categoryColorOptions,
@@ -157,7 +158,13 @@ interface BackupImportState {
 
 interface SectionPdfExportState {
   categoryName: string;
+  includeBrandingFooter: boolean;
   selectedEntryIds: string[];
+}
+
+interface EntryPdfExportState {
+  entryId: string;
+  includeBrandingFooter: boolean;
 }
 
 interface BackupImportSummary {
@@ -1469,8 +1476,13 @@ export const App = () => {
   const [templateForm, setTemplateForm] = useState<TemplateFormState | null>(
     null,
   );
+  const [showEntryAdvancedOptions, setShowEntryAdvancedOptions] = useState(false);
+  const [showTemplateTechnicalOptions, setShowTemplateTechnicalOptions] =
+    useState(false);
   const [backupImportState, setBackupImportState] =
     useState<BackupImportState | null>(null);
+  const [entryPdfExportState, setEntryPdfExportState] =
+    useState<EntryPdfExportState | null>(null);
   const [sectionPdfExportState, setSectionPdfExportState] =
     useState<SectionPdfExportState | null>(null);
   const [formError, setFormError] = useState('');
@@ -2111,6 +2123,7 @@ export const App = () => {
       categoryLocked,
       categoria: nextCategory || current.categoria,
     }));
+    setShowEntryAdvancedOptions(false);
     setSelectedTemplateId('');
     setFormError('');
     setModalState({
@@ -2123,6 +2136,7 @@ export const App = () => {
   const openEditEntryModal = (entry: KnowledgeEntry) => {
     const categoryDefinition = categoryMap.get(entry.categoria.toLowerCase());
     setEntryForm(buildEntryFormState(entry, categoryDefinition, false));
+    setShowEntryAdvancedOptions(false);
     setSelectedTemplateId('');
     setFormError('');
     setModalState({ entryId: entry.id, mode: 'edit', type: 'entry' });
@@ -2136,12 +2150,14 @@ export const App = () => {
 
   const openCreateTemplateModal = () => {
     setTemplateForm(buildTemplateFormState(undefined, manualData.categories[0]?.name ?? ''));
+    setShowTemplateTechnicalOptions(false);
     setFormError('');
     setModalState({ mode: 'create', type: 'template' });
   };
 
   const openEditTemplateModal = (template: EntryTemplate) => {
     setTemplateForm(buildTemplateFormState(template));
+    setShowTemplateTechnicalOptions(false);
     setFormError('');
     setModalState({ mode: 'edit', templateId: template.id, type: 'template' });
   };
@@ -2161,6 +2177,8 @@ export const App = () => {
     setModalState(null);
     setCategoryForm(null);
     setTemplateForm(null);
+    setShowEntryAdvancedOptions(false);
+    setShowTemplateTechnicalOptions(false);
     setSelectedTemplateId('');
     setFormError('');
   };
@@ -2303,6 +2321,7 @@ export const App = () => {
     options: {
       documentSubtitle?: string;
       documentTitle?: string;
+      includeBrandingFooter?: boolean;
     } = {},
   ) => {
     if (!entries.length) {
@@ -2354,20 +2373,23 @@ export const App = () => {
       const contentWidth = pageWidth - margin * 2;
       const footerHeight = 14;
       const contentBottomLimit = pageHeight - margin - footerHeight;
+      const includeBrandingFooter = options.includeBrandingFooter !== false;
       let cursorY = margin;
       const footerIconSource =
         customization.appIconDataUrl.trim() || defaultPrysmaIconDataUrl;
-      const footerIconAsset = await (async () => {
-        try {
-          if (footerIconSource.startsWith('data:')) {
-            return await rasterizeImageDataUrl(footerIconSource);
-          }
+      const footerIconAsset = includeBrandingFooter
+        ? await (async () => {
+            try {
+              if (footerIconSource.startsWith('data:')) {
+                return await rasterizeImageDataUrl(footerIconSource);
+              }
 
-          return await resolvePdfImageAsset(footerIconSource);
-        } catch {
-          return null;
-        }
-      })();
+              return await resolvePdfImageAsset(footerIconSource);
+            } catch {
+              return null;
+            }
+          })()
+        : null;
 
       const ensureSpace = (height: number) => {
         if (cursorY + height <= contentBottomLimit) {
@@ -3362,34 +3384,40 @@ export const App = () => {
 
       for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
         pdf.setPage(pageNumber);
-        pdf.setDrawColor(226, 232, 240);
-        pdf.setLineWidth(0.25);
-        pdf.line(margin, footerDividerY, pageWidth - margin, footerDividerY);
 
-        let footerTextX = margin;
+        if (includeBrandingFooter) {
+          pdf.setDrawColor(226, 232, 240);
+          pdf.setLineWidth(0.25);
+          pdf.line(margin, footerDividerY, pageWidth - margin, footerDividerY);
 
-        if (footerIconAsset) {
-          const footerIconFormat = footerIconAsset.dataUrl.includes('image/jpeg')
-            ? 'JPEG'
-            : 'PNG';
+          let footerTextX = margin;
 
-          pdf.addImage(
-            footerIconAsset.dataUrl,
-            footerIconFormat,
-            margin,
-            footerBaselineY - footerIconSize + 0.4,
-            footerIconSize,
-            footerIconSize,
-          );
-          footerTextX += footerIconSize + 2.5;
+          if (footerIconAsset) {
+            const footerIconFormat = footerIconAsset.dataUrl.includes('image/jpeg')
+              ? 'JPEG'
+              : 'PNG';
+
+            pdf.addImage(
+              footerIconAsset.dataUrl,
+              footerIconFormat,
+              margin,
+              footerBaselineY - footerIconSize + 0.4,
+              footerIconSize,
+              footerIconSize,
+            );
+            footerTextX += footerIconSize + 2.5;
+          }
+
+          pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
+          pdf.setFontSize(8.5);
+          pdf.setTextColor(71, 85, 105);
+          pdf.text('Documentación generada con Prysma', footerTextX, footerBaselineY);
         }
 
-        pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
-        pdf.setFontSize(8.5);
-        pdf.setTextColor(71, 85, 105);
-        pdf.text('Documentación generada con Prysma', footerTextX, footerBaselineY);
-
         if (totalPages > 1) {
+          pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
+          pdf.setFontSize(8.5);
+          pdf.setTextColor(71, 85, 105);
           pdf.text(`Página ${pageNumber}`, pageWidth - margin, footerBaselineY, {
             align: 'right',
           });
@@ -3409,8 +3437,39 @@ export const App = () => {
     }
   };
 
-  const handleExportEntryPdf = async (entry: KnowledgeEntry) => {
-    await exportEntriesToPdf([entry], `${entry.id}.pdf`);
+  const openEntryPdfExportModal = (entry: KnowledgeEntry) => {
+    setEntryPdfExportState({
+      entryId: entry.id,
+      includeBrandingFooter: true,
+    });
+  };
+
+  const closeEntryPdfExportModal = () => {
+    setEntryPdfExportState(null);
+  };
+
+  const handleExportEntryPdf = async () => {
+    if (!entryPdfExportState) {
+      return;
+    }
+
+    const entry = manualData.entries.find(
+      (currentEntry) => currentEntry.id === entryPdfExportState.entryId,
+    );
+
+    if (!entry) {
+      setSaveToast({
+        message: 'No se ha encontrado la ficha seleccionada para exportar.',
+        tone: 'error',
+      });
+      closeEntryPdfExportModal();
+      return;
+    }
+
+    closeEntryPdfExportModal();
+    await exportEntriesToPdf([entry], `${entry.id}.pdf`, {
+      includeBrandingFooter: entryPdfExportState.includeBrandingFooter,
+    });
     setSaveToast({
       message: `PDF generado para "${entry.titulo}".`,
       tone: 'success',
@@ -3436,6 +3495,7 @@ export const App = () => {
 
     setSectionPdfExportState({
       categoryName,
+      includeBrandingFooter: true,
       selectedEntryIds: categoryEntries.map((entry) => entry.id),
     });
   };
@@ -3501,6 +3561,7 @@ export const App = () => {
           documentSubtitle:
             sectionDescription ||
             `${selectedEntries.length} ficha${selectedEntries.length === 1 ? '' : 's'} seleccionada${selectedEntries.length === 1 ? '' : 's'}`,
+          includeBrandingFooter: sectionPdfExportState.includeBrandingFooter,
         },
       );
       setSaveToast({
@@ -3717,7 +3778,7 @@ export const App = () => {
 
     if (duplicateTemplateId) {
       setFormError(
-        'Ya existe una plantilla con ese ID. Usa otro identificador o deja el campo vacio para autogenerarlo.',
+        'Ya existe una plantilla con ese ID tecnico. Cambialo desde las opciones tecnicas o deja que la app lo genere automaticamente.',
       );
       return;
     }
@@ -4665,9 +4726,6 @@ export const App = () => {
     <SidebarUtilities
       customization={customization}
       onEmptyTrash={handleEmptyTrash}
-      onExportBackup={handleExportBackup}
-      onExportManual={handleExport}
-      onImportBackupClick={handleImportBackupClick}
       onRestoreCategory={handleRestoreCategory}
       onRestoreEntry={handleRestoreEntry}
       restorableCategories={restorableTrashCategories}
@@ -4994,6 +5052,9 @@ export const App = () => {
               customization={customization}
               diagnostics={diagnosticsSnapshot}
               onCancel={() => setActiveView('home')}
+              onExportBackup={handleExportBackup}
+              onExportManual={handleExport}
+              onImportBackupClick={handleImportBackupClick}
               onSave={handleSaveCustomization}
             />
           ) : activeView === 'templates' ? (
@@ -5319,7 +5380,7 @@ export const App = () => {
                         onCommandSave={handleCommandSave}
                         onDeleteEntry={handleDeleteEntry}
                         onEditEntry={openEditEntryModal}
-                        onExportPdf={handleExportEntryPdf}
+                        onExportPdf={openEntryPdfExportModal}
                         onTagClick={handleTagFilter}
                         onTogglePin={handleTogglePinEntry}
                         pdfIsGenerating={exportEntryId === entry.id}
@@ -5527,7 +5588,7 @@ export const App = () => {
                           onCommandSave={handleCommandSave}
                           onDeleteEntry={handleDeleteEntry}
                           onEditEntry={openEditEntryModal}
-                          onExportPdf={handleExportEntryPdf}
+                          onExportPdf={openEntryPdfExportModal}
                           onTagClick={handleTagFilter}
                           onTogglePin={handleTogglePinEntry}
                           pdfIsGenerating={exportEntryId === entry.id}
@@ -5781,6 +5842,65 @@ export const App = () => {
         }}
       />
 
+      {entryPdfExportState ? (
+        <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="modal-shell w-full max-w-xl rounded-3xl border border-slate-200 p-5 shadow-2xl dark:border-slate-800">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Exportar ficha a PDF
+                </h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+                  Elige si quieres incluir el pie corporativo con icono, texto y numeración.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeEntryPdfExportModal}
+                aria-label="Cerrar exportacion individual de PDF"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-300 hover:text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <ToggleSwitch
+                checked={entryPdfExportState.includeBrandingFooter}
+                description="Incluye icono de Prysma, texto de generación y número de página cuando corresponda."
+                label="Pie corporativo en PDF"
+                onChange={(nextValue) =>
+                  setEntryPdfExportState((currentState) =>
+                    currentState
+                      ? { ...currentState, includeBrandingFooter: nextValue }
+                      : currentState,
+                  )
+                }
+              />
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeEntryPdfExportModal}
+                className="rounded-xl border border-red-600 bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleExportEntryPdf();
+                }}
+                className="rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
+              >
+                Generar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {sectionPdfExportState ? (
         <div className="modal-overlay fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div className="modal-shell w-full max-w-3xl rounded-3xl border border-slate-200 p-5 shadow-2xl dark:border-slate-800">
@@ -5846,6 +5966,21 @@ export const App = () => {
               <p className="text-sm text-slate-500 dark:text-slate-300">
                 {sectionPdfExportState.selectedEntryIds.length} de {sectionPdfEntries.length} fichas seleccionadas
               </p>
+            </div>
+
+            <div className="mt-4">
+              <ToggleSwitch
+                checked={sectionPdfExportState.includeBrandingFooter}
+                description="Incluye icono de Prysma, texto de generación y numeración al final de cada página."
+                label="Pie corporativo en PDF"
+                onChange={(nextValue) =>
+                  setSectionPdfExportState((currentState) =>
+                    currentState
+                      ? { ...currentState, includeBrandingFooter: nextValue }
+                      : currentState,
+                  )
+                }
+              />
             </div>
 
             <div className="mt-5 max-h-[50vh] space-y-3 overflow-y-auto pr-1">
@@ -6100,13 +6235,12 @@ export const App = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSaveCurrentEntryAsTemplate}
-                    className="rounded-xl border border-sky-600 bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500"
-                  >
-                    Guardar como plantilla
-                  </button>
+                  <ToggleSwitch
+                    checked={showEntryAdvancedOptions}
+                    description="Activa acciones técnicas, plantillas e identificador manual."
+                    label="Opciones avanzadas"
+                    onChange={setShowEntryAdvancedOptions}
+                  />
                   <button
                     type="button"
                     onClick={closeModal}
@@ -6140,36 +6274,6 @@ export const App = () => {
                         </p>
                       </div>
 
-                      {manualData.templates.length ? (
-                        <div className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-800 md:grid-cols-[minmax(0,1fr)_auto]">
-                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Plantilla
-                            <select
-                              value={selectedTemplateId}
-                              onChange={(event) => setSelectedTemplateId(event.target.value)}
-                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                            >
-                              <option value="">Selecciona una plantilla</option>
-                              {manualData.templates.map((template) => (
-                                <option key={template.id} value={template.id}>
-                                  {template.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-
-                          <div className="flex items-end">
-                            <button
-                              type="button"
-                              onClick={handleApplySelectedTemplate}
-                              className="w-full rounded-xl border border-sky-600 bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500 md:w-auto"
-                            >
-                              Aplicar plantilla
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
                       <div className="grid gap-4 md:grid-cols-2">
                         <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                           Seccion
@@ -6195,21 +6299,6 @@ export const App = () => {
                               </option>
                             ))}
                           </select>
-                        </label>
-
-                        <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                          ID de la ficha
-                          <input
-                            value={entryForm.id}
-                            onChange={(event) =>
-                              setEntryForm((current) => ({
-                                ...current,
-                                id: event.target.value,
-                              }))
-                            }
-                            className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                            placeholder="Se genera automaticamente si lo dejas vacio"
-                          />
                         </label>
 
                         <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -6244,6 +6333,76 @@ export const App = () => {
                           </p>
                         </label>
                       </div>
+
+                      {showEntryAdvancedOptions ? (
+                        <div className="space-y-4 rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                              Opciones avanzadas de la ficha
+                            </p>
+                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                              Aquí puedes reutilizar plantillas, guardar esta ficha como plantilla o editar el identificador técnico.
+                            </p>
+                          </div>
+
+                          {manualData.templates.length ? (
+                            <div className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-4 dark:border-slate-800 md:grid-cols-[minmax(0,1fr)_auto]">
+                              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Plantilla
+                                <select
+                                  value={selectedTemplateId}
+                                  onChange={(event) => setSelectedTemplateId(event.target.value)}
+                                  className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                                >
+                                  <option value="">Selecciona una plantilla</option>
+                                  {manualData.templates.map((template) => (
+                                    <option key={template.id} value={template.id}>
+                                      {template.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+
+                              <div className="flex items-end">
+                                <button
+                                  type="button"
+                                  onClick={handleApplySelectedTemplate}
+                                  className="w-full rounded-xl border border-sky-600 bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500 md:w-auto"
+                                >
+                                  Aplicar plantilla
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+                            <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                              ID de la ficha
+                              <input
+                                value={entryForm.id}
+                                onChange={(event) =>
+                                  setEntryForm((current) => ({
+                                    ...current,
+                                    id: event.target.value,
+                                  }))
+                                }
+                                className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                                placeholder="Se genera automaticamente si lo dejas vacio"
+                              />
+                            </label>
+
+                            <div className="flex items-end">
+                              <button
+                                type="button"
+                                onClick={handleSaveCurrentEntryAsTemplate}
+                                className="w-full rounded-xl border border-sky-600 bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500 md:w-auto"
+                              >
+                                Guardar como plantilla
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
 
                       {entryForm.categoryLocked && activeEntryCategory ? (
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
@@ -6690,6 +6849,12 @@ export const App = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
+                    <ToggleSwitch
+                      checked={showTemplateTechnicalOptions}
+                      description="Activa el identificador técnico y los campos opcionales de la plantilla."
+                      label="Opciones avanzadas"
+                      onChange={setShowTemplateTechnicalOptions}
+                    />
                     <button
                       type="button"
                       onClick={closeModal}
@@ -6728,82 +6893,97 @@ export const App = () => {
                       />
                     </label>
 
-                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      ID de plantilla
-                      <input
-                        value={templateForm?.id ?? ''}
-                        onChange={(event) =>
-                          setTemplateForm((current) =>
-                            current ? { ...current, id: event.target.value } : current,
-                          )
-                        }
-                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                        placeholder="Se genera automaticamente si lo dejas vacio"
-                      />
-                    </label>
+                    {showTemplateTechnicalOptions ? (
+                      <div className="rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/60">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            Opciones avanzadas de plantilla
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                            La app puede generar el identificador técnico automáticamente y dejar el resto de campos opcionales fuera del flujo normal.
+                          </p>
+                        </div>
 
-                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Sección sugerida
-                      <select
-                        value={templateForm?.categoria ?? ''}
-                        onChange={(event) =>
-                          setTemplateForm((current) =>
-                            current ? { ...current, categoria: event.target.value } : current,
-                          )
-                        }
-                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                      >
-                        <option value="">Sin sección fija</option>
-                        {manualData.categories.map((category) => (
-                          <option key={category.name} value={category.name}>
-                            {category.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        <div className="mt-3 space-y-4">
+                          <label className="block space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            ID de plantilla
+                            <input
+                              value={templateForm?.id ?? ''}
+                              onChange={(event) =>
+                                setTemplateForm((current) =>
+                                  current ? { ...current, id: event.target.value } : current,
+                                )
+                              }
+                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                              placeholder="Se genera automaticamente si lo dejas vacio"
+                            />
+                          </label>
 
-                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Título sugerido
-                      <input
-                        value={templateForm?.titulo ?? ''}
-                        onChange={(event) =>
-                          setTemplateForm((current) =>
-                            current ? { ...current, titulo: event.target.value } : current,
-                          )
-                        }
-                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                        placeholder="Ej. Nueva incidencia"
-                      />
-                    </label>
+                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Sección sugerida
+                            <select
+                              value={templateForm?.categoria ?? ''}
+                              onChange={(event) =>
+                                setTemplateForm((current) =>
+                                  current ? { ...current, categoria: event.target.value } : current,
+                                )
+                              }
+                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                            >
+                              <option value="">Sin sección fija</option>
+                              {manualData.categories.map((category) => (
+                                <option key={category.name} value={category.name}>
+                                  {category.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
 
-                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Tags sugeridos
-                      <input
-                        value={templateForm?.tags ?? ''}
-                        onChange={(event) =>
-                          setTemplateForm((current) =>
-                            current ? { ...current, tags: event.target.value } : current,
-                          )
-                        }
-                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                        placeholder="batch, incidencia, producción"
-                      />
-                    </label>
+                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Título sugerido
+                            <input
+                              value={templateForm?.titulo ?? ''}
+                              onChange={(event) =>
+                                setTemplateForm((current) =>
+                                  current ? { ...current, titulo: event.target.value } : current,
+                                )
+                              }
+                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                              placeholder="Ej. Nueva incidencia"
+                            />
+                          </label>
 
-                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Pasos sugeridos
-                      <textarea
-                        value={templateForm?.pasos ?? ''}
-                        onChange={(event) =>
-                          setTemplateForm((current) =>
-                            current ? { ...current, pasos: event.target.value } : current,
-                          )
-                        }
-                        rows={5}
-                        className="themed-field w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                        placeholder="Un paso por linea"
-                      />
-                    </label>
+                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Tags sugeridos
+                            <input
+                              value={templateForm?.tags ?? ''}
+                              onChange={(event) =>
+                                setTemplateForm((current) =>
+                                  current ? { ...current, tags: event.target.value } : current,
+                                )
+                              }
+                              className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                              placeholder="batch, incidencia, producción"
+                            />
+                          </label>
+
+                          <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Pasos sugeridos
+                            <textarea
+                              value={templateForm?.pasos ?? ''}
+                              onChange={(event) =>
+                                setTemplateForm((current) =>
+                                  current ? { ...current, pasos: event.target.value } : current,
+                                )
+                              }
+                              rows={5}
+                              className="themed-field w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                              placeholder="Un paso por linea"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : null}
                     </section>
 
                     <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
@@ -6822,110 +7002,112 @@ export const App = () => {
                       />
                     </label>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Comandos y parámetros sugeridos
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setTemplateForm((current) =>
-                              current
-                                ? {
-                                    ...current,
-                                    comandos: [
-                                      ...current.comandos,
-                                      { label: '', value: '' },
-                                    ],
-                                  }
-                                : current,
-                            )
-                          }
-                          className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
-                        >
-                            Añadir fila
-                        </button>
-                      </div>
-
+                    {showTemplateTechnicalOptions ? (
                       <div className="space-y-3">
-                        {(templateForm?.comandos ?? []).map((command, index) => (
-                          <div
-                            key={`template-command-${index}`}
-                            className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[180px_minmax(0,1fr)_auto]"
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Comandos y parámetros sugeridos
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setTemplateForm((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      comandos: [
+                                        ...current.comandos,
+                                        { label: '', value: '' },
+                                      ],
+                                    }
+                                  : current,
+                              )
+                            }
+                            className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
                           >
-                            <input
-                              value={command.label}
-                              onChange={(event) =>
-                                setTemplateForm((current) =>
-                                  current
-                                    ? {
-                                        ...current,
-                                        comandos: current.comandos.map(
-                                          (currentCommand, commandIndex) =>
-                                            commandIndex === index
-                                              ? {
-                                                  ...currentCommand,
-                                                  label: event.target.value,
-                                                }
-                                              : currentCommand,
-                                        ),
-                                      }
-                                    : current,
-                                )
-                              }
-                              className="themed-field rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                              placeholder="Etiqueta"
-                            />
-                            <input
-                              value={command.value}
-                              onChange={(event) =>
-                                setTemplateForm((current) =>
-                                  current
-                                    ? {
-                                        ...current,
-                                        comandos: current.comandos.map(
-                                          (currentCommand, commandIndex) =>
-                                            commandIndex === index
-                                              ? {
-                                                  ...currentCommand,
-                                                  value: event.target.value,
-                                                }
-                                              : currentCommand,
-                                        ),
-                                      }
-                                    : current,
-                                )
-                              }
-                              className="themed-field rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                              placeholder="Valor"
-                            />
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setTemplateForm((current) =>
-                                  current
-                                    ? {
-                                        ...current,
-                                        comandos:
-                                          current.comandos.length === 1
-                                            ? [{ label: '', value: '' }]
-                                            : current.comandos.filter(
-                                                (_, commandIndex) =>
-                                                  commandIndex !== index,
-                                              ),
-                                      }
-                                    : current,
-                                )
-                              }
-                              className="rounded-xl border border-red-600 bg-red-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
+                            Añadir fila
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {(templateForm?.comandos ?? []).map((command, index) => (
+                            <div
+                              key={`template-command-${index}`}
+                              className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950 md:grid-cols-[180px_minmax(0,1fr)_auto]"
                             >
-                              Quitar
-                            </button>
-                          </div>
-                        ))}
+                              <input
+                                value={command.label}
+                                onChange={(event) =>
+                                  setTemplateForm((current) =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          comandos: current.comandos.map(
+                                            (currentCommand, commandIndex) =>
+                                              commandIndex === index
+                                                ? {
+                                                    ...currentCommand,
+                                                    label: event.target.value,
+                                                  }
+                                                : currentCommand,
+                                          ),
+                                        }
+                                      : current,
+                                  )
+                                }
+                                className="themed-field rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                                placeholder="Etiqueta"
+                              />
+                              <input
+                                value={command.value}
+                                onChange={(event) =>
+                                  setTemplateForm((current) =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          comandos: current.comandos.map(
+                                            (currentCommand, commandIndex) =>
+                                              commandIndex === index
+                                                ? {
+                                                    ...currentCommand,
+                                                    value: event.target.value,
+                                                  }
+                                                : currentCommand,
+                                          ),
+                                        }
+                                      : current,
+                                  )
+                                }
+                                className="themed-field rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                                placeholder="Valor"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setTemplateForm((current) =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          comandos:
+                                            current.comandos.length === 1
+                                              ? [{ label: '', value: '' }]
+                                              : current.comandos.filter(
+                                                  (_, commandIndex) =>
+                                                    commandIndex !== index,
+                                                ),
+                                        }
+                                      : current,
+                                  )
+                                }
+                                className="rounded-xl border border-red-600 bg-red-600 px-3 py-2.5 text-sm font-medium text-white transition-colors hover:border-red-700 hover:bg-red-700 dark:border-red-500 dark:bg-red-600 dark:hover:border-red-400 dark:hover:bg-red-500"
+                              >
+                                Quitar
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
 
                     {formError ? (
                       <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

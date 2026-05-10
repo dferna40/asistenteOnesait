@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { AppCustomizationSettings, KnowledgeEntry } from '../../types';
+import { ToggleSwitch } from './ToggleSwitch';
 
 interface TrashCategorySummary {
   entryCount: number;
@@ -9,9 +10,6 @@ interface TrashCategorySummary {
 interface SidebarUtilitiesProps {
   customization: AppCustomizationSettings;
   onEmptyTrash: () => void;
-  onExportBackup: () => void;
-  onExportManual: () => void;
-  onImportBackupClick: () => void;
   onRestoreCategory: (categoryName: string) => void;
   onRestoreEntry: (entryId: string) => void;
   restorableCategories: TrashCategorySummary[];
@@ -80,15 +78,13 @@ const formatSqlInput = (rawValue: string) => {
 export function SidebarUtilities({
   customization,
   onEmptyTrash,
-  onExportBackup,
-  onExportManual,
-  onImportBackupClick,
   onRestoreCategory,
   onRestoreEntry,
   restorableCategories,
   trashEntries,
 }: SidebarUtilitiesProps) {
   const [expandedTool, setExpandedTool] = useState<ExpandedTool>(null);
+  const [showAdvancedUtilities, setShowAdvancedUtilities] = useState(false);
   const [jsonInput, setJsonInput] = useState('');
   const [sqlInput, setSqlInput] = useState('');
 
@@ -127,7 +123,17 @@ export function SidebarUtilities({
             </h3>
           </div>
 
-          <div className="app-scrollbar mt-3 max-h-[28rem] space-y-4 overflow-y-auto pr-1">
+          <div className="mt-3">
+            <ToggleSwitch
+              checked={showAdvancedUtilities}
+              description="Activa JSON Formatter y SQL Beautifier dentro de este bloque."
+              label="Opciones avanzadas"
+              onChange={setShowAdvancedUtilities}
+            />
+          </div>
+
+          {showAdvancedUtilities ? (
+            <div className="app-scrollbar mt-4 max-h-[28rem] space-y-4 overflow-y-auto pr-1">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-200">
@@ -189,36 +195,17 @@ export function SidebarUtilities({
                 </pre>
               ) : null}
             </div>
-          </div>
-        </section>
-
-        <section className="sidebar-panel rounded-[1.7rem] border border-slate-200/80 p-4 dark:border-slate-800">
-          <h3 className="text-xs font-black uppercase tracking-[0.24em] text-slate-500 dark:text-slate-200">
-            {customization.backupSectionTitle}
-          </h3>
-          <div className="mt-3 grid gap-2">
-            <button
-              type="button"
-              onClick={onExportBackup}
-              className="rounded-xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500"
-            >
-              Exportar backup completo
-            </button>
-            <button
-              type="button"
-              onClick={onExportManual}
-              className="rounded-xl border border-slate-300 bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-200 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-700"
-            >
-              Descargar manual actual
-            </button>
-            <button
-              type="button"
-              onClick={onImportBackupClick}
-              className="rounded-xl border border-sky-500 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-700 transition-colors hover:border-sky-600 hover:bg-sky-500/20 dark:border-sky-400/60 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15"
-            >
-              Importar backup
-            </button>
-          </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-300/80 bg-slate-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-900/60">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                Utilidades tecnicas ocultas
+              </p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                JSON Formatter y SQL Beautifier solo se muestran cuando activas las opciones avanzadas de este bloque.
+              </p>
+            </div>
+          )}
         </section>
 
         <section

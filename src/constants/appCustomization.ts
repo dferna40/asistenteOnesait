@@ -80,6 +80,9 @@ export const defaultAppCustomization: AppCustomizationSettings = {
   heroTitle: 'Ecosistema de Conocimiento',
   reminderText:
     'Para cualquier implementacion Java que gestione excepciones, utiliza siempre try-catch-resources para garantizar la seguridad del codigo.',
+  showExternalTools: false,
+  showGlobalCredentials: false,
+  showSidebarIdentity: false,
   sidebarIdentityTitle: 'Escritorio',
   trashSectionTitle: 'Papelera',
 };
@@ -112,5 +115,8 @@ export const normalizeCustomization = (
         ? normalizedAppName
         : defaultAppCustomization.appName,
     externalTools: mergedExternalTools,
+    showExternalTools: customization?.showExternalTools === true,
+    showGlobalCredentials: customization?.showGlobalCredentials === true,
+    showSidebarIdentity: customization?.showSidebarIdentity === true,
   };
 };

@@ -44,6 +44,9 @@ export interface AppCustomizationSettings {
   heroDescription: string;
   heroTitle: string;
   reminderText: string;
+  showExternalTools: boolean;
+  showGlobalCredentials: boolean;
+  showSidebarIdentity: boolean;
   sidebarIdentityTitle: string;
   trashSectionTitle: string;
 }

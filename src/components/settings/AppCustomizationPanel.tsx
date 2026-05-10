@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { AppLogo } from '../ui/AppLogo';
+import { ToggleSwitch } from '../ui/ToggleSwitch';
 import type {
   AppCustomizationSettings,
   AppDiagnosticsSnapshot,
@@ -16,6 +17,9 @@ interface AppCustomizationPanelProps {
   customization: AppCustomizationSettings;
   diagnostics: AppDiagnosticsSnapshot;
   onCancel: () => void;
+  onExportBackup: () => void;
+  onExportManual: () => void;
+  onImportBackupClick: () => void;
   onSave: (nextCustomization: AppCustomizationSettings) => void;
 }
 
@@ -29,9 +33,13 @@ export function AppCustomizationPanel({
   customization,
   diagnostics,
   onCancel,
+  onExportBackup,
+  onExportManual,
+  onImportBackupClick,
   onSave,
 }: AppCustomizationPanelProps) {
   const [formState, setFormState] = useState<AppCustomizationSettings>(customization);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   useEffect(() => {
     setFormState(customization);
@@ -39,7 +47,7 @@ export function AppCustomizationPanel({
 
   const updateField = (
     field: keyof AppCustomizationSettings,
-    value: string | ExternalToolLink[],
+    value: string | boolean | ExternalToolLink[],
   ) => {
     setFormState((currentValue) => ({
       ...currentValue,
@@ -76,6 +84,22 @@ export function AppCustomizationPanel({
     );
   };
 
+  const createVisibilityToggle = (
+    field: keyof Pick<
+      AppCustomizationSettings,
+      'showExternalTools' | 'showGlobalCredentials' | 'showSidebarIdentity'
+    >,
+    title: string,
+    description: string,
+  ) => (
+    <ToggleSwitch
+      checked={formState[field]}
+      description={description}
+      label={title}
+      onChange={(nextValue) => updateField(field, nextValue)}
+    />
+  );
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSave({
@@ -106,6 +130,15 @@ export function AppCustomizationPanel({
               destacado y el contenido del lateral, sin sobrecargar la interfaz
               con controles dispersos.
             </p>
+
+            <div className="mt-4">
+              <ToggleSwitch
+                checked={showAdvancedOptions}
+                description="Muestra diagnostico, textos internos y la edicion de accesos laterales."
+                label="Opciones avanzadas"
+                onChange={setShowAdvancedOptions}
+              />
+            </div>
           </div>
 
           <div className="soft-subpanel rounded-3xl border border-slate-200 p-4 dark:border-slate-700">
@@ -185,256 +218,330 @@ export function AppCustomizationPanel({
           </div>
 
           <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Herramientas del menu lateral
-              </h3>
-              <button
-                type="button"
-                onClick={handleAddTool}
-                className="rounded-xl border border-emerald-500/60 bg-emerald-500/12 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/18 dark:text-emerald-300"
-              >
-                Anadir acceso
-              </button>
-            </div>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Visibilidad del lateral
+            </h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              Activa solo los bloques personales que quieras mostrar en el
+              lateral. Por defecto quedan ocultos para nuevas instalaciones.
+            </p>
 
             <div className="mt-4 space-y-3">
-              {formState.externalTools.map((tool, index) => (
-                <div
-                  key={tool.id}
-                  className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]"
-                >
-                  <input
-                    value={tool.name}
-                    onChange={(event) =>
-                      updateExternalTool(tool.id, 'name', event.target.value)
-                    }
-                    className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
-                    placeholder={`Nombre del enlace ${index + 1}`}
-                  />
-                  <input
-                    value={tool.url}
-                    onChange={(event) =>
-                      updateExternalTool(tool.id, 'url', event.target.value)
-                    }
-                    className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
-                    placeholder="https://..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTool(tool.id)}
-                    className="rounded-xl border border-rose-500/60 bg-rose-500/12 px-3 py-2.5 text-sm font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-500/18 dark:text-rose-300"
-                  >
-                    Quitar
-                  </button>
-                </div>
-              ))}
+              {createVisibilityToggle(
+                'showSidebarIdentity',
+                'Mostrar bloque de escritorio',
+                'Controla si se ve el bloque con la clave maestra y los usuarios por compania.',
+              )}
+              {createVisibilityToggle(
+                'showGlobalCredentials',
+                'Mostrar credenciales Global Prysma',
+                'Controla si se ve el bloque lateral con usuario y password globales.',
+              )}
+              {createVisibilityToggle(
+                'showExternalTools',
+                'Mostrar herramientas externas',
+                'Controla si se ve el bloque lateral con accesos externos personalizados.',
+              )}
+            </div>
+          </div>
+
+          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {formState.backupSectionTitle}
+            </h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              Exporta una copia de seguridad, descarga el manual actual o importa un backup desde esta pantalla.
+            </p>
+            <div className="mt-4 grid gap-2">
+              <button
+                type="button"
+                onClick={onExportBackup}
+                className="rounded-2xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700"
+              >
+                Exportar backup completo
+              </button>
+              <button
+                type="button"
+                onClick={onExportManual}
+                className="rounded-2xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+              >
+                Descargar manual actual
+              </button>
+              <button
+                type="button"
+                onClick={onImportBackupClick}
+                className="rounded-2xl border border-sky-500 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-600 hover:bg-sky-500/20 dark:border-sky-400/60 dark:text-sky-300"
+              >
+                Importar backup
+              </button>
             </div>
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Diagnostico rapido
-            </h3>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              Resumen del estado operativo actual, la sincronizacion del manual y
-              la salud general de la sesion.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
-                  Servidor
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {diagnostics.serverStatusLabel}
-                </p>
+          {showAdvancedOptions ? (
+            <>
+              <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                    Herramientas del menu lateral
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={handleAddTool}
+                    className="rounded-xl border border-emerald-500/60 bg-emerald-500/12 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/18 dark:text-emerald-300"
+                  >
+                    Anadir acceso
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {formState.externalTools.map((tool, index) => (
+                    <div
+                      key={tool.id}
+                      className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]"
+                    >
+                      <input
+                        value={tool.name}
+                        onChange={(event) =>
+                          updateExternalTool(tool.id, 'name', event.target.value)
+                        }
+                        className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
+                        placeholder={`Nombre del enlace ${index + 1}`}
+                      />
+                      <input
+                        value={tool.url}
+                        onChange={(event) =>
+                          updateExternalTool(tool.id, 'url', event.target.value)
+                        }
+                        className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
+                        placeholder="https://..."
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTool(tool.id)}
+                        className="rounded-xl border border-rose-500/60 bg-rose-500/12 px-3 py-2.5 text-sm font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-500/18 dark:text-rose-300"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
-                  Guardado
+
+              <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Diagnostico rapido
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  Resumen del estado operativo actual, la sincronizacion del manual y
+                  la salud general de la sesion.
                 </p>
-                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {diagnostics.saveStatusLabel}
-                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+                      Servidor
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {diagnostics.serverStatusLabel}
+                    </p>
+                  </div>
+                  <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+                      Guardado
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {diagnostics.saveStatusLabel}
+                    </p>
+                  </div>
+                  <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+                      Origen de datos
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {diagnostics.dataOriginLabel}
+                    </p>
+                  </div>
+                  <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
+                      Revision activa
+                    </p>
+                    <p className="mt-1 break-all text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {diagnostics.revisionLabel}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
+                    <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
+                      Manual
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                      {diagnostics.categoriesCount} secciones
+                    </p>
+                    <p className="text-sm text-slate-700 dark:text-slate-200">
+                      {diagnostics.entriesCount} fichas
+                    </p>
+                    <p className="text-sm text-slate-700 dark:text-slate-200">
+                      {diagnostics.templatesCount} plantillas
+                    </p>
+                    <p className="text-sm text-slate-700 dark:text-slate-200">
+                      {diagnostics.trashCount} en papelera
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
+                    <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
+                      Historial
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                      {diagnostics.undoDepth} acciones para deshacer
+                    </p>
+                    <p className="text-sm text-slate-700 dark:text-slate-200">
+                      {diagnostics.redoDepth} acciones para rehacer
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
+                    <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
+                      Huella
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                      {diagnostics.approximateSizeKb} KB aprox.
+                    </p>
+                    <p className="text-sm text-slate-700 dark:text-slate-200">
+                      Ultimo guardado: {diagnostics.lastSavedAt || 'sin registro'}
+                    </p>
+                    <p
+                      className={`text-sm ${
+                        diagnostics.hasSaveConflict
+                          ? 'text-rose-600 dark:text-rose-300'
+                          : 'text-emerald-700 dark:text-emerald-300'
+                      }`}
+                    >
+                      {diagnostics.hasSaveConflict
+                        ? 'Hay conflicto con otra instancia'
+                        : 'Sin conflictos activos'}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
-                  Origen de datos
-                </p>
-                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {diagnostics.dataOriginLabel}
-                </p>
+
+              <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Textos del menu lateral
+                </h3>
+                <div className="mt-4 grid gap-4">
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Titulo de herramientas externas
+                    <input
+                      value={formState.externalToolsTitle}
+                      onChange={(event) =>
+                        updateField('externalToolsTitle', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Titulo del bloque de escritorio
+                    <input
+                      value={formState.sidebarIdentityTitle}
+                      onChange={(event) =>
+                        updateField('sidebarIdentityTitle', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Texto de usuarios por compania
+                    <input
+                      value={formState.companyUsersLabel}
+                      onChange={(event) =>
+                        updateField('companyUsersLabel', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Titulo de Global Prysma
+                    <input
+                      value={formState.globalRgaTitle}
+                      onChange={(event) =>
+                        updateField('globalRgaTitle', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Etiqueta de usuario
+                    <input
+                      value={formState.globalUserLabel}
+                      onChange={(event) =>
+                        updateField('globalUserLabel', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Etiqueta de password
+                    <input
+                      value={formState.globalPasswordLabel}
+                      onChange={(event) =>
+                        updateField('globalPasswordLabel', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Titulo de DevTools
+                    <input
+                      value={formState.devToolsSectionTitle}
+                      onChange={(event) =>
+                        updateField('devToolsSectionTitle', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Titulo de Backup
+                    <input
+                      value={formState.backupSectionTitle}
+                      onChange={(event) =>
+                        updateField('backupSectionTitle', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    Titulo de Papelera
+                    <input
+                      value={formState.trashSectionTitle}
+                      onChange={(event) =>
+                        updateField('trashSectionTitle', event.target.value)
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    />
+                  </label>
+                </div>
               </div>
-              <div className="soft-subpanel rounded-2xl border border-slate-200 p-3 dark:border-slate-700">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-300">
-                  Revision activa
-                </p>
-                <p className="mt-1 break-all text-sm font-medium text-slate-900 dark:text-slate-100">
-                  {diagnostics.revisionLabel}
-                </p>
-              </div>
+            </>
+          ) : (
+            <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Ajustes avanzados ocultos
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                La edicion de herramientas externas, los textos internos del lateral y
+                el diagnostico tecnico se muestran solo cuando activas las opciones avanzadas.
+              </p>
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
-                  Manual
-                </p>
-                <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                  {diagnostics.categoriesCount} secciones
-                </p>
-                <p className="text-sm text-slate-700 dark:text-slate-200">
-                  {diagnostics.entriesCount} fichas
-                </p>
-                <p className="text-sm text-slate-700 dark:text-slate-200">
-                  {diagnostics.templatesCount} plantillas
-                </p>
-                <p className="text-sm text-slate-700 dark:text-slate-200">
-                  {diagnostics.trashCount} en papelera
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
-                  Historial
-                </p>
-                <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                  {diagnostics.undoDepth} acciones para deshacer
-                </p>
-                <p className="text-sm text-slate-700 dark:text-slate-200">
-                  {diagnostics.redoDepth} acciones para rehacer
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 dark:border-slate-700 dark:bg-slate-900">
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-300">
-                  Huella
-                </p>
-                <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
-                  {diagnostics.approximateSizeKb} KB aprox.
-                </p>
-                <p className="text-sm text-slate-700 dark:text-slate-200">
-                  Ultimo guardado: {diagnostics.lastSavedAt || 'sin registro'}
-                </p>
-                <p
-                  className={`text-sm ${
-                    diagnostics.hasSaveConflict
-                      ? 'text-rose-600 dark:text-rose-300'
-                      : 'text-emerald-700 dark:text-emerald-300'
-                  }`}
-                >
-                  {diagnostics.hasSaveConflict
-                    ? 'Hay conflicto con otra instancia'
-                    : 'Sin conflictos activos'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              Textos del menu lateral
-            </h3>
-            <div className="mt-4 grid gap-4">
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de herramientas externas
-                <input
-                  value={formState.externalToolsTitle}
-                  onChange={(event) =>
-                    updateField('externalToolsTitle', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo del bloque de escritorio
-                <input
-                  value={formState.sidebarIdentityTitle}
-                  onChange={(event) =>
-                    updateField('sidebarIdentityTitle', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Texto de usuarios por compania
-                <input
-                  value={formState.companyUsersLabel}
-                  onChange={(event) =>
-                    updateField('companyUsersLabel', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de Global Prysma
-                <input
-                  value={formState.globalRgaTitle}
-                  onChange={(event) =>
-                    updateField('globalRgaTitle', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Etiqueta de usuario
-                <input
-                  value={formState.globalUserLabel}
-                  onChange={(event) =>
-                    updateField('globalUserLabel', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Etiqueta de password
-                <input
-                  value={formState.globalPasswordLabel}
-                  onChange={(event) =>
-                    updateField('globalPasswordLabel', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de DevTools
-                <input
-                  value={formState.devToolsSectionTitle}
-                  onChange={(event) =>
-                    updateField('devToolsSectionTitle', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de Backup
-                <input
-                  value={formState.backupSectionTitle}
-                  onChange={(event) =>
-                    updateField('backupSectionTitle', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-
-              <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                Titulo de Papelera
-                <input
-                  value={formState.trashSectionTitle}
-                  onChange={(event) =>
-                    updateField('trashSectionTitle', event.target.value)
-                  }
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-                />
-              </label>
-            </div>
-          </div>
+          )}
         </div>
       </section>
 

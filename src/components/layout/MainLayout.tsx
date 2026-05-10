@@ -40,6 +40,10 @@ export function MainLayout({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const activeSearchTerm = onSearchTermChange ? searchTerm : internalSearchTerm;
   const handleSearchTermChange = onSearchTermChange ?? setInternalSearchTerm;
+  const hasIdentityWidgetContent =
+    customization.showSidebarIdentity || customization.showGlobalCredentials;
+  const hasExternalToolsContent =
+    customization.showExternalTools && customization.externalTools.length > 0;
 
   const closeSidebar = () => setIsSidebarOpen(false);
   const handleHomeNavigation = () => {
@@ -48,7 +52,7 @@ export function MainLayout({
     closeSidebar();
   };
 
-  const defaultSidebarContent = (
+  const defaultSidebarContent = hasExternalToolsContent ? (
     <section className="sidebar-panel rounded-[1.7rem] border border-slate-200/80 p-4 dark:border-slate-800">
       <p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-slate-500 dark:text-slate-300">
         {customization.externalToolsTitle}
@@ -77,13 +81,15 @@ export function MainLayout({
         </ul>
       </nav>
     </section>
-  );
+  ) : null;
 
   const mobileSidebarPanel = (
     <div className="sidebar-shell app-scrollbar min-h-0 flex-1 overflow-y-auto">
-      <div className="p-4">
-        <IdentityWidget customization={customization} />
-      </div>
+      {hasIdentityWidgetContent ? (
+        <div className="p-4">
+          <IdentityWidget customization={customization} />
+        </div>
+      ) : null}
 
       <div className="app-scrollbar border-t border-slate-200/70 p-4 dark:border-slate-800/90">
         <div className="space-y-6">
@@ -96,9 +102,11 @@ export function MainLayout({
 
   const desktopSidebarPanel = (
     <div className="sidebar-shell flex h-full flex-col">
-      <div className="p-4">
-        <IdentityWidget customization={customization} />
-      </div>
+      {hasIdentityWidgetContent ? (
+        <div className="p-4">
+          <IdentityWidget customization={customization} />
+        </div>
+      ) : null}
 
       <div className="app-scrollbar border-t border-slate-200/70 p-4 dark:border-slate-800/90">
         <div className="space-y-6">
