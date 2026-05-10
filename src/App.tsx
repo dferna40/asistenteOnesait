@@ -5,6 +5,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { AppLogo } from './components/ui/AppLogo';
 import { MarkdownRenderer } from './components/ui/MarkdownRenderer';
 import { ResultCard } from './components/ui/ResultCard';
+import { SearchHelpButton } from './components/ui/SearchHelpButton';
 import { SidebarUtilities } from './components/ui/SidebarUtilities';
 import { ToggleSwitch } from './components/ui/ToggleSwitch';
 import { defaultAppCustomization, normalizeCustomization } from './constants/appCustomization';
@@ -1448,6 +1449,9 @@ const loadPdfFontBase64 = async (fileName: string) => {
 
 export const App = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isQuickAccessCollapsed, setIsQuickAccessCollapsed] = useState(false);
+  const [isFavoriteTemplatesCollapsed, setIsFavoriteTemplatesCollapsed] =
+    useState(false);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showAllQuickAccessEntries, setShowAllQuickAccessEntries] = useState(false);
   const [templateSearchTerm, setTemplateSearchTerm] = useState('');
@@ -4807,23 +4811,59 @@ export const App = () => {
     trashCount: manualData.trash.length,
     undoDepth: undoStack.length,
   };
+  const renderHeaderStatusBadge = (
+    label: string,
+    tone: string,
+    icon: 'server' | 'storage' | 'save',
+  ) => {
+    const iconMarkup =
+      icon === 'server' ? (
+        <span
+          aria-hidden="true"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/70 ring-1 ring-current/10 dark:bg-slate-950/30"
+        >
+          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.6">
+            <rect x="4" y="4" width="12" height="4" rx="1.2" />
+            <rect x="4" y="11" width="12" height="4" rx="1.2" />
+            <path d="M7 6h.01M7 13h.01M10 6h4M10 13h4" strokeLinecap="round" />
+          </svg>
+        </span>
+      ) : icon === 'storage' ? (
+        <span
+          aria-hidden="true"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/70 ring-1 ring-current/10 dark:bg-slate-950/30"
+        >
+          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.6">
+            <path d="M5 4.5h10a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" />
+            <path d="M7 4.5v4h6v-4M8 12.5h4" strokeLinecap="round" />
+          </svg>
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/70 ring-1 ring-current/10 dark:bg-slate-950/30"
+        >
+          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 fill-none stroke-current" strokeWidth="1.6">
+            <circle cx="10" cy="10" r="5.5" />
+            <path d="M10 7v3.3l2.2 1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      );
+
+    return (
+      <div
+        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${tone}`}
+      >
+        {iconMarkup}
+        <span>{label}</span>
+      </div>
+    );
+  };
   const headerStatus = (
     <>
-      <div
-        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${serverStatusTone}`}
-      >
-        {serverStatusLabel}
-      </div>
-      <div
-        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${storageStatusTone}`}
-      >
-        {storageStatusLabel}
-      </div>
-      <div
-        className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${saveStatusTone}`}
-      >
-        {saveStatusLabel}
-      </div>
+      {renderHeaderStatusBadge(serverStatusLabel, serverStatusTone, 'server')}
+      {renderHeaderStatusBadge(storageStatusLabel, storageStatusTone, 'storage')}
+      {renderHeaderStatusBadge(saveStatusLabel, saveStatusTone, 'save')}
     </>
   );
   const headerActions = (
@@ -4977,11 +5017,14 @@ export const App = () => {
           className="h-5 w-5"
         >
           <path
-            d="M10 3.25a1.1 1.1 0 0 1 1.06.81l.2.73a5.9 5.9 0 0 1 1.01.42l.67-.35a1.1 1.1 0 0 1 1.28.21l1.01 1.01a1.1 1.1 0 0 1 .21 1.28l-.35.67c.16.33.3.67.41 1.02l.74.19a1.1 1.1 0 0 1 .81 1.06v1.43a1.1 1.1 0 0 1-.81 1.06l-.74.19a5.8 5.8 0 0 1-.41 1.02l.35.67a1.1 1.1 0 0 1-.21 1.28l-1.01 1.01a1.1 1.1 0 0 1-1.28.21l-.67-.35a5.9 5.9 0 0 1-1.01.42l-.2.73a1.1 1.1 0 0 1-1.06.81H8.57a1.1 1.1 0 0 1-1.06-.81l-.2-.73a5.9 5.9 0 0 1-1.01-.42l-.67.35a1.1 1.1 0 0 1-1.28-.21L3.34 15.7a1.1 1.1 0 0 1-.21-1.28l.35-.67a5.8 5.8 0 0 1-.41-1.02l-.74-.19a1.1 1.1 0 0 1-.81-1.06V9.05a1.1 1.1 0 0 1 .81-1.06l.74-.19c.11-.35.25-.69.41-1.02l-.35-.67a1.1 1.1 0 0 1 .21-1.28l1.01-1.01a1.1 1.1 0 0 1 1.28-.21l.67.35c.32-.17.66-.31 1.01-.42l.2-.73a1.1 1.1 0 0 1 1.06-.81H10Z"
+            d="M4 5.25h4M12 5.25h4M4 10h7M15 10h1M4 14.75h2M10 14.75h6"
             stroke="currentColor"
-            strokeWidth="1.2"
+            strokeLinecap="round"
+            strokeWidth="1.7"
           />
-          <circle cx="10" cy="10.25" r="2.5" stroke="currentColor" strokeWidth="1.2" />
+          <circle cx="10" cy="5.25" r="1.6" fill="currentColor" />
+          <circle cx="13" cy="10" r="1.6" fill="currentColor" />
+          <circle cx="7" cy="14.75" r="1.6" fill="currentColor" />
         </svg>
       </button>
       <button
@@ -5139,15 +5182,39 @@ export const App = () => {
                 </div>
 
                 <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_220px_auto]">
-                  <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    Buscar plantilla
-                    <input
-                      value={templateSearchTerm}
-                      onChange={(event) => setTemplateSearchTerm(event.target.value)}
-                      placeholder="Nombre, título, tag o contenido..."
-                      className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                  <div className="flex items-end gap-2">
+                    <label className="min-w-0 flex-1 space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                      Buscar plantilla
+                      <input
+                        value={templateSearchTerm}
+                        onChange={(event) => setTemplateSearchTerm(event.target.value)}
+                        placeholder="Nombre, título, tag o contenido..."
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
+                      />
+                    </label>
+                    <SearchHelpButton
+                      title="Ayuda del buscador de plantillas"
+                      description="Encuentra plantillas por nombre, contenido, seccion, tags o estado de favorita."
+                      items={[
+                        {
+                          title: 'Nombre y titulo',
+                          description: 'Busca por palabras clave relacionadas con el nombre o el titulo sugerido de la plantilla.',
+                        },
+                        {
+                          title: 'Contenido y pasos',
+                          description: 'Tambien localiza texto dentro del contenido base y de los pasos sugeridos.',
+                        },
+                        {
+                          title: 'Seccion y tags',
+                          description: 'Combina el texto con el filtro por seccion o con los tags para acotar mas rapido.',
+                        },
+                        {
+                          title: 'Favoritas',
+                          description: 'Activa Solo favoritas para quedarte solo con las plantillas marcadas como destacadas.',
+                        },
+                      ]}
                     />
-                  </label>
+                  </div>
 
                   <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                     Filtrar por sección
@@ -5562,40 +5629,54 @@ export const App = () => {
                         {quickAccessEntries.length} ficha{quickAccessEntries.length === 1 ? '' : 's'} anclada{quickAccessEntries.length === 1 ? '' : 's'}
                       </p>
                     </div>
-                    {quickAccessEntries.length > HOME_PINNED_ENTRY_PREVIEW_LIMIT ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      {quickAccessEntries.length > HOME_PINNED_ENTRY_PREVIEW_LIMIT &&
+                      !isQuickAccessCollapsed ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setShowAllQuickAccessEntries((currentValue) => !currentValue)
+                          }
+                          className="text-xs font-semibold text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                        >
+                          {showAllQuickAccessEntries ? 'Ver menos' : `Ver más (${quickAccessEntries.length - HOME_PINNED_ENTRY_PREVIEW_LIMIT})`}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() =>
-                          setShowAllQuickAccessEntries((currentValue) => !currentValue)
+                          setIsQuickAccessCollapsed((currentValue) => !currentValue)
                         }
-                        className="text-xs font-semibold text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                        className="text-xs font-semibold text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                       >
-                        {showAllQuickAccessEntries ? 'Ver menos' : `Ver más (${quickAccessEntries.length - HOME_PINNED_ENTRY_PREVIEW_LIMIT})`}
+                        {isQuickAccessCollapsed ? 'Expandir' : 'Colapsar'}
                       </button>
-                    ) : null}
+                    </div>
                   </div>
-                  <div className="mt-3 grid gap-3">
-                    {visibleQuickAccessEntries.map((entry) => {
-                      const category = categoryMap.get(entry.categoria.toLowerCase());
+                  {!isQuickAccessCollapsed ? (
+                    <div className="mt-3 grid gap-3">
+                      {visibleQuickAccessEntries.map((entry) => {
+                        const category = categoryMap.get(entry.categoria.toLowerCase());
 
-                      return (
-                      <ResultCard
-                          activeTags={activeTagFilters}
-                          key={entry.id}
-                          categoryColorKey={category?.color}
-                          compact={isCompactViewEnabled}
-                          entry={entry}
-                          onCommandSave={handleCommandSave}
-                          onDeleteEntry={handleDeleteEntry}
-                          onEditEntry={openEditEntryModal}
-                          onExportPdf={openEntryPdfExportModal}
-                          onTagClick={handleTagFilter}
-                          onTogglePin={handleTogglePinEntry}
-                          pdfIsGenerating={exportEntryId === entry.id}
-                        />
-                      );
-                    })}
-                  </div>
+                        return (
+                        <ResultCard
+                            activeTags={activeTagFilters}
+                            key={entry.id}
+                            categoryColorKey={category?.color}
+                            compact={isCompactViewEnabled}
+                            entry={entry}
+                            onCommandSave={handleCommandSave}
+                            onDeleteEntry={handleDeleteEntry}
+                            onEditEntry={openEditEntryModal}
+                            onExportPdf={openEntryPdfExportModal}
+                            onTagClick={handleTagFilter}
+                            onTogglePin={handleTogglePinEntry}
+                            pdfIsGenerating={exportEntryId === entry.id}
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
 
@@ -5605,26 +5686,39 @@ export const App = () => {
                     <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
                       Plantillas favoritas
                     </h3>
-                    <button
-                      type="button"
-                      onClick={handleOpenTemplatesView}
-                      className="text-xs font-semibold text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
-                    >
-                      Ver todas
-                    </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleOpenTemplatesView}
+                        className="text-xs font-semibold text-sky-700 transition-colors hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+                      >
+                        Ver todas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setIsFavoriteTemplatesCollapsed((currentValue) => !currentValue)
+                        }
+                        className="text-xs font-semibold text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                      >
+                        {isFavoriteTemplatesCollapsed ? 'Expandir' : 'Colapsar'}
+                      </button>
+                    </div>
                   </div>
-                  {favoriteTemplates.length ? (
-                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                      {favoriteTemplates.map((template) =>
-                        renderTemplateCard(template, 'home-favorite'),
-                      )}
-                    </div>
-                  ) : (
-                    <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
-                      Aún no tienes plantillas favoritas. Entra en la biblioteca de
-                      plantillas y marca las que quieras fijar en esta pantalla.
-                    </div>
-                  )}
+                  {!isFavoriteTemplatesCollapsed ? (
+                    favoriteTemplates.length ? (
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        {favoriteTemplates.map((template) =>
+                          renderTemplateCard(template, 'home-favorite'),
+                        )}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                        Aún no tienes plantillas favoritas. Entra en la biblioteca de
+                        plantillas y marca las que quieras fijar en esta pantalla.
+                      </div>
+                    )
+                  ) : null}
                 </section>
               ) : null}
 
