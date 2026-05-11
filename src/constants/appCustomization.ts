@@ -1,5 +1,7 @@
 import type { AppCustomizationSettings, ExternalToolLink } from '../types';
 
+export const DEFAULT_APP_ICON_PATH = '/app-icon_final.png';
+
 const legacyAppNames = new Set([
   'Asistente Onesait',
   'Asistente Onesite RGA',
@@ -64,7 +66,7 @@ export const defaultExternalTools: ExternalToolLink[] = [
 ];
 
 export const defaultAppCustomization: AppCustomizationSettings = {
-  appIconDataUrl: '',
+  appIconDataUrl: DEFAULT_APP_ICON_PATH,
   appName: 'Prysma',
   backupSectionTitle: 'Backup',
   companyUsersLabel: 'Usuarios por Compania',
@@ -106,10 +108,16 @@ export const normalizeCustomization = (
     : defaultExternalTools;
 
   const normalizedAppName = customization?.appName?.trim();
+  const normalizedAppIconDataUrl =
+    typeof customization?.appIconDataUrl === 'string' &&
+    customization.appIconDataUrl.trim()
+      ? customization.appIconDataUrl.trim()
+      : defaultAppCustomization.appIconDataUrl;
 
   return {
     ...defaultAppCustomization,
     ...customization,
+    appIconDataUrl: normalizedAppIconDataUrl,
     appName:
       normalizedAppName && !legacyAppNames.has(normalizedAppName)
         ? normalizedAppName

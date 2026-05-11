@@ -52,6 +52,7 @@
       "dist/**/*",
       "build-assets/**/*",
       "public/app-icon.png",
+      "public/app-icon_final.png",
       "electron/**/*",
       "public/images/**/*",
       "server.js",
@@ -59,7 +60,7 @@
       "package.json"
     ],
     "win": {
-      "icon": "build-assets/icon.ico",
+      "icon": "build-assets/app-icon_final.ico",
       "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false,
       "target": [

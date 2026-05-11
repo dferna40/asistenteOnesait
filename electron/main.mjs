@@ -10,24 +10,8 @@ const projectRoot = path.resolve(electronRoot, '..');
 const desktopUserDataPath = path.join(projectRoot, '.runtime', 'electron-userdata');
 const desktopPort = Number(process.env.ELECTRON_APP_PORT || 3002);
 const devServerUrl = process.env.ELECTRON_START_URL || '';
-const defaultPrysmaIconDataUrl = (() => {
-  const iconSvg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-      <defs>
-        <linearGradient id="prysma-electron-gradient" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#38bdf8" />
-          <stop offset="0.52" stop-color="#06b6d4" />
-          <stop offset="1" stop-color="#0f766e" />
-        </linearGradient>
-      </defs>
-      <path d="M32 6 52 18v28L32 58 12 46V18L32 6Z" fill="url(#prysma-electron-gradient)" stroke="rgba(255,255,255,0.82)" stroke-width="1.5"/>
-      <path d="M32 6v52M12 18l20 12 20-12M12 46l20-16 20 16" stroke="rgba(255,255,255,0.35)" stroke-width="1.2" stroke-linejoin="round"/>
-      <path d="M25 20.5h10.5c4.1 0 7 2.4 7 6.3 0 4.4-3 6.9-7.8 6.9H30v9.3h-5V20.5Zm5 4.3v4.8h5c1.8 0 2.9-.9 2.9-2.4 0-1.5-1.1-2.4-2.9-2.4h-5Z" fill="white"/>
-    </svg>
-  `;
-
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(iconSvg)}`;
-})();
+const defaultPrysmaIconPath = path.join(projectRoot, 'dist', 'app-icon_final.png');
+const defaultPrysmaIcon = nativeImage.createFromPath(defaultPrysmaIconPath);
 
 let mainWindow = null;
 let serverHandle = null;
@@ -53,13 +37,12 @@ const logDesktopEvent = (message, details) => {
 
 const createMainWindow = async () => {
   logDesktopEvent('Creando ventana principal.');
-  const prysmaWindowIcon = nativeImage.createFromDataURL(defaultPrysmaIconDataUrl);
   mainWindow = new BrowserWindow({
     autoHideMenuBar: true,
     backgroundColor: '#0f172a',
     center: true,
     height: 960,
-    icon: prysmaWindowIcon,
+    icon: defaultPrysmaIcon.isEmpty() ? undefined : defaultPrysmaIcon,
     minHeight: 760,
     minWidth: 1200,
     show: true,

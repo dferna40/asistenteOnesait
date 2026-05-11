@@ -9,7 +9,11 @@ import { ResultCard } from './components/ui/ResultCard';
 import { SearchHelpButton } from './components/ui/SearchHelpButton';
 import { SidebarUtilities } from './components/ui/SidebarUtilities';
 import { ToggleSwitch } from './components/ui/ToggleSwitch';
-import { defaultAppCustomization, normalizeCustomization } from './constants/appCustomization';
+import {
+  DEFAULT_APP_ICON_PATH,
+  defaultAppCustomization,
+  normalizeCustomization,
+} from './constants/appCustomization';
 import {
   categoryColorOptions,
   getCategoryColorHex,
@@ -75,24 +79,7 @@ const defaultCategoryMetadata: Record<
 };
 
 const getCurrentIsoDate = () => new Date().toISOString();
-const defaultPrysmaIconDataUrl = (() => {
-  const iconSvg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-      <defs>
-        <linearGradient id="prysma-favicon-gradient" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#38bdf8" />
-          <stop offset="0.52" stop-color="#06b6d4" />
-          <stop offset="1" stop-color="#0f766e" />
-        </linearGradient>
-      </defs>
-      <path d="M32 6 52 18v28L32 58 12 46V18L32 6Z" fill="url(#prysma-favicon-gradient)" stroke="rgba(255,255,255,0.82)" stroke-width="1.5"/>
-      <path d="M32 6v52M12 18l20 12 20-12M12 46l20-16 20 16" stroke="rgba(255,255,255,0.35)" stroke-width="1.2" stroke-linejoin="round"/>
-      <path d="M25 20.5h10.5c4.1 0 7 2.4 7 6.3 0 4.4-3 6.9-7.8 6.9H30v9.3h-5V20.5Zm5 4.3v4.8h5c1.8 0 2.9-.9 2.9-2.4 0-1.5-1.1-2.4-2.9-2.4h-5Z" fill="white"/>
-    </svg>
-  `;
-
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(iconSvg)}`;
-})();
+const defaultPrysmaIconDataUrl = DEFAULT_APP_ICON_PATH;
 
 interface EntryFormState {
   categoryColor: CategoryColorKey;
@@ -1505,25 +1492,30 @@ const loadPdfFontBase64 = async (fileName: string) => {
 };
 
 export const App = () => {
+  const initialManualSnapshotRef = useRef<StoredManualSnapshot>(
+    getFallbackManualSnapshot(),
+  );
   const [searchTerm, setSearchTerm] = useState('');
-  const [isQuickAccessCollapsed, setIsQuickAccessCollapsed] = useState(false);
+  const [isQuickAccessCollapsed, setIsQuickAccessCollapsed] = useState(true);
   const [isFavoriteTemplatesCollapsed, setIsFavoriteTemplatesCollapsed] =
-    useState(false);
+    useState(true);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showAllQuickAccessEntries, setShowAllQuickAccessEntries] = useState(false);
   const [templateSearchTerm, setTemplateSearchTerm] = useState('');
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState('');
   const [showFavoriteTemplatesOnly, setShowFavoriteTemplatesOnly] = useState(false);
-  const [collapsedHomeCategories, setCollapsedHomeCategories] = useState<string[]>([]);
+  const [collapsedHomeCategories, setCollapsedHomeCategories] = useState<string[]>(
+    () =>
+      initialManualSnapshotRef.current.manualData.categories.map(
+        (category) => category.name,
+      ),
+  );
   const [activeCategoryFilter, setActiveCategoryFilter] = useState('');
   const [activeTagFilters, setActiveTagFilters] = useState<string[]>([]);
   const [resultSortMode, setResultSortMode] =
     useState<ResultSortMode>('pinned-latest');
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [activeView, setActiveView] = useState<'home' | 'settings' | 'templates'>('home');
-  const initialManualSnapshotRef = useRef<StoredManualSnapshot>(
-    getFallbackManualSnapshot(),
-  );
   const [manualData, setManualData] = useState<ManualData>(
     () => initialManualSnapshotRef.current.manualData,
   );
@@ -4482,7 +4474,7 @@ export const App = () => {
     const isHomeFavorite = variant === 'home-favorite';
     const isCompactTemplateCard = isCompactViewEnabled || isHomeFavorite;
     const visibleTagLimit = isCompactTemplateCard ? 4 : 6;
-    const iconActionButtonClass = `inline-flex items-center justify-center rounded-xl border bg-slate-950/30 text-slate-400 transition-colors hover:bg-slate-50 dark:bg-slate-950 ${
+    const iconActionButtonClass = `inline-flex items-center justify-center rounded-xl border bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900 ${
       isCompactTemplateCard ? 'h-10 w-10' : 'h-11 w-11'
     }`;
 
@@ -4619,7 +4611,7 @@ export const App = () => {
             }}
             aria-label={`Duplicar plantilla ${template.name}`}
             title={`Duplicar plantilla ${template.name}`}
-            className={`${iconActionButtonClass} border-violet-500/30 text-violet-500 hover:border-violet-400 hover:text-violet-600 dark:text-violet-400 dark:hover:border-violet-500/50 dark:hover:text-violet-300`}
+            className={`${iconActionButtonClass} border-violet-300 bg-violet-50 text-violet-700 hover:border-violet-400 hover:bg-violet-100 hover:text-violet-800 dark:border-violet-500/40 dark:bg-violet-500/10 dark:text-violet-300 dark:hover:border-violet-400/60 dark:hover:bg-violet-500/15 dark:hover:text-violet-200`}
           >
             <svg
               aria-hidden="true"
@@ -4653,7 +4645,7 @@ export const App = () => {
             }}
             aria-label={`Eliminar plantilla ${template.name}`}
             title={`Eliminar plantilla ${template.name}`}
-            className={`${iconActionButtonClass} border-red-500/30 text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
+            className={`${iconActionButtonClass} border-red-300 bg-red-50 text-red-700 hover:border-red-400 hover:bg-red-100 hover:text-red-800 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300 dark:hover:border-red-400/60 dark:hover:bg-red-500/15 dark:hover:text-red-200`}
           >
             <svg
               aria-hidden="true"

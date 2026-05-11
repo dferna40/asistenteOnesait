@@ -58,7 +58,7 @@ export function AppLogo({
       src={resolvedIconUrl}
       alt={`Icono de ${appName}`}
       onError={() => setHasImageError(true)}
-      className={`${className} rounded-2xl border border-slate-200 bg-white object-cover shadow-sm dark:border-slate-700 dark:bg-slate-900 ${
+      className={`${className} object-contain ${
         interactive ? logoInteractionClass : ''
       }`}
     />

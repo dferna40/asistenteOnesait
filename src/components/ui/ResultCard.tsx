@@ -35,7 +35,7 @@ type HealthCheckStatus = {
 
 // Recordatorio: Para cualquier proceso en Java que gestione la configuración de estos iconos o estados de usuario, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos.
 const actionButtonBaseClass =
-  'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white transition-colors dark:border-slate-700 dark:bg-slate-950 dark:hover:bg-slate-900';
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900';
 const actionIconClass = 'icon-neon h-5 w-5';
 
 const isHealthCheckLabel = (label: string) => healthLabelPattern.test(label);
