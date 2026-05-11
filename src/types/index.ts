@@ -67,10 +67,22 @@ export interface AppDiagnosticsSnapshot {
   undoDepth: number;
 }
 
+export type QuickViewTone = 'amber' | 'emerald' | 'sky' | 'violet';
+
+export interface QuickViewSettings {
+  categoryName?: string;
+  id: string;
+  label: string;
+  searchTerm?: string;
+  showPinnedOnly?: boolean;
+  tone: QuickViewTone;
+}
+
 export interface AppSettings {
   compactMode: boolean;
   customization: AppCustomizationSettings;
   darkMode: boolean;
+  quickViews: QuickViewSettings[];
 }
 
 export interface EntryTemplate {

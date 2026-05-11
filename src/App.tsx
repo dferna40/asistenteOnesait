@@ -33,18 +33,13 @@ import type {
   KnowledgeEntry,
   ManualBackupPayload,
   ManualData,
+  QuickViewSettings,
 } from './types';
 
 const STORAGE_KEY = 'knowledge-manual-state-v2';
 const LEGACY_COMMAND_STORAGE_KEY = 'result-card-command-overrides';
 const ASSISTANT_VERSION = '1.0.0';
 const HOME_PINNED_ENTRY_PREVIEW_LIMIT = 4;
-const defaultSettings: AppSettings = {
-  compactMode: false,
-  customization: defaultAppCustomization,
-  darkMode: false,
-};
-
 const defaultCategoryMetadata: Record<
   string,
   { color: CategoryColorKey; description: string }
@@ -196,16 +191,9 @@ interface TrashCategorySummary {
   name: string;
 }
 
-interface QuickViewDefinition {
-  categoryName?: string;
-  id: string;
-  label: string;
-  searchTerm?: string;
-  showPinnedOnly?: boolean;
-  tone: 'amber' | 'emerald' | 'sky' | 'violet';
-}
+type QuickViewDefinition = QuickViewSettings;
 
-const quickViews: QuickViewDefinition[] = [
+const defaultQuickViews: QuickViewDefinition[] = [
   {
     categoryName: 'Entorno',
     id: 'quick-entorno',
@@ -231,6 +219,13 @@ const quickViews: QuickViewDefinition[] = [
     tone: 'emerald',
   },
 ];
+
+const defaultSettings: AppSettings = {
+  compactMode: false,
+  customization: defaultAppCustomization,
+  darkMode: false,
+  quickViews: defaultQuickViews,
+};
 
 interface PdfCodeSegment {
   color: [number, number, number];
@@ -381,6 +376,57 @@ const applyLegacyCommandOverrides = (
     };
   });
 
+const normalizeQuickViews = (source: unknown): QuickViewDefinition[] => {
+  if (!Array.isArray(source)) {
+    return defaultQuickViews;
+  }
+
+  const normalizedQuickViews = source.reduce<QuickViewDefinition[]>(
+    (accumulator, item, index) => {
+      if (!item || typeof item !== 'object') {
+        return accumulator;
+      }
+
+      const candidate = item as Partial<QuickViewDefinition>;
+      const label = typeof candidate.label === 'string' ? candidate.label.trim() : '';
+      const tone = candidate.tone;
+      const categoryName =
+        typeof candidate.categoryName === 'string'
+          ? candidate.categoryName.trim()
+          : '';
+      const searchTerm =
+        typeof candidate.searchTerm === 'string'
+          ? candidate.searchTerm.trim()
+          : '';
+      const showPinnedOnly = Boolean(candidate.showPinnedOnly);
+
+      if (!label || (!categoryName && !searchTerm && !showPinnedOnly)) {
+        return accumulator;
+      }
+
+      accumulator.push({
+        categoryName: categoryName || undefined,
+        id:
+          typeof candidate.id === 'string' && candidate.id.trim()
+            ? candidate.id.trim()
+            : `quick-view-${index + 1}`,
+        label,
+        searchTerm: searchTerm || undefined,
+        showPinnedOnly,
+        tone:
+          tone === 'amber' || tone === 'emerald' || tone === 'sky' || tone === 'violet'
+            ? tone
+            : 'sky',
+      });
+
+      return accumulator;
+    },
+    [],
+  );
+
+  return normalizedQuickViews.length ? normalizedQuickViews : defaultQuickViews;
+};
+
 const normalizeManualData = (source: unknown): ManualData => {
   if (Array.isArray(source)) {
     const entries = source.map((entry) => normalizeEntry(entry as KnowledgeEntry));
@@ -424,6 +470,7 @@ const normalizeManualData = (source: unknown): ManualData => {
         ...defaultSettings,
         ...(candidate.settings ?? {}),
         customization: normalizeCustomization(candidate.settings?.customization),
+        quickViews: normalizeQuickViews(candidate.settings?.quickViews),
       },
       templates,
       trash: Array.isArray(candidate.trash)
@@ -830,6 +877,15 @@ const buildTemplateFormState = (
   pasos: template?.pasos?.join('\n') ?? '',
   tags: template?.tags?.join(', ') ?? '',
   titulo: template?.titulo ?? '',
+});
+
+const buildDuplicatedTemplateFormState = (
+  template: EntryTemplate,
+): TemplateFormState => ({
+  ...buildTemplateFormState(template),
+  id: '',
+  name: `Copia de ${template.name}`,
+  titulo: template.titulo ? `Copia de ${template.titulo}` : '',
 });
 
 const applyTemplateToEntryForm = (
@@ -1497,6 +1553,7 @@ export const App = () => {
   const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const templateContentEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const topContentRef = useRef<HTMLElement | null>(null);
   const resultsSectionRef = useRef<HTMLDivElement | null>(null);
   const templatesSectionRef = useRef<HTMLDivElement | null>(null);
@@ -1527,6 +1584,7 @@ export const App = () => {
   const hasMountedRef = useRef(false);
   const customization = manualData.settings.customization;
   const isCompactViewEnabled = manualData.settings.compactMode;
+  const quickViews = manualData.settings.quickViews;
   const deferredEntryPreview = useDeferredValue(debouncedEntryPreview);
 
   const scrollViewportToTop = () => {
@@ -2183,6 +2241,13 @@ export const App = () => {
     setShowTemplateTechnicalOptions(false);
     setFormError('');
     setModalState({ mode: 'edit', templateId: template.id, type: 'template' });
+  };
+
+  const openDuplicateTemplateModal = (template: EntryTemplate) => {
+    setTemplateForm(buildDuplicatedTemplateFormState(template));
+    setShowTemplateTechnicalOptions(false);
+    setFormError('');
+    setModalState({ mode: 'create', type: 'template' });
   };
 
   const openCategoryModal = (categoryName: string) => {
@@ -4292,8 +4357,11 @@ export const App = () => {
     }
   };
 
-  const handleContentPaste = async (
+  const handleMarkdownEditorPaste = async (
     event: ReactClipboardEvent<HTMLTextAreaElement>,
+    textarea: HTMLTextAreaElement | null,
+    currentValue: string,
+    setValue: (value: string) => void,
   ) => {
     const clipboardFiles = Array.from(event.clipboardData.files);
     const imageFile = clipboardFiles.find((file) =>
@@ -4335,10 +4403,9 @@ export const App = () => {
       }
 
       insertTextAtCursor(
-        contentEditorRef.current,
-        entryForm.contenido,
-        (nextValue) =>
-          setEntryForm((current) => ({ ...current, contenido: nextValue })),
+        textarea,
+        currentValue,
+        setValue,
         `![descripcion](${imagePath})`,
       );
     } catch {
@@ -4415,11 +4482,24 @@ export const App = () => {
     const isHomeFavorite = variant === 'home-favorite';
     const isCompactTemplateCard = isCompactViewEnabled || isHomeFavorite;
     const visibleTagLimit = isCompactTemplateCard ? 4 : 6;
+    const iconActionButtonClass = `inline-flex items-center justify-center rounded-xl border bg-slate-950/30 text-slate-400 transition-colors hover:bg-slate-50 dark:bg-slate-950 ${
+      isCompactTemplateCard ? 'h-10 w-10' : 'h-11 w-11'
+    }`;
 
     return (
       <div
         key={template.id}
-        className={`rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 ${
+        role="button"
+        tabIndex={0}
+        onClick={() => openEditTemplateModal(template)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openEditTemplateModal(template);
+          }
+        }}
+        aria-label={`Editar plantilla ${template.name}`}
+        className={`cursor-pointer rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors hover:border-sky-300 hover:bg-slate-50/70 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-sky-500/40 dark:hover:bg-slate-900 ${
           isCompactTemplateCard ? 'p-3.5' : 'p-4'
         }`}
       >
@@ -4457,7 +4537,10 @@ export const App = () => {
           <button
             type="button"
             aria-pressed={template.isFavorite}
-            onClick={() => handleToggleFavoriteTemplate(template.id)}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleToggleFavoriteTemplate(template.id);
+            }}
             className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border ${
               isCompactTemplateCard ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-xs'
             } font-medium transition-colors ${
@@ -4505,20 +4588,23 @@ export const App = () => {
           </div>
         ) : null}
 
-        <p
-          className={`mt-3 text-slate-600 dark:text-slate-300 ${
-            isCompactTemplateCard
-              ? 'line-clamp-2 text-[13px] leading-5'
-              : 'line-clamp-3 text-sm leading-6'
+        <div
+          className={`mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/30 ${
+            isCompactTemplateCard ? 'max-h-32 p-2.5' : 'max-h-40 p-3'
           }`}
         >
-          {template.contenido}
-        </p>
+          <div className="pointer-events-none text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <MarkdownRenderer content={template.contenido} />
+          </div>
+        </div>
 
         <div className={`mt-4 flex flex-wrap ${isCompactTemplateCard ? 'gap-1.5' : 'gap-2'}`}>
           <button
             type="button"
-            onClick={() => openCreateEntryWithTemplate(template)}
+            onClick={(event) => {
+              event.stopPropagation();
+              openCreateEntryWithTemplate(template);
+            }}
             className={`rounded-xl border border-emerald-600 bg-emerald-600 font-medium text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 dark:border-emerald-500 dark:bg-emerald-600 dark:hover:border-emerald-400 dark:hover:bg-emerald-500 ${
               isCompactTemplateCard ? 'px-2.5 py-1.5 text-[11px]' : 'px-3 py-2 text-sm'
             }`}
@@ -4527,25 +4613,80 @@ export const App = () => {
           </button>
           <button
             type="button"
-            onClick={() => openEditTemplateModal(template)}
-            className={`rounded-xl border border-sky-600 bg-sky-600 font-medium text-white transition-colors hover:border-sky-700 hover:bg-sky-700 dark:border-sky-500 dark:bg-sky-600 dark:hover:border-sky-400 dark:hover:bg-sky-500 ${
-              isCompactTemplateCard ? 'px-2.5 py-1.5 text-[11px]' : 'px-3 py-2 text-sm'
-            }`}
+            onClick={(event) => {
+              event.stopPropagation();
+              openDuplicateTemplateModal(template);
+            }}
+            aria-label={`Duplicar plantilla ${template.name}`}
+            title={`Duplicar plantilla ${template.name}`}
+            className={`${iconActionButtonClass} border-violet-500/30 text-violet-500 hover:border-violet-400 hover:text-violet-600 dark:text-violet-400 dark:hover:border-violet-500/50 dark:hover:text-violet-300`}
           >
-            Editar plantilla
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              className="h-5 w-5"
+            >
+              <rect
+                x="7"
+                y="7"
+                width="9"
+                height="9"
+                rx="1.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <path
+                d="M5 13H4a1 1 0 0 1-1-1V4.5a1.5 1.5 0 0 1 1.5-1.5H12a1 1 0 0 1 1 1v1"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleDeleteTemplate(template.id);
+            }}
+            aria-label={`Eliminar plantilla ${template.name}`}
+            title={`Eliminar plantilla ${template.name}`}
+            className={`${iconActionButtonClass} border-red-500/30 text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              className="h-5 w-5"
+            >
+              <path
+                d="M4.5 6h11M8 3.5h4m-6 2.5.6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-9"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </button>
         </div>
       </div>
     );
   };
-  const handleSaveCustomization = (
-    nextCustomization: AppCustomizationSettings,
-  ) => {
+  const handleSaveCustomization = ({
+    customization: nextCustomization,
+    quickViews: nextQuickViews,
+  }: {
+    customization: AppCustomizationSettings;
+    quickViews: QuickViewDefinition[];
+  }) => {
     updateManualData((currentManualData) => ({
       ...currentManualData,
       settings: {
         ...currentManualData.settings,
         customization: normalizeCustomization(nextCustomization),
+        quickViews: normalizeQuickViews(nextQuickViews),
       },
     }));
     setActiveView('home');
@@ -4588,6 +4729,145 @@ export const App = () => {
     borderColor: getCategoryColorHex(entryEditorColorKey),
     boxShadow: `0 0 0 1px ${hexToRgba(getCategoryColorHex(entryEditorColorKey), 0.2)}, 0 0 14px ${hexToRgba(getCategoryColorHex(entryEditorColorKey), 0.08)}`,
   } as CSSProperties;
+  const createToolbarActions = (
+    textareaRef: React.RefObject<HTMLTextAreaElement | null>,
+    currentValue: string,
+    setValue: (value: string) => void,
+  ): ToolbarAction[] => [
+    {
+      buttonLabel: 'Negrita',
+      icon: 'B',
+      label: '**Negrita**',
+      onClick: () =>
+        updateContentSelection(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          '**',
+          '**',
+          'texto en negrita',
+        ),
+    },
+    {
+      buttonLabel: 'Codigo',
+      icon: '<>',
+      label: '> Codigo',
+      onClick: () =>
+        updateContentSelection(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          '```java\n',
+          '\n```',
+          '// codigo aqui',
+        ),
+    },
+    {
+      buttonLabel: 'Imagen',
+      icon: '[]',
+      label: '![Imagen]()',
+      onClick: () =>
+        updateContentSelection(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          '![descripcion](',
+          ')',
+          '/images/nombre.png',
+        ),
+    },
+    {
+      buttonLabel: 'Enlace',
+      icon: 'lnk',
+      label: 'Enlace',
+      onClick: () =>
+        updateContentSelection(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          '[',
+          '](https://)',
+          'texto del enlace',
+        ),
+    },
+    {
+      buttonLabel: 'Lista',
+      icon: '*',
+      label: 'Lista',
+      onClick: () =>
+        prefixSelectedLines(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          () => '- ',
+          'Elemento de lista',
+        ),
+    },
+    {
+      buttonLabel: 'Numerada',
+      icon: '1.',
+      label: 'Numerada',
+      onClick: () =>
+        prefixSelectedLines(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          (lineIndex) => `${lineIndex + 1}. `,
+          'Primer elemento',
+        ),
+    },
+    {
+      buttonLabel: 'Tab',
+      icon: '>>',
+      label: 'Tab',
+      onClick: () =>
+        indentSelectedLines(
+          textareaRef.current,
+          currentValue,
+          setValue,
+        ),
+    },
+    {
+      buttonLabel: 'Salto',
+      icon: '//',
+      label: 'Salto',
+      onClick: () =>
+        insertTextAtCursor(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          '\n\n',
+        ),
+    },
+    {
+      buttonLabel: 'Seccion',
+      icon: 'H2',
+      label: 'Seccion',
+      onClick: () =>
+        updateContentSelection(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          '## ',
+          '',
+          'Nueva sección',
+        ),
+    },
+    {
+      buttonLabel: 'Tabla',
+      icon: '::',
+      label: 'Tabla',
+      onClick: () =>
+        updateContentSelection(
+          textareaRef.current,
+          currentValue,
+          setValue,
+          '',
+          '',
+          '| Columna 1 | Columna 2 |\n| --- | --- |\n| Valor 1 | Valor 2 |',
+        ),
+    },
+  ];
   const handleToolbarActionClick = (actionIndex: number, action: ToolbarAction) => {
     action.onClick();
     const actionKey = `${actionIndex}`;
@@ -4600,151 +4880,20 @@ export const App = () => {
   };
 
   // Recordatorio: Si se implementa una logica Java para personalizar estas barras de herramientas o cargar macros de texto dinamicas, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de configuracion de la interfaz.
-  const toolbarActions: ToolbarAction[] = [
-    {
-      buttonLabel: 'Negrita',
-      icon: 'B',
-      label: '**Negrita**',
-      onClick: () =>
-        updateContentSelection(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          '**',
-          '**',
-          'texto en negrita',
-        ),
-    },
-    {
-      buttonLabel: 'Codigo',
-      icon: '<>',
-      label: '> Codigo',
-      onClick: () =>
-        updateContentSelection(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          '```java\n',
-          '\n```',
-          '// codigo aqui',
-        ),
-    },
-    {
-      buttonLabel: 'Imagen',
-      icon: '[]',
-      label: '![Imagen]()',
-      onClick: () =>
-        updateContentSelection(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          '![descripcion](',
-          ')',
-          '/images/nombre.png',
-        ),
-    },
-    {
-      buttonLabel: 'Enlace',
-      icon: 'lnk',
-      label: 'Enlace',
-      onClick: () =>
-        updateContentSelection(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          '[',
-          '](https://)',
-          'texto del enlace',
-        ),
-    },
-    {
-      buttonLabel: 'Lista',
-      icon: '*',
-      label: 'Lista',
-      onClick: () =>
-        prefixSelectedLines(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          () => '- ',
-          'Elemento de lista',
-        ),
-    },
-    {
-      buttonLabel: 'Numerada',
-      icon: '1.',
-      label: 'Numerada',
-      onClick: () =>
-        prefixSelectedLines(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          (lineIndex) => `${lineIndex + 1}. `,
-          'Primer elemento',
-        ),
-    },
-    {
-      buttonLabel: 'Tab',
-      icon: '>>',
-      label: 'Tab',
-      onClick: () =>
-        indentSelectedLines(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-        ),
-    },
-    {
-      buttonLabel: 'Salto',
-      icon: '//',
-      label: 'Salto',
-      onClick: () =>
-        insertTextAtCursor(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          '\n\n',
-        ),
-    },
-    {
-      buttonLabel: 'Seccion',
-      icon: 'H2',
-      label: 'Seccion',
-      onClick: () =>
-        updateContentSelection(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          '## ',
-          '',
-          'Nueva sección',
-        ),
-    },
-    {
-      buttonLabel: 'Tabla',
-      icon: '::',
-      label: 'Tabla',
-      onClick: () =>
-        updateContentSelection(
-          contentEditorRef.current,
-          entryForm.contenido,
-          (nextValue) =>
-            setEntryForm((current) => ({ ...current, contenido: nextValue })),
-          '',
-          '',
-          '| Columna 1 | Columna 2 |\n| --- | --- |\n| Valor 1 | Valor 2 |',
-        ),
-    },
-  ];
+  const toolbarActions = createToolbarActions(
+    contentEditorRef,
+    entryForm.contenido,
+    (nextValue) =>
+      setEntryForm((current) => ({ ...current, contenido: nextValue })),
+  );
+  const templateToolbarActions = createToolbarActions(
+    templateContentEditorRef,
+    templateForm?.contenido ?? '',
+    (nextValue) =>
+      setTemplateForm((current) =>
+        current ? { ...current, contenido: nextValue } : current,
+      ),
+  );
   const sidebarContent = (
     <SidebarUtilities
       customization={customization}
@@ -5111,6 +5260,7 @@ export const App = () => {
         <section ref={topContentRef} className="space-y-5 sm:space-y-6">
           {activeView === 'settings' ? (
             <AppCustomizationPanel
+              categoryNames={manualData.categories.map((category) => category.name)}
               customization={customization}
               diagnostics={diagnosticsSnapshot}
               onCancel={() => setActiveView('home')}
@@ -5118,6 +5268,7 @@ export const App = () => {
               onExportManual={handleExport}
               onImportBackupClick={handleImportBackupClick}
               onSave={handleSaveCustomization}
+              quickViews={quickViews}
             />
           ) : activeView === 'templates' ? (
             <div
@@ -6124,9 +6275,11 @@ export const App = () => {
                           {entry.id}
                         </span>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">
-                        {entry.contenido}
-                      </p>
+                      <div className="mt-2 max-h-28 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 dark:border-slate-800 dark:bg-slate-950/30">
+                        <div className="pointer-events-none text-sm leading-6 text-slate-600 dark:text-slate-300">
+                          <MarkdownRenderer content={entry.contenido} />
+                        </div>
+                      </div>
                     </div>
                   </label>
                 );
@@ -6606,7 +6759,16 @@ export const App = () => {
                           ref={contentEditorRef}
                           value={entryForm.contenido}
                           onPaste={(event) => {
-                            void handleContentPaste(event);
+                            void handleMarkdownEditorPaste(
+                              event,
+                              contentEditorRef.current,
+                              entryForm.contenido,
+                              (nextValue) =>
+                                setEntryForm((current) => ({
+                                  ...current,
+                                  contenido: nextValue,
+                                })),
+                            );
                           }}
                           onChange={(event) =>
                             setEntryForm((current) => ({
@@ -7100,20 +7262,105 @@ export const App = () => {
                     </section>
 
                     <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
-                    <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Contenido base Markdown
-                      <textarea
-                        value={templateForm?.contenido ?? ''}
-                        onChange={(event) =>
-                          setTemplateForm((current) =>
-                            current ? { ...current, contenido: event.target.value } : current,
-                          )
-                        }
-                        rows={14}
-                        className="themed-field min-h-[280px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white"
-                        placeholder="## Contexto&#10;&#10;## Pasos&#10;&#10;## Validacion"
-                      />
-                    </label>
+                      <div
+                        className="flex flex-wrap items-center gap-2 rounded-xl border-b border-slate-200 bg-slate-50/80 px-2 py-2 dark:border-slate-800 dark:bg-slate-900/80"
+                        style={toolbarContainerStyle}
+                      >
+                        {templateToolbarActions.map((action, index) => {
+                          const isActive = activeToolbarActionId === `${index}`;
+
+                          return (
+                            <button
+                              key={`template-${action.label}`}
+                              type="button"
+                              onClick={() => handleToolbarActionClick(index, action)}
+                              aria-label={`Insertar ${action.buttonLabel}`}
+                              title={`Insertar ${action.buttonLabel}`}
+                              className={`inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-all duration-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 ${
+                                isActive ? 'scale-[1.02] shadow-sm' : ''
+                              }`}
+                              style={
+                                isActive
+                                  ? {
+                                      borderColor: getCategoryColorHex(entryEditorColorKey),
+                                      color: getCategoryColorHex(entryEditorColorKey),
+                                      boxShadow: `0 0 0 1px ${hexToRgba(getCategoryColorHex(entryEditorColorKey), 0.2)}, 0 0 10px ${hexToRgba(getCategoryColorHex(entryEditorColorKey), 0.22)}`,
+                                    }
+                                  : undefined
+                              }
+                            >
+                              <span
+                                className="font-mono text-[11px]"
+                                aria-hidden="true"
+                              >
+                                {action.icon}
+                              </span>
+                              <span>{action.buttonLabel}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                            Documento Markdown
+                          </p>
+                          <div className="flex items-center gap-3">
+                            {isUploadingImage ? (
+                              <span className="text-xs font-medium text-sky-600 dark:text-sky-300">
+                                Subiendo imagen...
+                              </span>
+                            ) : null}
+                            <p className="text-xs text-slate-400 dark:text-slate-300">
+                              Soporta codigo, tablas, acordeones por encabezado e imagenes locales en `/public/images/`
+                            </p>
+                          </div>
+                        </div>
+
+                        <textarea
+                          ref={templateContentEditorRef}
+                          value={templateForm?.contenido ?? ''}
+                          onPaste={(event) => {
+                            void handleMarkdownEditorPaste(
+                              event,
+                              templateContentEditorRef.current,
+                              templateForm?.contenido ?? '',
+                              (nextValue) =>
+                                setTemplateForm((current) =>
+                                  current
+                                    ? { ...current, contenido: nextValue }
+                                    : current,
+                                ),
+                            );
+                          }}
+                          onChange={(event) =>
+                            setTemplateForm((current) =>
+                              current ? { ...current, contenido: event.target.value } : current,
+                            )
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key !== 'Tab') {
+                              return;
+                            }
+
+                            event.preventDefault();
+                            indentSelectedLines(
+                              templateContentEditorRef.current,
+                              templateForm?.contenido ?? '',
+                              (nextValue) =>
+                                setTemplateForm((current) =>
+                                  current
+                                    ? { ...current, contenido: nextValue }
+                                    : current,
+                                ),
+                            );
+                          }}
+                          rows={14}
+                          className={`themed-field min-h-[280px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white ${isUploadingImage ? 'cursor-wait' : ''}`}
+                          placeholder="# Título de sección&#10;&#10;Escribe aquí tu documentación en Markdown..."
+                        />
+                      </div>
 
                     {showTemplateTechnicalOptions ? (
                       <div className="space-y-3">
@@ -7231,15 +7478,6 @@ export const App = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-2 dark:border-slate-800">
-                    {modalState.mode === 'edit' && modalState.templateId ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTemplate(modalState.templateId!)}
-                        className="mr-auto rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 transition-all duration-200 hover:border-rose-300 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:border-rose-400/40 dark:hover:bg-rose-500/20"
-                      >
-                        Eliminar plantilla
-                      </button>
-                    ) : null}
                     <button
                       type="button"
                       onClick={closeModal}

@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { AppLogo } from '../ui/AppLogo';
 import { ToggleSwitch } from '../ui/ToggleSwitch';
 import type {
   AppCustomizationSettings,
   AppDiagnosticsSnapshot,
   ExternalToolLink,
+  QuickViewSettings,
+  QuickViewTone,
 } from '../../types';
 
 // Si en el futuro los recursos visuales o la configuracion de Prysma se gestionan
@@ -14,13 +16,18 @@ import type {
 // rendimiento comercial del sistema [cite: 2026-02-12].
 
 interface AppCustomizationPanelProps {
+  categoryNames: string[];
   customization: AppCustomizationSettings;
   diagnostics: AppDiagnosticsSnapshot;
   onCancel: () => void;
   onExportBackup: () => void;
   onExportManual: () => void;
   onImportBackupClick: () => void;
-  onSave: (nextCustomization: AppCustomizationSettings) => void;
+  onSave: (nextState: {
+    customization: AppCustomizationSettings;
+    quickViews: QuickViewSettings[];
+  }) => void;
+  quickViews: QuickViewSettings[];
 }
 
 const createToolDraft = (index: number): ExternalToolLink => ({
@@ -29,7 +36,24 @@ const createToolDraft = (index: number): ExternalToolLink => ({
   url: '',
 });
 
+const quickViewToneOptions: Array<{ label: string; value: QuickViewTone }> = [
+  { label: 'Azul', value: 'sky' },
+  { label: 'Violeta', value: 'violet' },
+  { label: 'Ambar', value: 'amber' },
+  { label: 'Verde', value: 'emerald' },
+];
+
+const createQuickViewDraft = (index: number): QuickViewSettings => ({
+  categoryName: '',
+  id: `quick-view-draft-${index + 1}`,
+  label: '',
+  searchTerm: '',
+  showPinnedOnly: false,
+  tone: 'sky',
+});
+
 export function AppCustomizationPanel({
+  categoryNames,
   customization,
   diagnostics,
   onCancel,
@@ -37,13 +61,19 @@ export function AppCustomizationPanel({
   onExportManual,
   onImportBackupClick,
   onSave,
+  quickViews,
 }: AppCustomizationPanelProps) {
   const [formState, setFormState] = useState<AppCustomizationSettings>(customization);
+  const [quickViewDrafts, setQuickViewDrafts] = useState<QuickViewSettings[]>(quickViews);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   useEffect(() => {
     setFormState(customization);
   }, [customization]);
+
+  useEffect(() => {
+    setQuickViewDrafts(quickViews);
+  }, [quickViews]);
 
   const updateField = (
     field: keyof AppCustomizationSettings,
@@ -84,6 +114,59 @@ export function AppCustomizationPanel({
     );
   };
 
+  const getQuickViewMode = (quickView: QuickViewSettings) => {
+    if (quickView.showPinnedOnly) {
+      return 'pinned';
+    }
+
+    if ((quickView.searchTerm ?? '').trim()) {
+      return 'search';
+    }
+
+    return 'category';
+  };
+
+  const updateQuickView = (
+    quickViewId: string,
+    updater: (quickView: QuickViewSettings) => QuickViewSettings,
+  ) => {
+    setQuickViewDrafts((currentQuickViews) =>
+      currentQuickViews.map((quickView) =>
+        quickView.id === quickViewId ? updater(quickView) : quickView,
+      ),
+    );
+  };
+
+  const handleAddQuickView = () => {
+    setQuickViewDrafts((currentQuickViews) => [
+      ...currentQuickViews,
+      createQuickViewDraft(currentQuickViews.length),
+    ]);
+  };
+
+  const handleRemoveQuickView = (quickViewId: string) => {
+    setQuickViewDrafts((currentQuickViews) =>
+      currentQuickViews.length === 1
+        ? [createQuickViewDraft(0)]
+        : currentQuickViews.filter((quickView) => quickView.id !== quickViewId),
+    );
+  };
+
+  const handleQuickViewModeChange = (
+    quickViewId: string,
+    mode: 'category' | 'pinned' | 'search',
+  ) => {
+    updateQuickView(quickViewId, (quickView) => ({
+      ...quickView,
+      categoryName:
+        mode === 'category'
+          ? quickView.categoryName || categoryNames[0] || ''
+          : '',
+      searchTerm: mode === 'search' ? quickView.searchTerm || '' : '',
+      showPinnedOnly: mode === 'pinned',
+    }));
+  };
+
   const createVisibilityToggle = (
     field: keyof Pick<
       AppCustomizationSettings,
@@ -103,14 +186,31 @@ export function AppCustomizationPanel({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSave({
-      ...formState,
-      appIconDataUrl: customization.appIconDataUrl,
-      appName: customization.appName,
-      externalTools: formState.externalTools.map((tool, index) => ({
-        id: tool.id.trim() || `external-tool-${index + 1}`,
-        name: tool.name.trim() || `Enlace ${index + 1}`,
-        url: tool.url.trim() || '#',
-      })),
+      customization: {
+        ...formState,
+        appIconDataUrl: customization.appIconDataUrl,
+        appName: customization.appName,
+        externalTools: formState.externalTools.map((tool, index) => ({
+          id: tool.id.trim() || `external-tool-${index + 1}`,
+          name: tool.name.trim() || `Enlace ${index + 1}`,
+          url: tool.url.trim() || '#',
+        })),
+      },
+      quickViews: quickViewDrafts
+        .map((quickView, index) => ({
+          ...quickView,
+          categoryName: quickView.categoryName?.trim() || undefined,
+          id: quickView.id.trim() || `quick-view-${index + 1}`,
+          label: quickView.label.trim(),
+          searchTerm: quickView.searchTerm?.trim() || undefined,
+        }))
+        .filter(
+          (quickView) =>
+            quickView.label &&
+            (quickView.categoryName ||
+              quickView.searchTerm ||
+              quickView.showPinnedOnly),
+        ),
     });
   };
 
@@ -242,6 +342,124 @@ export function AppCustomizationPanel({
                 'Mostrar herramientas externas',
                 'Controla si se ve el bloque lateral con accesos externos personalizados.',
               )}
+            </div>
+          </div>
+
+          <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Filtros rapidos de la Home
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  Configura los accesos rapidos que aparecen como chips en la Home.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddQuickView}
+                className="rounded-xl border border-emerald-500/60 bg-emerald-500/12 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/18 dark:text-emerald-300"
+              >
+                Anadir filtro
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {quickViewDrafts.map((quickView, index) => {
+                const quickViewMode = getQuickViewMode(quickView);
+
+                return (
+                  <div
+                    key={quickView.id}
+                    className="soft-subpanel space-y-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700"
+                  >
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
+                      <input
+                        value={quickView.label}
+                        onChange={(event) =>
+                          updateQuickView(quickView.id, (currentQuickView) => ({
+                            ...currentQuickView,
+                            label: event.target.value,
+                          }))
+                        }
+                        className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
+                        placeholder={`Nombre del filtro ${index + 1}`}
+                      />
+                      <select
+                        value={quickViewMode}
+                        onChange={(event) =>
+                          handleQuickViewModeChange(
+                            quickView.id,
+                            event.target.value as 'category' | 'pinned' | 'search',
+                          )
+                        }
+                        className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
+                      >
+                        <option value="category">Filtrar por seccion</option>
+                        <option value="search">Buscar texto</option>
+                        <option value="pinned">Solo ancladas</option>
+                      </select>
+                      <select
+                        value={quickView.tone}
+                        onChange={(event) =>
+                          updateQuickView(quickView.id, (currentQuickView) => ({
+                            ...currentQuickView,
+                            tone: event.target.value as QuickViewTone,
+                          }))
+                        }
+                        className="themed-field rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
+                      >
+                        {quickViewToneOptions.map((toneOption) => (
+                          <option key={toneOption.value} value={toneOption.value}>
+                            {toneOption.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveQuickView(quickView.id)}
+                        className="rounded-xl border border-rose-500/60 bg-rose-500/12 px-3 py-2.5 text-sm font-medium text-rose-700 transition-colors hover:border-rose-500 hover:bg-rose-500/18 dark:text-rose-300"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+
+                    {quickViewMode === 'category' ? (
+                      <select
+                        value={quickView.categoryName ?? ''}
+                        onChange={(event) =>
+                          updateQuickView(quickView.id, (currentQuickView) => ({
+                            ...currentQuickView,
+                            categoryName: event.target.value,
+                          }))
+                        }
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
+                      >
+                        <option value="">Selecciona una seccion</option>
+                        {categoryNames.map((categoryName) => (
+                          <option key={categoryName} value={categoryName}>
+                            {categoryName}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
+
+                    {quickViewMode === 'search' ? (
+                      <input
+                        value={quickView.searchTerm ?? ''}
+                        onChange={(event) =>
+                          updateQuickView(quickView.id, (currentQuickView) => ({
+                            ...currentQuickView,
+                            searchTerm: event.target.value,
+                          }))
+                        }
+                        className="themed-field w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-800 outline-none dark:border-slate-700 dark:bg-slate-900/90 dark:text-white"
+                        placeholder="Texto de busqueda, por ejemplo incidencia"
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

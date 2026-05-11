@@ -44,16 +44,6 @@ const isSensitiveLabel = (label: string) => sensitiveLabelPattern.test(label);
 const maskValue = (value: string) => '*'.repeat(Math.max(value.length, 8));
 const isFieldVisible = (fieldKey: string, sensitive: boolean, hiddenFields: Record<string, boolean>) =>
   !sensitive || hiddenFields[fieldKey] === true;
-const buildCollapsedPreview = (content: string) =>
-  content
-    .replace(/```[\s\S]*?```/g, ' [codigo] ')
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, ' [imagen] ')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/[>*_~`|]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
 const formatUpdatedAt = (value?: string) => {
   if (!value) {
     return '';
@@ -133,6 +123,21 @@ const getCommandValueTone = (value: string) => {
   return 'dark:text-slate-100';
 };
 
+const shouldIgnoreCardClick = (
+  target: EventTarget | null,
+  currentTarget: EventTarget | null,
+) => {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const interactiveAncestor = target.closest(
+    'button, a, input, textarea, select, label, summary, [role="button"]',
+  );
+
+  return Boolean(interactiveAncestor && interactiveAncestor !== currentTarget);
+};
+
 export function ResultCard({
   activeTags = [],
   categoryColorKey = 'slate',
@@ -155,11 +160,6 @@ export function ResultCard({
   const categoryStyle = getCategoryTheme(categoryColorKey);
   const categoryColor = getCategoryColorHex(categoryColorKey);
   const formattedUpdatedAt = formatUpdatedAt(entry.updatedAt);
-  const collapsedPreview = buildCollapsedPreview(entry.contenido);
-  const previewText =
-    collapsedPreview.length > (compact ? 120 : 180)
-      ? `${collapsedPreview.slice(0, compact ? 120 : 180).trim()}...`
-      : collapsedPreview;
   const glowStyle = {
     '--card-glow': hexToRgba(categoryColor, 0.14),
     '--card-ring': hexToRgba(categoryColor, 0.22),
@@ -293,9 +293,35 @@ export function ResultCard({
     });
   };
 
+  const openEntryEditor = () => {
+    onEditEntry?.(entry);
+  };
+
   return (
     <article
+      role={onEditEntry ? 'button' : undefined}
+      tabIndex={onEditEntry ? 0 : undefined}
+      onClick={(event) => {
+        if (!onEditEntry || shouldIgnoreCardClick(event.target, event.currentTarget)) {
+          return;
+        }
+
+        openEntryEditor();
+      }}
+      onKeyDown={(event) => {
+        if (!onEditEntry || shouldIgnoreCardClick(event.target, event.currentTarget)) {
+          return;
+        }
+
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openEntryEditor();
+        }
+      }}
+      aria-label={onEditEntry ? `Editar ficha ${entry.titulo}` : undefined}
       className={`section-gradient-card neon-card w-full border border-slate-200 shadow-sm transition-all duration-200 ${
+        onEditEntry ? 'cursor-pointer hover:border-sky-300 dark:hover:border-sky-500/40' : ''
+      } ${
         compact
           ? 'rounded-[1.35rem] p-3.5 sm:p-4'
           : 'rounded-[1.6rem] p-4 sm:p-5'
@@ -427,36 +453,6 @@ export function ResultCard({
             </button>
           ) : null}
 
-          {onEditEntry ? (
-            <button
-              type="button"
-              onClick={() => onEditEntry(entry)}
-              aria-label={`Editar ficha ${entry.titulo}`}
-              title={`Editar ficha ${entry.titulo}`}
-              className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                className={actionIconClass}
-              >
-                <path
-                  d="M3 14.5V17h2.5L15 7.5 12.5 5 3 14.5Z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="m11.5 6 2.5 2.5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          ) : null}
-
           {onDeleteEntry ? (
             <button
               type="button"
@@ -533,9 +529,13 @@ export function ResultCard({
         <div className={`soft-subpanel rounded-xl border border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-300 ${
           compact ? 'mt-3 px-3 py-2.5 text-[13px]' : 'mt-4 px-4 py-3 text-sm'
         }`}>
-          <p className={`${compact ? 'line-clamp-2 leading-5' : 'line-clamp-3 leading-6'}`}>
-            {previewText || 'Ficha colapsada. Pulsa el icono para volver a verla completa.'}
-          </p>
+          <div className={`overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/30 ${
+            compact ? 'max-h-24 p-2' : 'max-h-28 p-2.5'
+          }`}>
+            <div className="pointer-events-none text-sm leading-6 text-slate-600 dark:text-slate-300">
+              <MarkdownRenderer content={entry.contenido} />
+            </div>
+          </div>
           <div className={`flex flex-wrap gap-2 font-medium text-slate-500 dark:text-slate-400 ${
             compact ? 'mt-2 text-[11px]' : 'mt-3 text-xs'
           }`}>
