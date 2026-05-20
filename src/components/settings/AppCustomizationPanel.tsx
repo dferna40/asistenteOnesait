@@ -373,7 +373,7 @@ export function AppCustomizationPanel({
                     key={quickView.id}
                     className="soft-subpanel space-y-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700"
                   >
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_180px_150px_auto]">
                       <input
                         value={quickView.label}
                         onChange={(event) =>
@@ -517,7 +517,7 @@ export function AppCustomizationPanel({
                   {formState.externalTools.map((tool, index) => (
                     <div
                       key={tool.id}
-                      className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]"
+                      className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]"
                     >
                       <input
                         value={tool.name}

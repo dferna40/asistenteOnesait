@@ -5751,7 +5751,7 @@ export const App = () => {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                     <div className="rounded-2xl border border-slate-200 bg-white/90 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/80">
                       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                         Secciones

@@ -121,7 +121,7 @@ export function MainLayout({
     <div className="app-background min-h-screen text-slate-900 dark:text-slate-100">
       <div className="flex min-h-screen">
         <div
-          className={`fixed inset-0 z-40 bg-slate-950/45 transition-opacity duration-200 sm:hidden ${
+          className={`fixed inset-0 z-40 bg-slate-950/45 transition-opacity duration-200 lg:hidden ${
             isSidebarOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
           }`}
           onClick={closeSidebar}
@@ -129,7 +129,7 @@ export function MainLayout({
         />
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[88vw] max-w-80 flex-col overflow-hidden border-r border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/95 sm:hidden ${
+          className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[88vw] max-w-80 flex-col overflow-hidden border-r border-slate-200/80 bg-white/95 shadow-2xl backdrop-blur transition-transform duration-300 dark:border-slate-800 dark:bg-slate-950/95 lg:hidden ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
           aria-label="Menu lateral movil"
@@ -148,7 +148,7 @@ export function MainLayout({
           {mobileSidebarPanel}
         </aside>
 
-        <aside className="hidden w-80 shrink-0 border-r border-slate-200/80 bg-white/70 backdrop-blur dark:border-slate-800 dark:bg-slate-950/70 sm:block">
+        <aside className="hidden w-80 shrink-0 border-r border-slate-200/80 bg-white/70 backdrop-blur dark:border-slate-800 dark:bg-slate-950/70 lg:block">
           {desktopSidebarPanel}
         </aside>
 
@@ -162,7 +162,7 @@ export function MainLayout({
                     type="button"
                     onClick={() => setIsSidebarOpen(true)}
                     aria-label="Abrir menu lateral"
-                    className="sidebar-soft-button inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-lg text-slate-700 transition-all duration-200 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 sm:hidden"
+                    className="sidebar-soft-button inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-lg text-slate-700 transition-all duration-200 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 lg:hidden"
                   >
                     ☰
                   </button>

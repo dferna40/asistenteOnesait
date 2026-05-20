@@ -383,7 +383,10 @@ export function ResultCard({
           {onTogglePin ? (
             <button
               type="button"
-              onClick={() => onTogglePin(entry.id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onTogglePin(entry.id);
+              }}
               aria-label={
                 entry.isPinned
                   ? `Desanclar ficha ${entry.titulo}`
@@ -420,7 +423,10 @@ export function ResultCard({
           {onExportPdf ? (
             <button
               type="button"
-              onClick={() => onExportPdf(entry)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onExportPdf(entry);
+              }}
               aria-label={`Exportar PDF de ${entry.titulo}`}
               title={`Exportar PDF de ${entry.titulo}`}
               className={`${actionButtonBaseClass} text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200`}
@@ -456,7 +462,10 @@ export function ResultCard({
           {onDeleteEntry ? (
             <button
               type="button"
-              onClick={() => onDeleteEntry(entry.id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onDeleteEntry(entry.id);
+              }}
               aria-label={`Mover a papelera ${entry.titulo}`}
               title={`Mover a papelera ${entry.titulo}`}
               className={`${actionButtonBaseClass} text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
@@ -480,7 +489,10 @@ export function ResultCard({
 
           <button
             type="button"
-            onClick={() => setIsCollapsed((current) => !current)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsCollapsed((current) => !current);
+            }}
             aria-label={
               isCollapsed
                 ? `Expandir ficha ${entry.titulo}`
@@ -636,7 +648,10 @@ export function ResultCard({
                         isHealthCheckLabel(command.label) ? (
                           <button
                             type="button"
-                            onClick={() => runHealthCheck(command.label, command.value)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void runHealthCheck(command.label, command.value);
+                            }}
                             aria-label={`Comprobar ${command.label}`}
                             title={
                               healthStatuses[command.label]?.detail ??
@@ -680,7 +695,10 @@ export function ResultCard({
                         {sensitive ? (
                           <button
                             type="button"
-                            onClick={() => toggleFieldVisibility(fieldKey)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleFieldVisibility(fieldKey);
+                            }}
                             aria-label={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
                             title={isHidden ? 'Mostrar valor' : 'Ocultar valor'}
                             className={`${actionButtonBaseClass} text-sky-500 hover:border-sky-300 hover:text-sky-600 dark:text-slate-200 dark:hover:border-sky-500/50 dark:hover:text-white`}
@@ -736,9 +754,10 @@ export function ResultCard({
                           <>
                             <button
                               type="button"
-                              onClick={() =>
-                                saveEditingField(fieldKey, command.label, command.value)
-                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                saveEditingField(fieldKey, command.label, command.value);
+                              }}
                               aria-label={`Guardar ${command.label}`}
                               title={`Guardar ${command.label}`}
                               className={`${actionButtonBaseClass} text-emerald-500 hover:border-emerald-300 hover:text-emerald-600 dark:text-emerald-400 dark:hover:border-emerald-500/50 dark:hover:text-emerald-300`}
@@ -761,7 +780,10 @@ export function ResultCard({
 
                             <button
                               type="button"
-                              onClick={() => cancelEditingField(fieldKey)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                cancelEditingField(fieldKey);
+                              }}
                               aria-label={`Cancelar edicion de ${command.label}`}
                               title={`Cancelar edicion de ${command.label}`}
                               className={`${actionButtonBaseClass} text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
@@ -785,7 +807,10 @@ export function ResultCard({
                           <>
                             <button
                               type="button"
-                              onClick={() => startEditingField(fieldKey, command.value)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                startEditingField(fieldKey, command.value);
+                              }}
                               aria-label={`Editar ${command.label}`}
                               title={`Editar ${command.label}`}
                               className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
@@ -813,7 +838,10 @@ export function ResultCard({
 
                             <button
                               type="button"
-                              onClick={() => copyTextToClipboard(command.value)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void copyTextToClipboard(command.value);
+                              }}
                               aria-label={`Copiar ${command.label}`}
                               title={`Copiar ${command.label}`}
                               className={`${actionButtonBaseClass} text-blue-500 hover:border-blue-300 hover:text-blue-600 dark:text-blue-400 dark:hover:border-blue-500/50 dark:hover:text-blue-300`}
