@@ -272,13 +272,13 @@ const createMarkdownComponents = (
     />
   ),
   li: (props: ComponentProps<'li'>) => (
-    <li {...props} className="whitespace-pre-wrap leading-7 text-slate-700 dark:text-slate-200 marker:text-slate-500 dark:marker:text-slate-300" />
+    <li {...props} className="break-words whitespace-pre-wrap [overflow-wrap:anywhere] leading-7 text-slate-700 dark:text-slate-200 marker:text-slate-500 dark:marker:text-slate-300" />
   ),
   ol: (props: ComponentProps<'ol'>) => (
     <ol {...props} className="my-4 list-decimal space-y-2 pl-5" />
   ),
   p: (props: ComponentProps<'p'>) => (
-    <p {...props} className="my-3 whitespace-pre-wrap leading-7 text-slate-700 dark:text-slate-200" />
+    <p {...props} className="my-3 break-words whitespace-pre-wrap [overflow-wrap:anywhere] leading-7 text-slate-700 dark:text-slate-200" />
   ),
   strong: (props: ComponentProps<'strong'>) => (
     <strong {...props} className="font-semibold text-slate-900 dark:text-white" />
@@ -294,7 +294,7 @@ const createMarkdownComponents = (
   td: (props: ComponentProps<'td'>) => (
     <td
       {...props}
-      className="border-t border-slate-100 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
+      className="border-t border-slate-100 px-3 py-2 text-sm break-words [overflow-wrap:anywhere] text-slate-700 dark:border-slate-700 dark:text-slate-200"
     />
   ),
   th: (props: ComponentProps<'th'>) => (
@@ -322,7 +322,7 @@ function MarkdownSectionAccordion({
     >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
         <span
-          className={`font-semibold text-slate-900 dark:text-slate-100 ${
+          className={`break-words [overflow-wrap:anywhere] font-semibold text-slate-900 dark:text-slate-100 ${
             section.depth <= 2 ? 'text-lg' : 'text-base'
           }`}
         >
@@ -366,7 +366,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
 
   return (
     <>
-      <div className="markdown-body">
+      <div className="markdown-body min-w-0 break-words [overflow-wrap:anywhere]">
       {preamble ? (
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}

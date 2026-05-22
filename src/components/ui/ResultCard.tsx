@@ -336,7 +336,7 @@ export function ResultCard({
       ) : null}
 
       <div className={`flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between ${compact ? 'gap-2.5' : 'gap-3'}`}>
-        <div className={`min-w-0 ${compact ? 'space-y-1.5' : 'space-y-2'}`}>
+        <div className={`min-w-0 flex-1 ${compact ? 'space-y-1.5' : 'space-y-2'}`}>
           <span
             className={`section-gradient-pill inline-flex rounded-full border font-semibold uppercase ${categoryStyle.badge} ${
               compact
@@ -346,7 +346,7 @@ export function ResultCard({
           >
             {entry.categoria}
           </span>
-          <h3 className={`font-semibold text-slate-900 dark:text-slate-100 ${
+          <h3 className={`break-words [overflow-wrap:anywhere] font-semibold text-slate-900 dark:text-slate-100 ${
             compact ? 'text-base sm:text-lg leading-6' : 'text-lg sm:text-xl'
           }`}>
             {entry.titulo}
@@ -358,7 +358,7 @@ export function ResultCard({
                   key={tag}
                   type="button"
                   onClick={() => onTagClick?.(tag)}
-                  className={`inline-flex rounded-full border font-medium lowercase transition-colors ${
+                  className={`inline-flex max-w-full break-all rounded-full border font-medium lowercase transition-colors ${
                     compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'
                   } ${
                     activeTags.includes(tag.toLowerCase())
@@ -379,7 +379,7 @@ export function ResultCard({
           ) : null}
         </div>
 
-        <div className="flex items-center gap-2 self-start">
+        <div className="flex max-w-full flex-wrap items-center gap-2 self-start sm:justify-end">
           {onTogglePin ? (
             <button
               type="button"
@@ -529,7 +529,7 @@ export function ResultCard({
             </svg>
           </button>
 
-          <span className={`soft-subpanel w-fit rounded-lg border border-slate-200 font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 ${
+          <span className={`soft-subpanel max-w-full break-all rounded-lg border border-slate-200 font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 ${
             compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'
           }`}>
             {entry.id}
@@ -635,7 +635,7 @@ export function ResultCard({
                         ) : (
                           <div className="flex items-center gap-2">
                             <span
-                              className={`block overflow-x-auto whitespace-nowrap text-slate-800 transition-all duration-200 ${getCommandValueTone(displayedValue)}`}
+                              className={`block break-all whitespace-pre-wrap [overflow-wrap:anywhere] text-slate-800 transition-all duration-200 ${getCommandValueTone(displayedValue)}`}
                             >
                               {displayedValue}
                             </span>

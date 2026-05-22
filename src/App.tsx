@@ -1,5 +1,10 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ClipboardEvent as ReactClipboardEvent, CSSProperties } from 'react';
+import type {
+  ClipboardEvent as ReactClipboardEvent,
+  ChangeEvent as ReactChangeEvent,
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { useDeferredValue } from 'react';
 import { AppCustomizationPanel } from './components/settings/AppCustomizationPanel';
 import { MainLayout } from './components/layout/MainLayout';
@@ -116,6 +121,13 @@ interface ToolbarAction {
   icon: string;
   label: string;
   onClick: () => void;
+  shortcut?: string;
+}
+
+interface EditorSelectionState {
+  hasSelection: boolean;
+  selectedCharacters: number;
+  selectedLines: number;
 }
 
 interface SaveToastState {
@@ -221,9 +233,10 @@ interface PdfCodeSegment {
 }
 
 interface PdfInlineSegment {
+  fontStyle: 'bold' | 'bolditalic' | 'italic' | 'normal';
   href?: string;
   text: string;
-  type: 'link' | 'text';
+  type: 'code' | 'link' | 'text';
 }
 
 interface PdfListItem {
@@ -912,14 +925,16 @@ const updateContentSelection = (
   const selectedText = currentValue.slice(start, end);
   const nextText = selectedText || placeholder;
   const nextValue = `${currentValue.slice(0, start)}${before}${nextText}${after}${currentValue.slice(end)}`;
-  setValue(nextValue);
+  const selectionStart = start + before.length;
+  const selectionEnd = selectionStart + nextText.length;
 
-  requestAnimationFrame(() => {
-    textarea.focus();
-    const selectionStart = start + before.length;
-    const selectionEnd = selectionStart + nextText.length;
-    textarea.setSelectionRange(selectionStart, selectionEnd);
-  });
+  updateTextareaValueWithSelection(
+    textarea,
+    setValue,
+    nextValue,
+    selectionStart,
+    selectionEnd,
+  );
 };
 
 const insertTextAtCursor = (
@@ -936,13 +951,91 @@ const insertTextAtCursor = (
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const nextValue = `${currentValue.slice(0, start)}${textToInsert}${currentValue.slice(end)}`;
+  const nextCursorPosition = start + textToInsert.length;
+  const nextScrollTop = textarea.scrollTop;
+
   setValue(nextValue);
 
   requestAnimationFrame(() => {
-    const nextCursorPosition = start + textToInsert.length;
     textarea.focus();
     textarea.setSelectionRange(nextCursorPosition, nextCursorPosition);
+    textarea.scrollTop = nextScrollTop;
   });
+};
+
+const insertSnippetAtCursor = (
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+  snippet: string,
+  cursorOffset: number,
+  selectionLength = 0,
+) => {
+  if (!textarea) {
+    setValue(`${currentValue}${snippet}`);
+    return;
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const nextValue = `${currentValue.slice(0, start)}${snippet}${currentValue.slice(end)}`;
+  const selectionStart = start + cursorOffset;
+  const selectionEnd = selectionStart + selectionLength;
+  const nextScrollTop = textarea.scrollTop;
+
+  updateTextareaValueWithSelection(
+    textarea,
+    setValue,
+    nextValue,
+    selectionStart,
+    selectionEnd,
+    nextScrollTop,
+  );
+};
+
+const updateTextareaValueWithSelection = (
+  textarea: HTMLTextAreaElement | null,
+  setValue: (nextValue: string) => void,
+  nextValue: string,
+  selectionStart: number,
+  selectionEnd = selectionStart,
+  scrollTop?: number,
+) => {
+  setValue(nextValue);
+
+  if (!textarea) {
+    return;
+  }
+
+  const nextScrollTop = scrollTop ?? textarea.scrollTop;
+
+  requestAnimationFrame(() => {
+    textarea.focus();
+    textarea.setSelectionRange(selectionStart, selectionEnd);
+    textarea.scrollTop = nextScrollTop;
+  });
+};
+
+const getEditorSelectionState = (
+  textarea: HTMLTextAreaElement | null,
+): EditorSelectionState => {
+  if (!textarea) {
+    return {
+      hasSelection: false,
+      selectedCharacters: 0,
+      selectedLines: 1,
+    };
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.slice(start, end);
+
+  return {
+    hasSelection: start !== end,
+    selectedCharacters: Math.max(0, end - start),
+    selectedLines: Math.max(1, selectedText.split('\n').length),
+  };
 };
 
 const prefixSelectedLines = (
@@ -964,13 +1057,15 @@ const prefixSelectedLines = (
   if (!selectedText) {
     const insertedText = `${prefixBuilder(0)}${placeholder}`;
     const nextValue = `${currentValue.slice(0, start)}${insertedText}${currentValue.slice(end)}`;
-    setValue(nextValue);
+    const nextCursorPosition = start + insertedText.length;
 
-    requestAnimationFrame(() => {
-      const nextCursorPosition = start + insertedText.length;
-      textarea.focus();
-      textarea.setSelectionRange(nextCursorPosition, nextCursorPosition);
-    });
+    updateTextareaValueWithSelection(
+      textarea,
+      setValue,
+      nextValue,
+      nextCursorPosition,
+      nextCursorPosition,
+    );
     return;
   }
 
@@ -979,19 +1074,74 @@ const prefixSelectedLines = (
     .map((line, lineIndex) => `${prefixBuilder(lineIndex)}${line}`)
     .join('\n');
   const nextValue = `${currentValue.slice(0, start)}${prefixedText}${currentValue.slice(end)}`;
-  setValue(nextValue);
+  updateTextareaValueWithSelection(
+    textarea,
+    setValue,
+    nextValue,
+    start,
+    start + prefixedText.length,
+  );
+};
 
-  requestAnimationFrame(() => {
-    textarea.focus();
-    textarea.setSelectionRange(start, start + prefixedText.length);
-  });
+const prefixCurrentOrSelectedLines = (
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+  prefixBuilder: (lineIndex: number) => string,
+) => {
+  if (!textarea) {
+    return;
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const hasSelection = start !== end;
+  const lineStart = currentValue.lastIndexOf('\n', start - 1) + 1;
+  const lineEnd = currentValue.indexOf('\n', end);
+  const safeLineEnd = lineEnd === -1 ? currentValue.length : lineEnd;
+
+  if (!hasSelection) {
+    const currentLine = currentValue.slice(lineStart, safeLineEnd);
+    const prefixedLine = `${prefixBuilder(0)}${currentLine}`;
+    const nextValue = `${currentValue.slice(0, lineStart)}${prefixedLine}${currentValue.slice(safeLineEnd)}`;
+    const cursorOffset = start - lineStart;
+    const nextCursorPosition = lineStart + prefixBuilder(0).length + cursorOffset;
+
+    updateTextareaValueWithSelection(
+      textarea,
+      setValue,
+      nextValue,
+      nextCursorPosition,
+      nextCursorPosition,
+    );
+    return;
+  }
+
+  const selectedBlock = currentValue.slice(lineStart, safeLineEnd);
+  const prefixedBlock = selectedBlock
+    .split('\n')
+    .map((line, lineIndex) => `${prefixBuilder(lineIndex)}${line}`)
+    .join('\n');
+  const nextValue = `${currentValue.slice(0, lineStart)}${prefixedBlock}${currentValue.slice(safeLineEnd)}`;
+  const firstPrefixLength = prefixBuilder(0).length;
+  const totalAddedCharacters = selectedBlock
+    .split('\n')
+    .reduce((sum, _line, lineIndex) => sum + prefixBuilder(lineIndex).length, 0);
+
+  updateTextareaValueWithSelection(
+    textarea,
+    setValue,
+    nextValue,
+    start + firstPrefixLength,
+    end + totalAddedCharacters,
+  );
 };
 
 const indentSelectedLines = (
   textarea: HTMLTextAreaElement | null,
   currentValue: string,
   setValue: (nextValue: string) => void,
-  indent = '\t',
+  indent = '    ',
 ) => {
   if (!textarea) {
     setValue(`${currentValue}${indent}`);
@@ -1000,13 +1150,6 @@ const indentSelectedLines = (
 
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
-  const selectedText = currentValue.slice(start, end);
-
-  if (!selectedText) {
-    insertTextAtCursor(textarea, currentValue, setValue, indent);
-    return;
-  }
-
   const lineStart = currentValue.lastIndexOf('\n', start - 1) + 1;
   const lineEnd = currentValue.indexOf('\n', end);
   const safeLineEnd = lineEnd === -1 ? currentValue.length : lineEnd;
@@ -1016,13 +1159,567 @@ const indentSelectedLines = (
     .map((line) => `${indent}${line}`)
     .join('\n');
   const nextValue = `${currentValue.slice(0, lineStart)}${indentedBlock}${currentValue.slice(safeLineEnd)}`;
+  updateTextareaValueWithSelection(
+    textarea,
+    setValue,
+    nextValue,
+    start + indent.length,
+    end + indent.length * selectedBlock.split('\n').length,
+  );
+};
 
-  setValue(nextValue);
+const outdentSelectedLines = (
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+  indent = '    ',
+) => {
+  if (!textarea) {
+    return;
+  }
 
-  requestAnimationFrame(() => {
-    textarea.focus();
-    textarea.setSelectionRange(start + indent.length, end + indent.length * selectedBlock.split('\n').length);
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const lineStart = currentValue.lastIndexOf('\n', start - 1) + 1;
+  const lineEnd = currentValue.indexOf('\n', end);
+  const safeLineEnd = lineEnd === -1 ? currentValue.length : lineEnd;
+  const selectedBlock = currentValue.slice(lineStart, safeLineEnd);
+  let removedBeforeStart = 0;
+  let removedTotal = 0;
+
+  const outdentedBlock = selectedBlock
+    .split('\n')
+    .map((line, index) => {
+      let nextLine = line;
+      let removedFromLine = 0;
+
+      if (nextLine.startsWith(indent)) {
+        nextLine = nextLine.slice(indent.length);
+        removedFromLine = indent.length;
+      } else {
+        const leadingWhitespace = nextLine.match(/^\s+/)?.[0] ?? '';
+        if (leadingWhitespace.length) {
+          removedFromLine = Math.min(indent.length, leadingWhitespace.length);
+          nextLine = nextLine.slice(removedFromLine);
+        }
+      }
+
+      if (index === 0) {
+        removedBeforeStart = removedFromLine;
+      }
+      removedTotal += removedFromLine;
+
+      return nextLine;
+    })
+    .join('\n');
+
+  const nextValue = `${currentValue.slice(0, lineStart)}${outdentedBlock}${currentValue.slice(safeLineEnd)}`;
+  updateTextareaValueWithSelection(
+    textarea,
+    setValue,
+    nextValue,
+    Math.max(lineStart, start - removedBeforeStart),
+    Math.max(lineStart, end - removedTotal),
+  );
+};
+
+const markdownListPattern = /^(\s*)([-*+]|\d+\.)\s+(.*)$/;
+
+const orderedMarkdownListPattern = /^(\s*)(\d+)\.\s+(.*)$/;
+
+const renumberOrderedMarkdownLists = (value: string) => {
+  const lines = value.split('\n');
+  const counters = new Map<number, number>();
+  const activeOrderedLevels = new Set<number>();
+  const unorderedLevels = new Set<number>();
+
+  const clearDeeperLevels = (level: number) => {
+    Array.from(counters.keys()).forEach((key) => {
+      if (key > level) {
+        counters.delete(key);
+      }
+    });
+
+    Array.from(activeOrderedLevels).forEach((key) => {
+      if (key > level) {
+        activeOrderedLevels.delete(key);
+      }
+    });
+
+    Array.from(unorderedLevels).forEach((key) => {
+      if (key > level) {
+        unorderedLevels.delete(key);
+      }
+    });
+  };
+
+  return lines
+    .map((line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        counters.clear();
+        activeOrderedLevels.clear();
+        unorderedLevels.clear();
+        return line;
+      }
+
+      const orderedMatch = line.match(orderedMarkdownListPattern);
+      if (orderedMatch) {
+        const [, indentation, , content] = orderedMatch;
+        const level = getIndentLevel(indentation);
+
+        clearDeeperLevels(level);
+
+        if (unorderedLevels.has(level)) {
+          counters.set(level, 0);
+        }
+
+        const nextNumber = (counters.get(level) ?? 0) + 1;
+        counters.set(level, nextNumber);
+        activeOrderedLevels.add(level);
+        unorderedLevels.delete(level);
+
+        return `${indentation}${nextNumber}. ${content}`;
+      }
+
+      const unorderedMatch = line.match(/^(\s*)([-*+])\s+(.*)$/);
+      if (unorderedMatch) {
+        const [, indentation] = unorderedMatch;
+        const level = getIndentLevel(indentation);
+
+        clearDeeperLevels(level);
+        counters.delete(level);
+        activeOrderedLevels.delete(level);
+        unorderedLevels.add(level);
+
+        return line;
+      }
+
+      const leadingIndentLevel = getIndentLevel(line);
+      Array.from(counters.keys()).forEach((key) => {
+        if (key >= leadingIndentLevel) {
+          counters.delete(key);
+          activeOrderedLevels.delete(key);
+          unorderedLevels.delete(key);
+        }
+      });
+
+      return line;
+    })
+    .join('\n');
+};
+
+const setEditorValueAndNormalizeLists = (
+  textarea: HTMLTextAreaElement | null,
+  _currentValue: string,
+  setValue: (nextValue: string) => void,
+  buildNextValue: (selectionStart: number, selectionEnd: number) => {
+    nextValue: string;
+    selectionEnd?: number;
+    selectionStart?: number;
+  },
+  scrollTop?: number,
+) => {
+  if (!textarea) {
+    return;
+  }
+
+  const initialSelectionStart = textarea.selectionStart;
+  const initialSelectionEnd = textarea.selectionEnd;
+  const initialScrollTop = scrollTop ?? textarea.scrollTop;
+  const { nextValue, selectionStart, selectionEnd } = buildNextValue(
+    initialSelectionStart,
+    initialSelectionEnd,
+  );
+
+  const normalizedValue = renumberOrderedMarkdownLists(nextValue);
+  const selectionAnchor = selectionStart ?? initialSelectionStart;
+  const selectionFocus = selectionEnd ?? selectionAnchor;
+  const selectionDelta = normalizedValue.length - nextValue.length;
+  const adjustedSelectionEnd = Math.max(selectionAnchor, selectionFocus + selectionDelta);
+
+  updateTextareaValueWithSelection(
+    textarea,
+    setValue,
+    normalizedValue,
+    selectionAnchor,
+    adjustedSelectionEnd,
+    initialScrollTop,
+  );
+};
+
+const handleMarkdownEditorKeyDown = (
+  event: ReactKeyboardEvent<HTMLTextAreaElement>,
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+) => {
+  if (!textarea) {
+    return;
+  }
+
+  const hasModifier = event.ctrlKey || event.metaKey;
+
+  if (hasModifier && !event.altKey) {
+    const normalizedKey = event.key.toLowerCase();
+
+    if (normalizedKey === 'b') {
+      event.preventDefault();
+      updateContentSelection(textarea, currentValue, setValue, '**', '**');
+      return;
+    }
+
+    if (normalizedKey === 'i') {
+      event.preventDefault();
+      updateContentSelection(textarea, currentValue, setValue, '*', '*');
+      return;
+    }
+
+    if (normalizedKey === 'k') {
+      event.preventDefault();
+      updateContentSelection(textarea, currentValue, setValue, '[', ']()');
+      return;
+    }
+
+    if (event.shiftKey && normalizedKey === '7') {
+      event.preventDefault();
+      prefixCurrentOrSelectedLines(textarea, currentValue, setValue, (lineIndex) => `${lineIndex + 1}. `);
+      return;
+    }
+
+    if (event.shiftKey && normalizedKey === '8') {
+      event.preventDefault();
+      prefixCurrentOrSelectedLines(textarea, currentValue, setValue, () => '- ');
+      return;
+    }
+  }
+
+  if (hasModifier && event.altKey) {
+    if (event.key === '1') {
+      event.preventDefault();
+      prefixCurrentOrSelectedLines(textarea, currentValue, setValue, () => '# ');
+      return;
+    }
+
+    if (event.key === '2') {
+      event.preventDefault();
+      prefixCurrentOrSelectedLines(textarea, currentValue, setValue, () => '## ');
+      return;
+    }
+
+    if (event.key === '3') {
+      event.preventDefault();
+      prefixCurrentOrSelectedLines(textarea, currentValue, setValue, () => '### ');
+      return;
+    }
+  }
+
+  if (event.key === 'Tab') {
+    event.preventDefault();
+
+    if (event.shiftKey) {
+      outdentSelectedLines(textarea, currentValue, setValue);
+      return;
+    }
+
+    indentSelectedLines(textarea, currentValue, setValue);
+    return;
+  }
+
+  if (
+    event.key !== 'Enter' ||
+    event.shiftKey ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey
+  ) {
+    return;
+  }
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  if (start !== end) {
+    return;
+  }
+
+  const lineStart = currentValue.lastIndexOf('\n', start - 1) + 1;
+  const lineEnd = currentValue.indexOf('\n', start);
+  const safeLineEnd = lineEnd === -1 ? currentValue.length : lineEnd;
+  const currentLine = currentValue.slice(lineStart, safeLineEnd);
+  const listMatch = currentLine.match(markdownListPattern);
+
+  if (!listMatch) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const [, indentation, marker, content] = listMatch;
+  const trimmedContent = content.trim();
+  const nextMarker = /^\d+\.$/.test(marker)
+    ? `${Number.parseInt(marker, 10) + 1}.`
+    : marker;
+
+  if (!trimmedContent) {
+    const nextIndentation = indentation.length >= 4
+      ? indentation.slice(0, Math.max(0, indentation.length - 4))
+      : '';
+    const replacementLine = nextIndentation;
+    const nextValue = `${currentValue.slice(0, lineStart)}${replacementLine}${currentValue.slice(safeLineEnd)}`;
+    const nextCursorPosition = lineStart + replacementLine.length;
+
+    updateTextareaValueWithSelection(
+      textarea,
+      setValue,
+      nextValue,
+      nextCursorPosition,
+      nextCursorPosition,
+    );
+    return;
+  }
+
+  const insertedText = `\n${indentation}${nextMarker} `;
+  const nextCursorPosition = start + insertedText.length;
+
+  setEditorValueAndNormalizeLists(
+    textarea,
+    currentValue,
+    setValue,
+    () => ({
+      nextValue: `${currentValue.slice(0, start)}${insertedText}${currentValue.slice(end)}`,
+      selectionStart: nextCursorPosition,
+      selectionEnd: nextCursorPosition,
+    }),
+  );
+};
+
+const normalizePastedMarkdownText = (value: string) =>
+  value
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u200b-\u200d\uFEFF]/g, '')
+    .replace(/^\t+/gm, (tabs) => '    '.repeat(tabs.length))
+    .replace(/^([ \t]*)([•◦▪▫●○◉‣⁃▪︎])\s+/gm, '$1- ')
+    .replace(/^([ \t]*)(\d+)[\)\.]?\s+/gm, '$1$2. ')
+    .replace(/[ \t]+\n/g, '\n');
+
+const cleanMarkdownSpacing = (value: string) =>
+  value
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+
+const convertHtmlClipboardToMarkdown = (html: string) => {
+  if (typeof DOMParser === 'undefined' || !html.trim()) {
+    return '';
+  }
+
+  const parser = new DOMParser();
+  const normalizedHtml = html
+    .replace(/<!--StartFragment-->|<!--EndFragment-->/gi, '')
+    .replace(/<o:p>\s*<\/o:p>/gi, '')
+    .replace(/<o:p>.*?<\/o:p>/gi, ' ');
+  const document = parser.parseFromString(normalizedHtml, 'text/html');
+
+  document.querySelectorAll('script,style,meta,link,title').forEach((node) => {
+    node.remove();
   });
+
+  document.querySelectorAll<HTMLElement>('[style]').forEach((element) => {
+    const style = element.getAttribute('style')?.toLowerCase() ?? '';
+    const marginLeftMatch = style.match(/margin-left:\s*([\d.]+)(px|pt)/);
+    if (marginLeftMatch && !element.dataset.indentLevel) {
+      const rawValue = Number.parseFloat(marginLeftMatch[1] ?? '0');
+      const unit = marginLeftMatch[2] ?? 'px';
+      const pixels = unit === 'pt' ? rawValue * 1.3333 : rawValue;
+      element.dataset.indentLevel = `${Math.max(0, Math.round(pixels / 32))}`;
+    }
+  });
+
+  const renderInlineNode = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent?.replace(/\s+/g, ' ') ?? '';
+    }
+
+    if (!(node instanceof HTMLElement)) {
+      return '';
+    }
+
+    const content = Array.from(node.childNodes).map(renderInlineNode).join('');
+    const style = node.getAttribute('style')?.toLowerCase() ?? '';
+    const isBold = /font-weight:\s*(bold|[6-9]00)/.test(style);
+    const isItalic = /font-style:\s*italic/.test(style);
+    const isMonospace =
+      /font-family:[^;]*(consolas|courier|monaco|menlo)/.test(style) ||
+      /mso-bidi-font-family:[^;]*(courier|consolas)/.test(style);
+    const normalizedContent = content.trim();
+
+    switch (node.tagName.toLowerCase()) {
+      case 'strong':
+      case 'b':
+        return normalizedContent ? `**${normalizedContent}**` : '';
+      case 'em':
+      case 'i':
+        return normalizedContent ? `*${normalizedContent}*` : '';
+      case 'code':
+        return normalizedContent ? `\`${normalizedContent}\`` : '';
+      case 'a': {
+        const href = node.getAttribute('href')?.trim() ?? '';
+        return href ? `[${normalizedContent || href}](${href})` : content;
+      }
+      case 'br':
+        return '\n';
+      default:
+        if (!normalizedContent) {
+          return content;
+        }
+
+        if (isMonospace) {
+          return `\`${normalizedContent}\``;
+        }
+
+        if (isBold && isItalic) {
+          return `***${normalizedContent}***`;
+        }
+
+        if (isBold) {
+          return `**${normalizedContent}**`;
+        }
+
+        if (isItalic) {
+          return `*${normalizedContent}*`;
+        }
+
+        return content;
+    }
+  };
+
+  const renderBlockNode = (node: Node, listDepth = 0): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    }
+
+    if (!(node instanceof HTMLElement)) {
+      return '';
+    }
+
+    const tagName = node.tagName.toLowerCase();
+    const inlineContent = cleanMarkdownSpacing(
+      Array.from(node.childNodes).map(renderInlineNode).join(''),
+    );
+
+    switch (tagName) {
+      case 'h1':
+        return inlineContent ? `# ${inlineContent}` : '';
+      case 'h2':
+        return inlineContent ? `## ${inlineContent}` : '';
+      case 'h3':
+        return inlineContent ? `### ${inlineContent}` : '';
+      case 'h4':
+        return inlineContent ? `#### ${inlineContent}` : '';
+      case 'h5':
+        return inlineContent ? `##### ${inlineContent}` : '';
+      case 'h6':
+        return inlineContent ? `###### ${inlineContent}` : '';
+      case 'p':
+      case 'div':
+        return inlineContent;
+      case 'blockquote':
+        return inlineContent
+          .split('\n')
+          .map((line) => (line.trim() ? `> ${line.trim()}` : '>'))
+          .join('\n');
+      case 'pre': {
+        const codeText = node.textContent?.replace(/\r\n/g, '\n').trimEnd() ?? '';
+        return codeText ? `\`\`\`\n${codeText}\n\`\`\`` : '';
+      }
+      case 'ul':
+      case 'ol':
+        return Array.from(node.children)
+          .filter((child) => child.tagName.toLowerCase() === 'li')
+          .map((child, index) =>
+            renderListItem(
+              child,
+              tagName === 'ol'
+                ? `${Number.parseInt(node.getAttribute('start') ?? '1', 10) + index}.`
+                : '-',
+              listDepth,
+            ),
+          )
+          .join('\n');
+      case 'li':
+        return renderListItem(node, '-', listDepth);
+      case 'table': {
+        const rows = Array.from(node.querySelectorAll('tr'));
+        if (!rows.length) {
+          return '';
+        }
+
+        const tableRows = rows.map((row) =>
+          Array.from(row.children)
+            .map((cell) => cleanMarkdownSpacing(cell.textContent ?? ''))
+            .join(' | '),
+        );
+        const headerCells = rows[0] ? Array.from(rows[0].children).length : 0;
+        const separator = headerCells
+          ? Array.from({ length: headerCells }, () => '---').join(' | ')
+          : '';
+
+        return [`| ${tableRows[0]} |`, separator ? `| ${separator} |` : '', ...tableRows.slice(1).map((row) => `| ${row} |`)]
+          .filter(Boolean)
+          .join('\n');
+      }
+      default: {
+        const childBlocks = Array.from(node.childNodes)
+          .map((child) => renderBlockNode(child, listDepth))
+          .filter(Boolean);
+
+        return childBlocks.length ? childBlocks.join('\n\n') : inlineContent;
+      }
+    }
+  };
+
+  const renderListItem = (
+    element: HTMLElement,
+    marker: string,
+    listDepth: number,
+  ) => {
+    const explicitIndentLevel = Number.parseInt(element.dataset.indentLevel ?? '', 10);
+    const computedDepth =
+      Number.isFinite(explicitIndentLevel) && explicitIndentLevel > listDepth
+        ? explicitIndentLevel
+        : listDepth;
+    const indent = '    '.repeat(computedDepth);
+    const nestedBlocks: string[] = [];
+    const contentParts: string[] = [];
+
+    Array.from(element.childNodes).forEach((child) => {
+      if (
+        child instanceof HTMLElement &&
+        (child.tagName.toLowerCase() === 'ul' || child.tagName.toLowerCase() === 'ol')
+      ) {
+        const nestedContent = renderBlockNode(child, listDepth + 1);
+        if (nestedContent) {
+          nestedBlocks.push(nestedContent);
+        }
+        return;
+      }
+
+      contentParts.push(renderInlineNode(child));
+    });
+
+    const itemLine = `${indent}${marker} ${cleanMarkdownSpacing(contentParts.join(''))}`.trimEnd();
+
+    return [itemLine, ...nestedBlocks].filter(Boolean).join('\n');
+  };
+
+  const bodyContent = Array.from(document.body.childNodes)
+    .map((node) => renderBlockNode(node))
+    .filter(Boolean)
+    .join('\n\n');
+
+  return cleanMarkdownSpacing(normalizePastedMarkdownText(bodyContent));
 };
 
 const normalizeIndentation = (value: string) => value.replace(/\t/g, '    ');
@@ -1044,10 +1741,23 @@ const normalizePdfText = (value: string) =>
     .replace(/^[-*]\s+/gm, '- ')
     .trim();
 
+const normalizePdfRichText = (value: string) =>
+  value
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u200b-\u200d\uFEFF]/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+
+const flattenPdfInlineMarkdown = (value: string) =>
+  parsePdfInlineSegments(value)
+    .map((segment) => segment.text)
+    .join('');
+
 const parsePdfInlineSegments = (value: string): PdfInlineSegment[] => {
   const segments: PdfInlineSegment[] = [];
   const pattern =
-    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/gi;
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(\*\*\*([^*]+)\*\*\*)|(\*\*([^*]+)\*\*)|(`([^`]+)`)|(\*([^*\n]+)\*)|(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/gi;
   let lastIndex = 0;
 
   for (const match of value.matchAll(pattern)) {
@@ -1055,6 +1765,7 @@ const parsePdfInlineSegments = (value: string): PdfInlineSegment[] => {
 
     if (matchIndex > lastIndex) {
       segments.push({
+        fontStyle: 'normal',
         text: value.slice(lastIndex, matchIndex),
         type: 'text',
       });
@@ -1062,14 +1773,40 @@ const parsePdfInlineSegments = (value: string): PdfInlineSegment[] => {
 
     if (match[1] && match[2]) {
       segments.push({
+        fontStyle: 'normal',
         href: match[2],
         text: match[1],
         type: 'link',
       });
-    } else if (match[3]) {
+    } else if (match[4]) {
       segments.push({
-        href: match[3],
-        text: match[3],
+        fontStyle: 'bolditalic',
+        text: match[4],
+        type: 'text',
+      });
+    } else if (match[6]) {
+      segments.push({
+        fontStyle: 'bold',
+        text: match[6],
+        type: 'text',
+      });
+    } else if (match[8]) {
+      segments.push({
+        fontStyle: 'normal',
+        text: match[8],
+        type: 'code',
+      });
+    } else if (match[10]) {
+      segments.push({
+        fontStyle: 'italic',
+        text: match[10],
+        type: 'text',
+      });
+    } else if (match[11]) {
+      segments.push({
+        fontStyle: 'normal',
+        href: match[11],
+        text: match[11],
         type: 'link',
       });
     }
@@ -1079,6 +1816,7 @@ const parsePdfInlineSegments = (value: string): PdfInlineSegment[] => {
 
   if (lastIndex < value.length) {
     segments.push({
+      fontStyle: 'normal',
       text: value.slice(lastIndex),
       type: 'text',
     });
@@ -1088,6 +1826,7 @@ const parsePdfInlineSegments = (value: string): PdfInlineSegment[] => {
     ? segments
     : [
         {
+          fontStyle: 'normal',
           text: value,
           type: 'text',
         },
@@ -1115,14 +1854,14 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
       .replace(/^\|/, '')
       .replace(/\|$/, '')
       .split('|')
-      .map((cell) => normalizePdfText(cell.trim()));
+      .map((cell) => normalizePdfRichText(cell.trim()));
   const parseListLine = (line: string) => {
     const bulletMatch = line.match(/^(\s*)([-*])\s+(.+)$/);
     if (bulletMatch) {
       return {
         indentLevel: getIndentLevel(bulletMatch[1]),
         marker: bulletMatch[2],
-        text: normalizePdfText(bulletMatch[3]),
+        text: normalizePdfRichText(bulletMatch[3]),
       };
     }
 
@@ -1131,7 +1870,7 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
       return {
         indentLevel: getIndentLevel(orderedMatch[1]),
         marker: orderedMatch[2],
-        text: normalizePdfText(orderedMatch[3]),
+        text: normalizePdfRichText(orderedMatch[3]),
       };
     }
 
@@ -1144,7 +1883,7 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
     }
 
     return {
-      content: normalizePdfText(headingMatch[2]),
+      content: normalizePdfRichText(headingMatch[2]),
       depth: headingMatch[1].length,
       type: 'heading' as const,
     };
@@ -1164,7 +1903,7 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
       return;
     }
 
-    const normalizedText = normalizePdfText(textBuffer.join('\n'));
+    const normalizedText = normalizePdfRichText(textBuffer.join('\n'));
     if (normalizedText.trim()) {
       blocks.push({ content: normalizedText, type: 'text' });
     }
@@ -1269,6 +2008,18 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
     }
 
     if (listBuffer.length) {
+      const lastListItem = listBuffer[listBuffer.length - 1];
+      const lastIndentLevel = lastListItem?.indentLevel ?? 0;
+      const currentIndentLevel = getIndentLevel(line);
+
+      if (/^\s+/.test(line) && currentIndentLevel >= lastIndentLevel) {
+        listBuffer[listBuffer.length - 1] = {
+          ...lastListItem,
+          text: `${lastListItem.text} ${normalizePdfRichText(trimmedLine)}`.trim(),
+        };
+        return;
+      }
+
       flushListBuffer();
     }
 
@@ -1543,6 +2294,18 @@ export const App = () => {
   const [formError, setFormError] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
+  const [contentEditorSelection, setContentEditorSelection] =
+    useState<EditorSelectionState>({
+      hasSelection: false,
+      selectedCharacters: 0,
+      selectedLines: 1,
+    });
+  const [templateEditorSelection, setTemplateEditorSelection] =
+    useState<EditorSelectionState>({
+      hasSelection: false,
+      selectedCharacters: 0,
+      selectedLines: 1,
+    });
   const backupInputRef = useRef<HTMLInputElement | null>(null);
   const contentEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const templateContentEditorRef = useRef<HTMLTextAreaElement | null>(null);
@@ -2516,7 +3279,7 @@ export const App = () => {
         options: {
           color?: [number, number, number];
           fontSize?: number;
-          fontStyle?: 'bold' | 'normal';
+          fontStyle?: 'bold' | 'bolditalic' | 'italic' | 'normal';
           lineGap?: number;
           maxWidth?: number;
           x?: number;
@@ -2545,9 +3308,19 @@ export const App = () => {
         });
 
         const measurePieceWidth = (piece: PdfInlineSegment) => {
+          const pieceFont =
+            piece.type === 'code'
+              ? getPdfCodeFont()
+              : getPdfTextFont();
+          const pieceFontStyle =
+            piece.type === 'link'
+              ? 'normal'
+              : piece.type === 'code'
+                ? 'normal'
+                : piece.fontStyle ?? baseFontStyle;
           pdf.setFont(
-            getPdfTextFont(),
-            getPdfFontStyle(piece.type === 'link' ? 'normal' : baseFontStyle),
+            pieceFont,
+            getPdfFontStyle(pieceFontStyle),
           );
           pdf.setFontSize(fontSize);
           return pdf.getTextWidth(piece.text);
@@ -2618,11 +3391,26 @@ export const App = () => {
 
           linePieces.forEach((piece) => {
             const isLink = piece.type === 'link' && piece.href;
-            const pieceColor = isLink ? [37, 99, 235] as [number, number, number] : baseColor;
+            const isCode = piece.type === 'code';
+            const pieceColor = isLink
+              ? [37, 99, 235] as [number, number, number]
+              : isCode
+                ? [30, 41, 59] as [number, number, number]
+                : baseColor;
+            const pieceFont =
+              isCode
+                ? getPdfCodeFont()
+                : getPdfTextFont();
+            const pieceFontStyle =
+              isLink
+                ? 'normal'
+                : isCode
+                  ? 'normal'
+                  : piece.fontStyle ?? baseFontStyle;
 
             pdf.setFont(
-              getPdfTextFont(),
-              getPdfFontStyle(isLink ? 'normal' : baseFontStyle),
+              pieceFont,
+              getPdfFontStyle(pieceFontStyle),
             );
             pdf.setFontSize(fontSize);
             pdf.setTextColor(...pieceColor);
@@ -3043,7 +3831,15 @@ export const App = () => {
           const textWidth = Math.max(24, pageWidth - margin - textX);
           const segments = parsePdfInlineSegments(item.text);
           const measurePieceWidth = (piece: PdfInlineSegment) => {
-            pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
+            const pieceFont =
+              piece.type === 'code'
+                ? getPdfCodeFont()
+                : getPdfTextFont();
+            const pieceFontStyle =
+              piece.type === 'link' || piece.type === 'code'
+                ? 'normal'
+                : piece.fontStyle;
+            pdf.setFont(pieceFont, getPdfFontStyle(pieceFontStyle));
             pdf.setFontSize(10);
             return pdf.getTextWidth(piece.text);
           };
@@ -3129,10 +3925,23 @@ export const App = () => {
 
             linePieces.forEach((piece) => {
               const isLink = piece.type === 'link' && piece.href;
-              const pieceColor = isLink ? [37, 99, 235] as [number, number, number] : [15, 23, 42] as [number, number, number];
+              const isCode = piece.type === 'code';
+              const pieceColor = isLink
+                ? [37, 99, 235] as [number, number, number]
+                : isCode
+                  ? [30, 41, 59] as [number, number, number]
+                  : [15, 23, 42] as [number, number, number];
               const pieceWidth = measurePieceWidth(piece);
+              const pieceFont =
+                isCode
+                  ? getPdfCodeFont()
+                  : getPdfTextFont();
+              const pieceFontStyle =
+                isLink || isCode
+                  ? 'normal'
+                  : piece.fontStyle;
 
-              pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
+              pdf.setFont(pieceFont, getPdfFontStyle(pieceFontStyle));
               pdf.setFontSize(10);
               pdf.setTextColor(...pieceColor);
               pdf.text(piece.text, cursorX, lineY);
@@ -3173,7 +3982,7 @@ export const App = () => {
           const wrappedCells = normalizedCells.map(
             (cell) =>
               pdf.splitTextToSize(
-                cell || ' ',
+                flattenPdfInlineMarkdown(cell) || ' ',
                 columnWidth - cellPaddingX * 2,
               ) as string[],
           );
@@ -3252,7 +4061,7 @@ export const App = () => {
         const matches = Array.from(line.matchAll(markdownImagePattern));
 
         if (!matches.length) {
-          writeInlineText(normalizePdfText(line));
+          writeInlineText(normalizePdfRichText(line));
           return;
         }
 
@@ -3264,7 +4073,7 @@ export const App = () => {
           const beforeText = line.slice(lastIndex, matchIndex).trim();
 
           if (beforeText) {
-            writeInlineText(normalizePdfText(beforeText));
+            writeInlineText(normalizePdfRichText(beforeText));
           }
 
           await writeImageToPdf(imageSource);
@@ -3273,7 +4082,7 @@ export const App = () => {
 
         const afterText = line.slice(lastIndex).trim();
         if (afterText) {
-          writeInlineText(normalizePdfText(afterText));
+          writeInlineText(normalizePdfRichText(afterText));
         }
       };
 
@@ -3375,7 +4184,7 @@ export const App = () => {
               const matches = Array.from(line.matchAll(markdownImagePattern));
 
               if (!matches.length) {
-                writeInlineText(normalizePdfText(line), {
+                writeInlineText(normalizePdfRichText(line), {
                   maxWidth: scopedWidth,
                   x: originalMargin + indentWidth,
                 });
@@ -3390,7 +4199,7 @@ export const App = () => {
                 const beforeText = line.slice(lastIndex, matchIndex).trim();
 
                 if (beforeText) {
-                  writeInlineText(normalizePdfText(beforeText), {
+                  writeInlineText(normalizePdfRichText(beforeText), {
                     maxWidth: scopedWidth,
                     x: originalMargin + indentWidth,
                   });
@@ -3402,7 +4211,7 @@ export const App = () => {
 
               const afterText = line.slice(lastIndex).trim();
               if (afterText) {
-                writeInlineText(normalizePdfText(afterText), {
+                writeInlineText(normalizePdfRichText(afterText), {
                   maxWidth: scopedWidth,
                   x: originalMargin + indentWidth,
                 });
@@ -4361,6 +5170,34 @@ export const App = () => {
     );
 
     if (!imageFile) {
+      const plainText = event.clipboardData.getData('text/plain');
+      const htmlText = event.clipboardData.getData('text/html');
+
+      if ((!plainText && !htmlText) || !textarea) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const nextScrollTop = textarea.scrollTop;
+      const normalizedText = htmlText
+        ? convertHtmlClipboardToMarkdown(htmlText) || normalizePastedMarkdownText(plainText)
+        : normalizePastedMarkdownText(plainText);
+      const nextCursorPosition = start + normalizedText.length;
+
+      setEditorValueAndNormalizeLists(
+        textarea,
+        currentValue,
+        setValue,
+        () => ({
+          nextValue: `${currentValue.slice(0, start)}${normalizedText}${currentValue.slice(end)}`,
+          selectionStart: nextCursorPosition,
+          selectionEnd: nextCursorPosition,
+        }),
+        nextScrollTop,
+      );
       return;
     }
 
@@ -4407,6 +5244,40 @@ export const App = () => {
     } finally {
       setIsUploadingImage(false);
     }
+  };
+  const handleMarkdownEditorChange = (
+    event: ReactChangeEvent<HTMLTextAreaElement>,
+    textarea: HTMLTextAreaElement | null,
+    setValue: (value: string) => void,
+    setSelectionState: (nextState: EditorSelectionState) => void,
+  ) => {
+    const nextRawValue = event.target.value;
+    const normalizedValue = renumberOrderedMarkdownLists(nextRawValue);
+
+    if (!textarea || normalizedValue === nextRawValue) {
+      setValue(normalizedValue);
+      requestAnimationFrame(() => {
+        setSelectionState(getEditorSelectionState(textarea));
+      });
+      return;
+    }
+
+    const selectionStart = textarea.selectionStart;
+    const selectionEnd = textarea.selectionEnd;
+    const selectionDelta = normalizedValue.length - nextRawValue.length;
+
+    updateTextareaValueWithSelection(
+      textarea,
+      setValue,
+      normalizedValue,
+      selectionStart,
+      Math.max(selectionStart, selectionEnd + selectionDelta),
+      textarea.scrollTop,
+    );
+
+    requestAnimationFrame(() => {
+      setSelectionState(getEditorSelectionState(textarea));
+    });
   };
 
   const activeEntryCategory = entryForm.categoria.trim()
@@ -4715,6 +5586,16 @@ export const App = () => {
     setActiveView('home');
     setSearchTerm(value);
   };
+  const syncEditorSelectionState = (
+    textarea: HTMLTextAreaElement | null,
+    setSelectionState: (nextState: EditorSelectionState) => void,
+  ) => {
+    setSelectionState(getEditorSelectionState(textarea));
+  };
+  const buildToolbarContextLabel = (selectionState: EditorSelectionState) =>
+    selectionState.hasSelection
+      ? `Seleccion activa: ${selectionState.selectedLines} ${selectionState.selectedLines === 1 ? 'linea' : 'lineas'} y ${selectionState.selectedCharacters} ${selectionState.selectedCharacters === 1 ? 'caracter' : 'caracteres'}. Los botones de estructura se aplican al bloque seleccionado.`
+      : 'Sin seleccion: los botones de estructura actuan sobre la linea actual y los de formato insertan o envuelven contenido en el cursor.';
   // Recordatorio: Si se implementa una lÃ³gica Java para la persistencia de estos cambios o el procesado de comandos en el servidor, es obligatorio utilizar try-catch-resources para el cierre seguro de flujos de datos y configuraciÃ³n.
   const toolbarContainerStyle = {
     ...entryThemeVars,
@@ -4725,141 +5606,185 @@ export const App = () => {
     textareaRef: React.RefObject<HTMLTextAreaElement | null>,
     currentValue: string,
     setValue: (value: string) => void,
-  ): ToolbarAction[] => [
-    {
-      buttonLabel: 'Negrita',
-      icon: 'B',
-      label: '**Negrita**',
-      onClick: () =>
-        updateContentSelection(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          '**',
-          '**',
-          'texto en negrita',
-        ),
-    },
-    {
-      buttonLabel: 'Codigo',
-      icon: '<>',
-      label: '> Codigo',
-      onClick: () =>
-        updateContentSelection(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          '```java\n',
-          '\n```',
-          '// codigo aqui',
-        ),
-    },
-    {
-      buttonLabel: 'Imagen',
-      icon: '[]',
-      label: '![Imagen]()',
-      onClick: () =>
-        updateContentSelection(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          '![descripcion](',
-          ')',
-          '/images/nombre.png',
-        ),
-    },
-    {
-      buttonLabel: 'Enlace',
-      icon: 'lnk',
-      label: 'Enlace',
-      onClick: () =>
-        updateContentSelection(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          '[',
-          '](https://)',
-          'texto del enlace',
-        ),
-    },
-    {
-      buttonLabel: 'Lista',
-      icon: '*',
-      label: 'Lista',
-      onClick: () =>
-        prefixSelectedLines(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          () => '- ',
-          'Elemento de lista',
-        ),
-    },
-    {
-      buttonLabel: 'Numerada',
-      icon: '1.',
-      label: 'Numerada',
-      onClick: () =>
-        prefixSelectedLines(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          (lineIndex) => `${lineIndex + 1}. `,
-          'Primer elemento',
-        ),
-    },
-    {
-      buttonLabel: 'Tab',
-      icon: '>>',
-      label: 'Tab',
-      onClick: () =>
-        indentSelectedLines(
-          textareaRef.current,
-          currentValue,
-          setValue,
-        ),
-    },
-    {
-      buttonLabel: 'Salto',
-      icon: '//',
-      label: 'Salto',
-      onClick: () =>
-        insertTextAtCursor(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          '\n\n',
-        ),
-    },
-    {
-      buttonLabel: 'Seccion',
-      icon: 'H2',
-      label: 'Seccion',
-      onClick: () =>
-        updateContentSelection(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          '## ',
-          '',
-          'Nueva sección',
-        ),
-    },
-    {
-      buttonLabel: 'Tabla',
-      icon: '::',
-      label: 'Tabla',
-      onClick: () =>
-        updateContentSelection(
-          textareaRef.current,
-          currentValue,
-          setValue,
-          '',
-          '',
-          '| Columna 1 | Columna 2 |\n| --- | --- |\n| Valor 1 | Valor 2 |',
-        ),
-    },
-  ];
+    syncSelectionState: () => void,
+  ): ToolbarAction[] => {
+    const runToolbarAction = (action: () => void) => () => {
+      action();
+      requestAnimationFrame(() => {
+        syncSelectionState();
+      });
+    };
+
+    return [
+      {
+        buttonLabel: 'Negrita',
+        icon: 'B',
+        label: '**Negrita**',
+        shortcut: 'Ctrl+B',
+        onClick: runToolbarAction(() =>
+          updateContentSelection(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            '**',
+            '**',
+          )),
+      },
+      {
+        buttonLabel: 'Codigo',
+        icon: '<>',
+        label: '> Codigo',
+        onClick: runToolbarAction(() =>
+          updateContentSelection(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            '```java\n',
+            '\n```',
+          )),
+      },
+      {
+        buttonLabel: 'Imagen',
+        icon: '[]',
+        label: '![Imagen]()',
+        onClick: runToolbarAction(() =>
+          updateContentSelection(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            '![',
+            ']()',
+          )),
+      },
+      {
+        buttonLabel: 'Enlace',
+        icon: 'lnk',
+        label: 'Enlace',
+        shortcut: 'Ctrl+K',
+        onClick: runToolbarAction(() =>
+          updateContentSelection(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            '[',
+            ']()',
+          )),
+      },
+      {
+        buttonLabel: 'Lista',
+        icon: '*',
+        label: 'Lista',
+        shortcut: 'Ctrl+Shift+8',
+        onClick: runToolbarAction(() =>
+          prefixCurrentOrSelectedLines(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            () => '- ',
+          )),
+      },
+      {
+        buttonLabel: 'Numerada',
+        icon: '1.',
+        label: 'Numerada',
+        shortcut: 'Ctrl+Shift+7',
+        onClick: runToolbarAction(() =>
+          prefixCurrentOrSelectedLines(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            (lineIndex) => `${lineIndex + 1}. `,
+          )),
+      },
+      {
+        buttonLabel: 'Tab',
+        icon: '>>',
+        label: 'Tab',
+        onClick: runToolbarAction(() =>
+          indentSelectedLines(
+            textareaRef.current,
+            currentValue,
+            setValue,
+          )),
+      },
+      {
+        buttonLabel: 'Salto',
+        icon: '//',
+        label: 'Salto',
+        onClick: runToolbarAction(() =>
+          insertTextAtCursor(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            '\n\n',
+          )),
+      },
+      {
+        buttonLabel: 'H1',
+        icon: 'H1',
+        label: 'Título 1',
+        shortcut: 'Ctrl+Alt+1',
+        onClick: runToolbarAction(() =>
+          prefixCurrentOrSelectedLines(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            () => '# ',
+          )),
+      },
+      {
+        buttonLabel: 'H2',
+        icon: 'H2',
+        label: 'Título 2',
+        shortcut: 'Ctrl+Alt+2',
+        onClick: runToolbarAction(() =>
+          prefixCurrentOrSelectedLines(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            () => '## ',
+          )),
+      },
+      {
+        buttonLabel: 'H3',
+        icon: 'H3',
+        label: 'Título 3',
+        shortcut: 'Ctrl+Alt+3',
+        onClick: runToolbarAction(() =>
+          prefixCurrentOrSelectedLines(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            () => '### ',
+          )),
+      },
+      {
+        buttonLabel: 'Seccion',
+        icon: '§',
+        label: 'Seccion',
+        onClick: runToolbarAction(() =>
+          prefixCurrentOrSelectedLines(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            () => '## ',
+          )),
+      },
+      {
+        buttonLabel: 'Tabla',
+        icon: '::',
+        label: 'Tabla',
+        onClick: runToolbarAction(() =>
+          insertSnippetAtCursor(
+            textareaRef.current,
+            currentValue,
+            setValue,
+            '|  |  |\n| --- | --- |\n|  |  |',
+            2,
+          )),
+      },
+    ];
+  };
   const handleToolbarActionClick = (actionIndex: number, action: ToolbarAction) => {
     action.onClick();
     const actionKey = `${actionIndex}`;
@@ -4877,6 +5802,7 @@ export const App = () => {
     entryForm.contenido,
     (nextValue) =>
       setEntryForm((current) => ({ ...current, contenido: nextValue })),
+    () => syncEditorSelectionState(contentEditorRef.current, setContentEditorSelection),
   );
   const templateToolbarActions = createToolbarActions(
     templateContentEditorRef,
@@ -4884,6 +5810,11 @@ export const App = () => {
     (nextValue) =>
       setTemplateForm((current) =>
         current ? { ...current, contenido: nextValue } : current,
+      ),
+    () =>
+      syncEditorSelectionState(
+        templateContentEditorRef.current,
+        setTemplateEditorSelection,
       ),
   );
   const sidebarContent = (
@@ -6703,7 +7634,11 @@ export const App = () => {
                             type="button"
                             onClick={() => handleToolbarActionClick(index, action)}
                             aria-label={`Insertar ${action.buttonLabel}`}
-                            title={`Insertar ${action.buttonLabel}`}
+                            title={
+                              action.shortcut
+                                ? `${action.buttonLabel} (${action.shortcut})`
+                                : `Insertar ${action.buttonLabel}`
+                            }
                             className={`inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-all duration-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 ${
                               isActive
                                 ? 'scale-[1.02] shadow-sm'
@@ -6730,6 +7665,9 @@ export const App = () => {
                           );
                         })}
                       </div>
+                      <p className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                        {buildToolbarContextLabel(contentEditorSelection)}
+                      </p>
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-3">
@@ -6763,18 +7701,44 @@ export const App = () => {
                             );
                           }}
                           onChange={(event) =>
-                            setEntryForm((current) => ({
-                              ...current,
-                              contenido: event.target.value,
-                            }))
+                            handleMarkdownEditorChange(
+                              event,
+                              contentEditorRef.current,
+                              (nextValue) =>
+                                setEntryForm((current) => ({
+                                  ...current,
+                                  contenido: nextValue,
+                                })),
+                              setContentEditorSelection,
+                            )
                           }
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Tab') {
-                              return;
-                            }
-
-                            event.preventDefault();
-                            indentSelectedLines(
+                          onFocus={() =>
+                            syncEditorSelectionState(
+                              contentEditorRef.current,
+                              setContentEditorSelection,
+                            )
+                          }
+                          onSelect={() =>
+                            syncEditorSelectionState(
+                              contentEditorRef.current,
+                              setContentEditorSelection,
+                            )
+                          }
+                          onKeyUp={() =>
+                            syncEditorSelectionState(
+                              contentEditorRef.current,
+                              setContentEditorSelection,
+                            )
+                          }
+                          onMouseUp={() =>
+                            syncEditorSelectionState(
+                              contentEditorRef.current,
+                              setContentEditorSelection,
+                            )
+                          }
+                          onKeyDown={(event) =>
+                            handleMarkdownEditorKeyDown(
+                              event,
                               contentEditorRef.current,
                               entryForm.contenido,
                               (nextValue) =>
@@ -6782,8 +7746,8 @@ export const App = () => {
                                   ...current,
                                   contenido: nextValue,
                                 })),
-                            );
-                          }}
+                            )
+                          }
                           className={`themed-field min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white ${isUploadingImage ? 'cursor-wait' : ''}`}
                           placeholder="# Título de sección&#10;&#10;Escribe aquí tu documentación en Markdown..."
                         />
@@ -7267,7 +8231,11 @@ export const App = () => {
                               type="button"
                               onClick={() => handleToolbarActionClick(index, action)}
                               aria-label={`Insertar ${action.buttonLabel}`}
-                              title={`Insertar ${action.buttonLabel}`}
+                              title={
+                                action.shortcut
+                                  ? `${action.buttonLabel} (${action.shortcut})`
+                                  : `Insertar ${action.buttonLabel}`
+                              }
                               className={`inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-all duration-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 ${
                                 isActive ? 'scale-[1.02] shadow-sm' : ''
                               }`}
@@ -7292,6 +8260,9 @@ export const App = () => {
                           );
                         })}
                       </div>
+                      <p className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                        {buildToolbarContextLabel(templateEditorSelection)}
+                      </p>
 
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-3">
@@ -7327,17 +8298,45 @@ export const App = () => {
                             );
                           }}
                           onChange={(event) =>
-                            setTemplateForm((current) =>
-                              current ? { ...current, contenido: event.target.value } : current,
+                            handleMarkdownEditorChange(
+                              event,
+                              templateContentEditorRef.current,
+                              (nextValue) =>
+                                setTemplateForm((current) =>
+                                  current
+                                    ? { ...current, contenido: nextValue }
+                                    : current,
+                                ),
+                              setTemplateEditorSelection,
                             )
                           }
-                          onKeyDown={(event) => {
-                            if (event.key !== 'Tab') {
-                              return;
-                            }
-
-                            event.preventDefault();
-                            indentSelectedLines(
+                          onFocus={() =>
+                            syncEditorSelectionState(
+                              templateContentEditorRef.current,
+                              setTemplateEditorSelection,
+                            )
+                          }
+                          onSelect={() =>
+                            syncEditorSelectionState(
+                              templateContentEditorRef.current,
+                              setTemplateEditorSelection,
+                            )
+                          }
+                          onKeyUp={() =>
+                            syncEditorSelectionState(
+                              templateContentEditorRef.current,
+                              setTemplateEditorSelection,
+                            )
+                          }
+                          onMouseUp={() =>
+                            syncEditorSelectionState(
+                              templateContentEditorRef.current,
+                              setTemplateEditorSelection,
+                            )
+                          }
+                          onKeyDown={(event) =>
+                            handleMarkdownEditorKeyDown(
+                              event,
                               templateContentEditorRef.current,
                               templateForm?.contenido ?? '',
                               (nextValue) =>
@@ -7346,8 +8345,8 @@ export const App = () => {
                                     ? { ...current, contenido: nextValue }
                                     : current,
                                 ),
-                            );
-                          }}
+                            )
+                          }
                           rows={14}
                           className={`themed-field min-h-[280px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white ${isUploadingImage ? 'cursor-wait' : ''}`}
                           placeholder="# Título de sección&#10;&#10;Escribe aquí tu documentación en Markdown..."
