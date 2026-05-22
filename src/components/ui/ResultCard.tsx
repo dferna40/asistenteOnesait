@@ -319,7 +319,7 @@ export function ResultCard({
         }
       }}
       aria-label={onEditEntry ? `Editar ficha ${entry.titulo}` : undefined}
-      className={`section-gradient-card neon-card w-full border border-slate-200 shadow-sm transition-all duration-200 ${
+      className={`section-gradient-card neon-card min-w-0 max-w-full overflow-hidden border border-slate-200 shadow-sm transition-all duration-200 ${
         onEditEntry ? 'cursor-pointer hover:border-sky-300 dark:hover:border-sky-500/40' : ''
       } ${
         compact
@@ -335,7 +335,7 @@ export function ResultCard({
         </div>
       ) : null}
 
-      <div className={`flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between ${compact ? 'gap-2.5' : 'gap-3'}`}>
+      <div className={`min-w-0 max-w-full flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between ${compact ? 'gap-2.5' : 'gap-3'}`}>
         <div className={`min-w-0 flex-1 ${compact ? 'space-y-1.5' : 'space-y-2'}`}>
           <span
             className={`section-gradient-pill inline-flex rounded-full border font-semibold uppercase ${categoryStyle.badge} ${
@@ -352,13 +352,13 @@ export function ResultCard({
             {entry.titulo}
           </h3>
           {entry.tags.length ? (
-            <div className={`flex flex-wrap ${compact ? 'gap-1.5' : 'gap-2'}`}>
+            <div className={`min-w-0 max-w-full flex flex-wrap ${compact ? 'gap-1.5' : 'gap-2'}`}>
               {(compact ? entry.tags.slice(0, 4) : entry.tags).map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => onTagClick?.(tag)}
-                  className={`inline-flex max-w-full break-all rounded-full border font-medium lowercase transition-colors ${
+                  className={`inline-flex min-w-0 max-w-full break-words whitespace-normal [overflow-wrap:anywhere] rounded-full border font-medium lowercase transition-colors ${
                     compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-[11px]'
                   } ${
                     activeTags.includes(tag.toLowerCase())
@@ -379,7 +379,7 @@ export function ResultCard({
           ) : null}
         </div>
 
-        <div className="flex max-w-full flex-wrap items-center gap-2 self-start sm:justify-end">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 self-start sm:justify-end">
           {onTogglePin ? (
             <button
               type="button"
@@ -529,7 +529,7 @@ export function ResultCard({
             </svg>
           </button>
 
-          <span className={`soft-subpanel max-w-full break-all rounded-lg border border-slate-200 font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 ${
+          <span className={`soft-subpanel min-w-0 max-w-full break-words whitespace-normal [overflow-wrap:anywhere] rounded-lg border border-slate-200 font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 ${
             compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'
           }`}>
             {entry.id}
@@ -538,13 +538,13 @@ export function ResultCard({
       </div>
 
       {isCollapsed ? (
-        <div className={`soft-subpanel rounded-xl border border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-300 ${
+        <div className={`soft-subpanel min-w-0 max-w-full rounded-xl border border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-300 ${
           compact ? 'mt-3 px-3 py-2.5 text-[13px]' : 'mt-4 px-4 py-3 text-sm'
         }`}>
-          <div className={`overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/30 ${
+          <div className={`min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/30 ${
             compact ? 'max-h-24 p-2' : 'max-h-28 p-2.5'
           }`}>
-            <div className="pointer-events-none text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <div className="pointer-events-none min-w-0 max-w-full overflow-hidden text-sm leading-6 text-slate-600 dark:text-slate-300">
               <MarkdownRenderer content={entry.contenido} />
             </div>
           </div>
@@ -560,7 +560,7 @@ export function ResultCard({
       ) : null}
       {!isCollapsed ? (
         <>
-          <div className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-200">
+          <div className="mt-4 min-w-0 max-w-full overflow-hidden text-sm leading-6 text-slate-600 dark:text-slate-200">
             <MarkdownRenderer content={entry.contenido} />
           </div>
 

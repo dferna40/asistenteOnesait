@@ -272,13 +272,16 @@ const createMarkdownComponents = (
     />
   ),
   li: (props: ComponentProps<'li'>) => (
-    <li {...props} className="break-words whitespace-pre-wrap [overflow-wrap:anywhere] leading-7 text-slate-700 dark:text-slate-200 marker:text-slate-500 dark:marker:text-slate-300" />
+    <li
+      {...props}
+      className="break-words whitespace-pre-wrap [overflow-wrap:anywhere] leading-7 text-slate-700 marker:text-slate-500 [&>p]:my-0 [&>p]:inline [&>p]:whitespace-pre-wrap [&>ul]:mt-2 [&>ol]:mt-2 dark:text-slate-200 dark:marker:text-slate-300"
+    />
   ),
   ol: (props: ComponentProps<'ol'>) => (
-    <ol {...props} className="my-4 list-decimal space-y-2 pl-5" />
+    <ol {...props} className="my-4 list-decimal space-y-2 pl-5 [&_ol]:mt-2 [&_ul]:mt-2" />
   ),
   p: (props: ComponentProps<'p'>) => (
-    <p {...props} className="my-3 break-words whitespace-pre-wrap [overflow-wrap:anywhere] leading-7 text-slate-700 dark:text-slate-200" />
+    <p {...props} className="my-3 break-words whitespace-pre-wrap [overflow-wrap:anywhere] leading-7 text-slate-700 first:mt-0 last:mb-0 dark:text-slate-200" />
   ),
   strong: (props: ComponentProps<'strong'>) => (
     <strong {...props} className="font-semibold text-slate-900 dark:text-white" />
@@ -304,7 +307,7 @@ const createMarkdownComponents = (
     />
   ),
   ul: (props: ComponentProps<'ul'>) => (
-    <ul {...props} className="my-4 list-disc space-y-2 pl-5" />
+    <ul {...props} className="my-4 list-disc space-y-2 pl-5 [&_ol]:mt-2 [&_ul]:mt-2" />
   ),
 });
 

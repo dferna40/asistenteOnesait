@@ -206,7 +206,7 @@ export function MainLayout({
             )}
           </header>
 
-          <main className="flex-1 p-4 sm:p-6">{children}</main>
+          <main className="min-w-0 overflow-x-hidden flex-1 p-4 sm:p-6">{children}</main>
         </div>
       </div>
     </div>
