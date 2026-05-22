@@ -1038,51 +1038,6 @@ const getEditorSelectionState = (
   };
 };
 
-const prefixSelectedLines = (
-  textarea: HTMLTextAreaElement | null,
-  currentValue: string,
-  setValue: (nextValue: string) => void,
-  prefixBuilder: (lineIndex: number) => string,
-  placeholder: string,
-) => {
-  if (!textarea) {
-    setValue(`${currentValue}${prefixBuilder(0)}${placeholder}`);
-    return;
-  }
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  const selectedText = currentValue.slice(start, end);
-
-  if (!selectedText) {
-    const insertedText = `${prefixBuilder(0)}${placeholder}`;
-    const nextValue = `${currentValue.slice(0, start)}${insertedText}${currentValue.slice(end)}`;
-    const nextCursorPosition = start + insertedText.length;
-
-    updateTextareaValueWithSelection(
-      textarea,
-      setValue,
-      nextValue,
-      nextCursorPosition,
-      nextCursorPosition,
-    );
-    return;
-  }
-
-  const lines = selectedText.split('\n');
-  const prefixedText = lines
-    .map((line, lineIndex) => `${prefixBuilder(lineIndex)}${line}`)
-    .join('\n');
-  const nextValue = `${currentValue.slice(0, start)}${prefixedText}${currentValue.slice(end)}`;
-  updateTextareaValueWithSelection(
-    textarea,
-    setValue,
-    nextValue,
-    start,
-    start + prefixedText.length,
-  );
-};
-
 const prefixCurrentOrSelectedLines = (
   textarea: HTMLTextAreaElement | null,
   currentValue: string,
@@ -1640,7 +1595,7 @@ const convertHtmlClipboardToMarkdown = (html: string) => {
           .filter((child) => child.tagName.toLowerCase() === 'li')
           .map((child, index) =>
             renderListItem(
-              child,
+              child as HTMLElement,
               tagName === 'ol'
                 ? `${Number.parseInt(node.getAttribute('start') ?? '1', 10) + index}.`
                 : '-',
@@ -1732,14 +1687,6 @@ const getIndentLevel = (value: string) => {
 };
 
 const stripLeadingWhitespace = (value: string) => value.replace(/^\s+/, '');
-
-const normalizePdfText = (value: string) =>
-  value
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/^[-*]\s+/gm, '- ')
-    .trim();
 
 const normalizePdfRichText = (value: string) =>
   value
@@ -3331,7 +3278,11 @@ export const App = () => {
         let currentWidth = 0;
 
         const pushCurrentLine = () => {
-          wrappedLines.push(currentLine.length ? currentLine : [{ text: ' ', type: 'text' }]);
+          wrappedLines.push(
+            currentLine.length
+              ? currentLine
+              : [{ fontStyle: 'normal', text: ' ', type: 'text' }],
+          );
           currentLine = [];
           currentWidth = 0;
         };
@@ -3859,7 +3810,11 @@ export const App = () => {
           let currentWidth = 0;
 
           const pushLine = () => {
-            lines.push(currentLine.length ? currentLine : [{ text: ' ', type: 'text' }]);
+            lines.push(
+              currentLine.length
+                ? currentLine
+                : [{ fontStyle: 'normal', text: ' ', type: 'text' }],
+            );
             currentLine = [];
             currentWidth = 0;
           };
