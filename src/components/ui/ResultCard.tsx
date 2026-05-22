@@ -335,10 +335,10 @@ export function ResultCard({
         </div>
       ) : null}
 
-      <div className={`min-w-0 max-w-full flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between ${compact ? 'gap-2.5' : 'gap-3'}`}>
-        <div className={`min-w-0 flex-1 ${compact ? 'space-y-1.5' : 'space-y-2'}`}>
+      <div className={`min-w-0 max-w-full ${compact ? 'space-y-2.5' : 'space-y-3'}`}>
+        <div className="flex min-w-0 max-w-full flex-wrap items-start justify-between gap-2">
           <span
-            className={`section-gradient-pill inline-flex rounded-full border font-semibold uppercase ${categoryStyle.badge} ${
+            className={`section-gradient-pill inline-flex max-w-full rounded-full border font-semibold uppercase ${categoryStyle.badge} ${
               compact
                 ? 'px-2.5 py-0.5 text-[10px] tracking-[0.14em]'
                 : 'px-3 py-1 text-xs tracking-[0.16em]'
@@ -346,6 +346,164 @@ export function ResultCard({
           >
             {entry.categoria}
           </span>
+          <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2 self-start">
+            {onTogglePin ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onTogglePin(entry.id);
+                }}
+                aria-label={
+                  entry.isPinned
+                    ? `Desanclar ficha ${entry.titulo}`
+                    : `Anclar ficha ${entry.titulo}`
+                }
+                title={
+                  entry.isPinned
+                    ? `Desanclar ficha ${entry.titulo}`
+                    : `Anclar ficha ${entry.titulo}`
+                }
+                className={`${actionButtonBaseClass} ${
+                  entry.isPinned
+                    ? 'text-amber-400 hover:border-amber-300 hover:text-amber-500 dark:text-amber-400 dark:hover:border-amber-400/50 dark:hover:text-amber-300'
+                    : 'text-slate-400 hover:border-amber-300 hover:text-amber-500 dark:text-slate-400 dark:hover:border-amber-400/50 dark:hover:text-amber-300'
+                }`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill={entry.isPinned ? 'currentColor' : 'none'}
+                  className={actionIconClass}
+                >
+                  <path
+                    d="m10 2.7 2.2 4.5 5 .7-3.6 3.5.8 5-4.4-2.4-4.4 2.4.8-5L2.8 7.9l5-.7L10 2.7Z"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.4"
+                  />
+                </svg>
+              </button>
+            ) : null}
+
+            {onExportPdf ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onExportPdf(entry);
+                }}
+                aria-label={`Exportar PDF de ${entry.titulo}`}
+                title={`Exportar PDF de ${entry.titulo}`}
+                className={`${actionButtonBaseClass} text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  className={`${actionIconClass} ${pdfIsGenerating ? 'animate-pulse' : ''}`}
+                >
+                  <path
+                    d="M6 2.5h5.5L16 7v9.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M11.5 2.5V7H16"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M7.1 12.1h5.8M7.1 14.6h4.6"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            ) : null}
+
+            {onDeleteEntry ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDeleteEntry(entry.id);
+                }}
+                aria-label={`Mover a papelera ${entry.titulo}`}
+                title={`Mover a papelera ${entry.titulo}`}
+                className={`${actionButtonBaseClass} text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  className="h-5 w-5"
+                >
+                  <path
+                    d="M4.5 6h11M8 3.5h4m-6 2.5.6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-9"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsCollapsed((current) => !current);
+              }}
+              aria-label={
+                isCollapsed
+                  ? `Expandir ficha ${entry.titulo}`
+                  : `Colapsar ficha ${entry.titulo}`
+              }
+              title={
+                isCollapsed
+                  ? `Expandir ficha ${entry.titulo}`
+                  : `Colapsar ficha ${entry.titulo}`
+              }
+              className={`${actionButtonBaseClass} text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100`}
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                className={actionIconClass}
+              >
+                {isCollapsed ? (
+                  <path
+                    d="M5 10h10M10 5v10"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                ) : (
+                  <path
+                    d="M5 10h10"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+            </button>
+
+            <span className={`soft-subpanel min-w-0 max-w-full break-words whitespace-normal [overflow-wrap:anywhere] rounded-lg border border-slate-200 font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 ${
+              compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'
+            }`}>
+              {entry.id}
+            </span>
+          </div>
+        </div>
+        <div className={`min-w-0 max-w-full ${compact ? 'space-y-1.5' : 'space-y-2'}`}>
           <h3 className={`break-words [overflow-wrap:anywhere] font-semibold text-slate-900 dark:text-slate-100 ${
             compact ? 'text-base sm:text-lg leading-6' : 'text-lg sm:text-xl'
           }`}>
@@ -377,163 +535,6 @@ export function ResultCard({
               ) : null}
             </div>
           ) : null}
-        </div>
-
-        <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2 self-start sm:justify-end">
-          {onTogglePin ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onTogglePin(entry.id);
-              }}
-              aria-label={
-                entry.isPinned
-                  ? `Desanclar ficha ${entry.titulo}`
-                  : `Anclar ficha ${entry.titulo}`
-              }
-              title={
-                entry.isPinned
-                  ? `Desanclar ficha ${entry.titulo}`
-                  : `Anclar ficha ${entry.titulo}`
-              }
-              className={`${actionButtonBaseClass} ${
-                entry.isPinned
-                  ? 'text-amber-400 hover:border-amber-300 hover:text-amber-500 dark:text-amber-400 dark:hover:border-amber-400/50 dark:hover:text-amber-300'
-                  : 'text-slate-400 hover:border-amber-300 hover:text-amber-500 dark:text-slate-400 dark:hover:border-amber-400/50 dark:hover:text-amber-300'
-              }`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill={entry.isPinned ? 'currentColor' : 'none'}
-                className={actionIconClass}
-              >
-                <path
-                  d="m10 2.7 2.2 4.5 5 .7-3.6 3.5.8 5-4.4-2.4-4.4 2.4.8-5L2.8 7.9l5-.7L10 2.7Z"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.4"
-                />
-              </svg>
-            </button>
-          ) : null}
-
-          {onExportPdf ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onExportPdf(entry);
-              }}
-              aria-label={`Exportar PDF de ${entry.titulo}`}
-              title={`Exportar PDF de ${entry.titulo}`}
-              className={`${actionButtonBaseClass} text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                className={`${actionIconClass} ${pdfIsGenerating ? 'animate-pulse' : ''}`}
-              >
-                <path
-                  d="M6 2.5h5.5L16 7v9.5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-13a1 1 0 0 1 1-1Z"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M11.5 2.5V7H16"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M7.1 12.1h5.8M7.1 14.6h4.6"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          ) : null}
-
-          {onDeleteEntry ? (
-            <button
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDeleteEntry(entry.id);
-              }}
-              aria-label={`Mover a papelera ${entry.titulo}`}
-              title={`Mover a papelera ${entry.titulo}`}
-              className={`${actionButtonBaseClass} text-red-500 hover:border-red-300 hover:text-red-600 dark:text-red-400 dark:hover:border-red-500/50 dark:hover:text-red-300`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                className="h-5 w-5"
-              >
-                <path
-                  d="M4.5 6h11M8 3.5h4m-6 2.5.6 9a1 1 0 0 0 1 .9h4.8a1 1 0 0 0 1-.9l.6-9"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </button>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setIsCollapsed((current) => !current);
-            }}
-            aria-label={
-              isCollapsed
-                ? `Expandir ficha ${entry.titulo}`
-                : `Colapsar ficha ${entry.titulo}`
-            }
-            title={
-              isCollapsed
-                ? `Expandir ficha ${entry.titulo}`
-                : `Colapsar ficha ${entry.titulo}`
-            }
-            className={`${actionButtonBaseClass} text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:text-slate-100`}
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              fill="none"
-              className={actionIconClass}
-            >
-              {isCollapsed ? (
-                <path
-                  d="M5 10h10M10 5v10"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              ) : (
-                <path
-                  d="M5 10h10"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              )}
-            </svg>
-          </button>
-
-          <span className={`soft-subpanel min-w-0 max-w-full break-words whitespace-normal [overflow-wrap:anywhere] rounded-lg border border-slate-200 font-medium text-slate-500 dark:border-slate-800 dark:text-slate-400 ${
-            compact ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'
-          }`}>
-            {entry.id}
-          </span>
         </div>
       </div>
 
