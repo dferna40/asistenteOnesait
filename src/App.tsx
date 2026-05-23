@@ -7624,7 +7624,7 @@ export const App = () => {
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 flex-1 text-left"
                         >
-                          <span className="section-gradient-pill inline-flex max-w-full rounded-[1.1rem] border px-3 py-2 text-left text-sm font-medium leading-5 whitespace-normal break-words">
+                          <span className="section-gradient-pill inline-flex max-w-full items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:anywhere]">
                             {category.name}
                           </span>
                           {!isCollapsed ? (
