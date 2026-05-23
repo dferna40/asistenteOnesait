@@ -141,6 +141,7 @@ type ManualOriginState = 'bundled' | 'local-storage' | 'server';
 type ServerHealthState = 'checking' | 'offline' | 'online';
 type ImportMode = 'merge' | 'replace';
 type ResultSortMode = 'pinned-latest' | 'latest' | 'oldest' | 'title';
+type EntryEditorViewMode = 'editor' | 'preview' | 'split';
 
 interface CategoryDeleteConfirmationState {
   categoryName: string;
@@ -2218,6 +2219,8 @@ export const App = () => {
     () => initialManualSnapshotRef.current.manualData,
   );
   const [modalState, setModalState] = useState<ModalState>(null);
+  const [entryEditorViewMode, setEntryEditorViewMode] =
+    useState<EntryEditorViewMode>('editor');
   const [entryForm, setEntryForm] = useState<EntryFormState>(() =>
     buildEntryFormState(),
   );
@@ -2608,6 +2611,12 @@ export const App = () => {
       window.clearTimeout(timeoutId);
     };
   }, [searchTerm]);
+
+  useEffect(() => {
+    if (modalState?.type === 'entry') {
+      setEntryEditorViewMode('editor');
+    }
+  }, [modalState]);
 
   useEffect(() => {
     if (modalState?.type !== 'entry') {
@@ -5772,6 +5781,16 @@ export const App = () => {
         setTemplateEditorSelection,
       ),
   );
+  const entryEditorViewModeOptions: Array<{
+    label: string;
+    value: EntryEditorViewMode;
+  }> = [
+    { label: 'Editor', value: 'editor' },
+    { label: 'Vista previa', value: 'preview' },
+    { label: 'Dividido', value: 'split' },
+  ];
+  const showEntryEditorPane = entryEditorViewMode !== 'preview';
+  const showEntryPreviewPane = entryEditorViewMode !== 'editor';
   const sidebarContent = (
     <SidebarUtilities
       customization={customization}
@@ -7374,11 +7393,32 @@ export const App = () => {
                       : 'Editar ficha'}
                   </h3>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Editor enriquecido con Markdown, panel dividido y previsualización en tiempo real.
+                    Editor enriquecido con Markdown, vista previa opcional y modo dividido bajo demanda.
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                  <div className="inline-flex flex-wrap items-center gap-1 rounded-2xl border border-slate-200 bg-white/80 p-1 dark:border-slate-800 dark:bg-slate-950/70">
+                    {entryEditorViewModeOptions.map((option) => {
+                      const isActive = entryEditorViewMode === option.value;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setEntryEditorViewMode(option.value)}
+                          aria-pressed={isActive}
+                          className={`rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                            isActive
+                              ? 'bg-sky-600 text-white shadow-sm dark:bg-sky-500'
+                              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <ToggleSwitch
                     checked={showEntryAdvancedOptions}
                     description="Activa acciones técnicas, plantillas e identificador manual."
@@ -7402,10 +7442,21 @@ export const App = () => {
                 </div>
               </div>
 
-              <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-2">
+              <div
+                className={`min-h-0 flex-1 ${
+                  entryEditorViewMode === 'split'
+                    ? 'grid grid-cols-1 xl:grid-cols-2'
+                    : 'flex h-full flex-col'
+                }`}
+              >
+                {showEntryEditorPane ? (
                 <div
                   ref={entryEditorFormPaneRef}
-                  className="app-surface-shell min-h-0 overflow-y-auto border-r border-slate-200 dark:border-slate-800"
+                  className={`app-surface-shell min-h-0 h-full overflow-y-auto ${
+                    entryEditorViewMode === 'split'
+                      ? 'border-r border-slate-200 dark:border-slate-800'
+                      : ''
+                  }`}
                 >
                   <div className="space-y-6 p-5 sm:p-6">
                     <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
@@ -7823,10 +7874,12 @@ export const App = () => {
                     ) : null}
                   </div>
                 </div>
+                ) : null}
 
+                {showEntryPreviewPane ? (
                 <div
                   ref={entryEditorPreviewPaneRef}
-                  className="app-surface-shell min-h-0 overflow-y-auto"
+                  className="app-surface-shell min-h-0 h-full overflow-y-auto"
                 >
                   <div className="space-y-6 p-5 sm:p-6">
                     <div className="section-gradient-card neon-card rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
@@ -7897,6 +7950,7 @@ export const App = () => {
                     ) : null}
                   </div>
                 </div>
+                ) : null}
               </div>
             </div>
           ) : modalState.type === 'category' ? (
