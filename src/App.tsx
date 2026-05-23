@@ -2363,6 +2363,68 @@ const loadPdfFontBase64 = async (fileName: string) => {
   return arrayBufferToBase64(buffer);
 };
 
+const buildCategoryChipLines = (label: string) => {
+  const normalizedTokens = label
+    .trim()
+    .split(/\s+/)
+    .flatMap((part) => part.split(/(?<=[/_-])/).filter(Boolean))
+    .reduce<string[]>((tokens, token) => {
+      if ((token === '/' || token === '_' || token === '-') && tokens.length) {
+        tokens[tokens.length - 1] = `${tokens[tokens.length - 1]}${token}`;
+        return tokens;
+      }
+
+      tokens.push(token);
+      return tokens;
+    }, []);
+
+  if (normalizedTokens.length <= 1) {
+    return [label];
+  }
+
+  const targetLineCount =
+    normalizedTokens.length >= 5 ? 4 : normalizedTokens.length >= 3 ? 3 : 2;
+  const maxLineLength =
+    targetLineCount >= 4 ? 12 : targetLineCount === 3 ? 14 : 18;
+  const lines: string[] = [];
+
+  normalizedTokens.forEach((token, index) => {
+    const currentLine = lines.at(-1) ?? '';
+    const candidateLine = currentLine
+      ? `${currentLine}${currentLine.endsWith('/') ? '' : ' '}${token}`
+      : token;
+    const remainingTokens = normalizedTokens.length - index - 1;
+    const remainingLineSlots = targetLineCount - lines.length;
+
+    if (
+      currentLine &&
+      candidateLine.length > maxLineLength &&
+      remainingTokens > 0 &&
+      remainingLineSlots > 0
+    ) {
+      lines.push(token);
+      return;
+    }
+
+    if (currentLine) {
+      lines[lines.length - 1] = candidateLine;
+      return;
+    }
+
+    lines.push(token);
+  });
+
+  return lines;
+};
+
+const renderCategoryChipLabel = (label: string) =>
+  buildCategoryChipLines(label).map((line, index, lines) => (
+    <span key={`${line}-${index}`} className="block">
+      {line}
+      {index < lines.length - 1 ? <br /> : null}
+    </span>
+  ));
+
 export const App = () => {
   const initialManualSnapshotRef = useRef<StoredManualSnapshot>(
     getFallbackManualSnapshot(),
@@ -7624,8 +7686,8 @@ export const App = () => {
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 flex-1 text-left"
                         >
-                          <span className="section-gradient-pill inline-flex max-w-full items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:anywhere]">
-                            {category.name}
+                          <span className="section-gradient-pill inline-flex max-w-full flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word]">
+                            {renderCategoryChipLabel(category.name)}
                           </span>
                           {!isCollapsed ? (
                             <span className="mt-2 block text-[11px] leading-5 text-slate-500 dark:text-slate-300 sm:text-xs sm:leading-5">
