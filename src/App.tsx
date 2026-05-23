@@ -227,6 +227,82 @@ const defaultSettings: AppSettings = {
   quickViews: defaultQuickViews,
 };
 
+type AdmonitionBlockKind =
+  | 'error'
+  | 'example'
+  | 'important'
+  | 'info'
+  | 'note'
+  | 'tip'
+  | 'warning';
+
+const admonitionBlockOptions: Array<{
+  colorClassName: string;
+  kind: AdmonitionBlockKind;
+  label: string;
+}> = [
+  { colorClassName: 'border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-600 dark:bg-slate-900/70 dark:text-slate-200', kind: 'note', label: 'Nota' },
+  { colorClassName: 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/10 dark:text-sky-200', kind: 'info', label: 'Info' },
+  { colorClassName: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200', kind: 'warning', label: 'Aviso' },
+  { colorClassName: 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200', kind: 'important', label: 'Importante' },
+  { colorClassName: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/40 dark:bg-emerald-500/10 dark:text-emerald-200', kind: 'tip', label: 'Tip' },
+  { colorClassName: 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200', kind: 'error', label: 'Error' },
+  { colorClassName: 'border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200', kind: 'example', label: 'Ejemplo' },
+];
+
+const admonitionPdfStyles: Record<
+  AdmonitionBlockKind,
+  {
+    border: [number, number, number];
+    fill: [number, number, number];
+    label: string;
+    text: [number, number, number];
+  }
+> = {
+  error: {
+    border: [244, 63, 94],
+    fill: [255, 241, 242],
+    label: 'Error',
+    text: [136, 19, 55],
+  },
+  example: {
+    border: [100, 116, 139],
+    fill: [248, 250, 252],
+    label: 'Ejemplo',
+    text: [30, 41, 59],
+  },
+  important: {
+    border: [99, 102, 241],
+    fill: [238, 242, 255],
+    label: 'Importante',
+    text: [49, 46, 129],
+  },
+  info: {
+    border: [14, 165, 233],
+    fill: [240, 249, 255],
+    label: 'Info',
+    text: [12, 74, 110],
+  },
+  note: {
+    border: [148, 163, 184],
+    fill: [248, 250, 252],
+    label: 'Nota',
+    text: [51, 65, 85],
+  },
+  tip: {
+    border: [16, 185, 129],
+    fill: [236, 253, 245],
+    label: 'Tip',
+    text: [6, 95, 70],
+  },
+  warning: {
+    border: [245, 158, 11],
+    fill: [255, 251, 235],
+    label: 'Aviso',
+    text: [146, 64, 14],
+  },
+};
+
 interface PdfCodeSegment {
   color: [number, number, number];
   fontStyle: 'bold' | 'normal';
@@ -252,6 +328,7 @@ interface PdfTableRow {
 
 type PdfContentBlock =
   | { content: string; type: 'text' }
+  | { content: string; kind: AdmonitionBlockKind; type: 'admonition' }
   | { content: string; language?: string; type: 'code' }
   | { content: string; depth: number; type: 'heading' }
   | { items: PdfListItem[]; type: 'list' }
@@ -991,6 +1068,26 @@ const insertSnippetAtCursor = (
     selectionStart,
     selectionEnd,
     nextScrollTop,
+  );
+};
+
+const insertAdmonitionBlockAtCursor = (
+  textarea: HTMLTextAreaElement | null,
+  currentValue: string,
+  setValue: (nextValue: string) => void,
+  kind: AdmonitionBlockKind,
+) => {
+  const label = admonitionBlockOptions.find((option) => option.kind === kind)?.label ?? 'Nota';
+  const snippet = `:::${kind}\n${label}\n:::\n`;
+  const cursorOffset = `:::${kind}\n`.length;
+
+  insertSnippetAtCursor(
+    textarea,
+    currentValue,
+    setValue,
+    snippet,
+    cursorOffset,
+    label.length,
   );
 };
 
@@ -1788,8 +1885,12 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
   let codeBuffer: string[] = [];
   let listBuffer: PdfListItem[] = [];
   let tableBuffer: string[] = [];
+  let admonitionBuffer: string[] = [];
+  let admonitionKind: AdmonitionBlockKind | null = null;
   let codeLanguage = '';
   let isInsideCodeBlock = false;
+  const admonitionPattern =
+    /^:::(note|info|warning|important|tip|error|example)\s*$/i;
   const isMarkdownTableLine = (line: string) => {
     const trimmedLine = line.trim();
     return trimmedLine.includes('|') && trimmedLine.split('|').length >= 3;
@@ -1905,8 +2006,30 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
     codeLanguage = '';
   };
 
+  const flushAdmonitionBuffer = () => {
+    if (admonitionKind && admonitionBuffer.join('\n').trim()) {
+      blocks.push({
+        content: admonitionBuffer.join('\n').trim(),
+        kind: admonitionKind,
+        type: 'admonition',
+      });
+    }
+
+    admonitionBuffer = [];
+    admonitionKind = null;
+  };
+
   lines.forEach((line) => {
     const trimmedLine = line.trim();
+
+    if (admonitionKind) {
+      if (trimmedLine === ':::') {
+        flushAdmonitionBuffer();
+      } else {
+        admonitionBuffer.push(line);
+      }
+      return;
+    }
 
     if (trimmedLine.startsWith('```')) {
       flushTextBuffer();
@@ -1955,6 +2078,16 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
       return;
     }
 
+    const admonitionMatch = trimmedLine.match(admonitionPattern);
+    if (admonitionMatch) {
+      flushTextBuffer();
+      flushListBuffer();
+      flushTableBuffer();
+      admonitionKind = admonitionMatch[1].toLowerCase() as AdmonitionBlockKind;
+      admonitionBuffer = [];
+      return;
+    }
+
     if (listBuffer.length) {
       const lastListItem = listBuffer[listBuffer.length - 1];
       const lastIndentLevel = lastListItem?.indentLevel ?? 0;
@@ -1986,6 +2119,10 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
 
   if (isInsideCodeBlock) {
     flushCodeBuffer();
+  }
+
+  if (admonitionKind) {
+    textBuffer.push(`:::${admonitionKind}`, ...admonitionBuffer);
   }
 
   flushTextBuffer();
@@ -2244,6 +2381,8 @@ export const App = () => {
   const [formError, setFormError] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [activeToolbarActionId, setActiveToolbarActionId] = useState('');
+  const [activeBlockMenu, setActiveBlockMenu] =
+    useState<'' | 'entry' | 'template'>('');
   const [contentEditorSelection, setContentEditorSelection] =
     useState<EditorSelectionState>({
       hasSelection: false,
@@ -3989,6 +4128,94 @@ export const App = () => {
         cursorY += 2;
       };
 
+      const writeAdmonitionBlock = (kind: AdmonitionBlockKind, content: string) => {
+        const tone = admonitionPdfStyles[kind];
+        const label = tone.label.toUpperCase();
+        const innerBlocks = parsePdfContentBlocks(content);
+        const flattenedLines: string[] = [];
+
+        innerBlocks.forEach((block) => {
+          if (block.type === 'heading') {
+            flattenedLines.push(block.content);
+            return;
+          }
+
+          if (block.type === 'list') {
+            block.items.forEach((item) => {
+              flattenedLines.push(`${'  '.repeat(item.indentLevel)}${item.marker} ${flattenPdfInlineMarkdown(item.text)}`);
+            });
+            return;
+          }
+
+          if (block.type === 'table') {
+            block.rows.forEach((row, rowIndex) => {
+              flattenedLines.push(
+                `${rowIndex === 0 ? '' : ''}${flattenPdfInlineMarkdown(row.cells.join(' | '))}`,
+              );
+            });
+            return;
+          }
+
+          if (block.type === 'code') {
+            block.content.split('\n').forEach((line) => {
+              flattenedLines.push(line);
+            });
+            return;
+          }
+
+          if (block.type === 'spacer') {
+            flattenedLines.push('');
+            return;
+          }
+
+          if (block.type === 'admonition') {
+            flattenedLines.push(admonitionPdfStyles[block.kind].label);
+            flattenedLines.push(flattenPdfInlineMarkdown(block.content));
+            return;
+          }
+
+          block.content.split('\n').forEach((line) => {
+            flattenedLines.push(flattenPdfInlineMarkdown(line));
+          });
+        });
+
+        const paddingX = 4;
+        const paddingY = 4;
+        const textWidth = contentWidth - paddingX * 2;
+        pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
+        pdf.setFontSize(10);
+        const wrappedLines = flattenedLines.flatMap((line) =>
+          line.trim()
+            ? (pdf.splitTextToSize(line, textWidth) as string[])
+            : [''],
+        );
+        const lineHeight = 10 * 0.3528 * 1.5;
+        const labelHeight = 9;
+        const contentHeight = Math.max(1, wrappedLines.length) * lineHeight;
+        const totalHeight = paddingY * 2 + labelHeight + contentHeight + 1;
+
+        ensureSpace(totalHeight + 4);
+        pdf.setFillColor(...tone.fill);
+        pdf.setDrawColor(...tone.border);
+        pdf.roundedRect(margin, cursorY, contentWidth, totalHeight, 2.5, 2.5, 'FD');
+
+        pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(...tone.text);
+        pdf.text(label, margin + paddingX, cursorY + 6.5);
+
+        pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
+        pdf.setFontSize(10);
+        pdf.setTextColor(...tone.text);
+        pdf.text(
+          wrappedLines,
+          margin + paddingX,
+          cursorY + paddingY + labelHeight + 3,
+        );
+
+        cursorY += totalHeight + 4;
+      };
+
       const writeImageToPdf = async (source: string) => {
         try {
           const imageAsset = await resolvePdfImageAsset(source);
@@ -4107,6 +4334,11 @@ export const App = () => {
 
         if (block.type === 'heading') {
           writeMarkdownHeading(block.content, block.depth);
+          continue;
+        }
+
+        if (block.type === 'admonition') {
+          writeAdmonitionBlock(block.kind, block.content);
           continue;
         }
 
@@ -5791,6 +6023,66 @@ export const App = () => {
   ];
   const showEntryEditorPane = entryEditorViewMode !== 'preview';
   const showEntryPreviewPane = entryEditorViewMode !== 'editor';
+  const renderAdmonitionToolbarMenu = (
+    menuId: 'entry' | 'template',
+    textarea: HTMLTextAreaElement | null,
+    currentValue: string,
+    setValue: (nextValue: string) => void,
+    syncSelectionState: () => void,
+  ) => {
+    const isOpen = activeBlockMenu === menuId;
+
+    return (
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() =>
+            setActiveBlockMenu((currentValue) =>
+              currentValue === menuId ? '' : menuId,
+            )
+          }
+          aria-expanded={isOpen}
+          aria-haspopup="menu"
+          className={`inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-all duration-200 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300 ${
+            isOpen ? 'shadow-sm' : ''
+          }`}
+        >
+          <span className="font-mono text-[11px]" aria-hidden="true">
+            []
+          </span>
+          <span>Bloque</span>
+        </button>
+
+        {isOpen ? (
+          <div className="absolute left-0 top-full z-20 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="grid gap-1">
+              {admonitionBlockOptions.map((option) => (
+                <button
+                  key={`${menuId}-${option.kind}`}
+                  type="button"
+                  onClick={() => {
+                    insertAdmonitionBlockAtCursor(
+                      textarea,
+                      currentValue,
+                      setValue,
+                      option.kind,
+                    );
+                    setActiveBlockMenu('');
+                    requestAnimationFrame(() => {
+                      syncSelectionState();
+                    });
+                  }}
+                  className={`rounded-xl border px-3 py-2 text-left text-xs font-medium transition-colors ${option.colorClassName}`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
   const sidebarContent = (
     <SidebarUtilities
       customization={customization}
@@ -7670,6 +7962,21 @@ export const App = () => {
                           </button>
                           );
                         })}
+                        {renderAdmonitionToolbarMenu(
+                          'entry',
+                          contentEditorRef.current,
+                          entryForm.contenido,
+                          (nextValue) =>
+                            setEntryForm((current) => ({
+                              ...current,
+                              contenido: nextValue,
+                            })),
+                          () =>
+                            syncEditorSelectionState(
+                              contentEditorRef.current,
+                              setContentEditorSelection,
+                            ),
+                        )}
                       </div>
                       <p className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
                         {buildToolbarContextLabel(contentEditorSelection)}
@@ -8268,6 +8575,22 @@ export const App = () => {
                             </button>
                           );
                         })}
+                        {renderAdmonitionToolbarMenu(
+                          'template',
+                          templateContentEditorRef.current,
+                          templateForm?.contenido ?? '',
+                          (nextValue) =>
+                            setTemplateForm((current) =>
+                              current
+                                ? { ...current, contenido: nextValue }
+                                : current,
+                            ),
+                          () =>
+                            syncEditorSelectionState(
+                              templateContentEditorRef.current,
+                              setTemplateEditorSelection,
+                            ),
+                        )}
                       </div>
                       <p className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
                         {buildToolbarContextLabel(templateEditorSelection)}

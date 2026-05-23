@@ -16,6 +16,23 @@ interface MarkdownSection {
   title: string;
 }
 
+type MarkdownAdmonitionKind =
+  | 'error'
+  | 'example'
+  | 'important'
+  | 'info'
+  | 'note'
+  | 'tip'
+  | 'warning';
+
+type MarkdownContentBlock =
+  | { content: string; type: 'markdown' }
+  | {
+      content: string;
+      kind: MarkdownAdmonitionKind;
+      type: 'admonition';
+    };
+
 interface ZoomedImageState {
   alt: string;
   src: string;
@@ -123,6 +140,133 @@ const parseMarkdownSections = (content: string) => {
     preamble: preamble.join('\n').trim(),
     sections,
   };
+};
+
+const admonitionLabels: Record<MarkdownAdmonitionKind, string> = {
+  error: 'Error',
+  example: 'Ejemplo',
+  important: 'Importante',
+  info: 'Info',
+  note: 'Nota',
+  tip: 'Tip',
+  warning: 'Aviso',
+};
+
+const admonitionToneClasses: Record<
+  MarkdownAdmonitionKind,
+  {
+    accent: string;
+    body: string;
+    icon: string;
+    title: string;
+  }
+> = {
+  error: {
+    accent: 'border-red-300 dark:border-red-500/40',
+    body: 'bg-red-50/90 text-red-950 dark:bg-red-500/10 dark:text-red-50',
+    icon: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-200',
+    title: 'text-red-900 dark:text-red-100',
+  },
+  example: {
+    accent: 'border-slate-300 dark:border-slate-600',
+    body: 'bg-slate-50/90 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100',
+    icon: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+    title: 'text-slate-900 dark:text-slate-100',
+  },
+  important: {
+    accent: 'border-indigo-300 dark:border-indigo-500/40',
+    body: 'bg-indigo-50/90 text-indigo-950 dark:bg-indigo-500/12 dark:text-indigo-50',
+    icon: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-200',
+    title: 'text-indigo-900 dark:text-indigo-100',
+  },
+  info: {
+    accent: 'border-sky-300 dark:border-sky-500/40',
+    body: 'bg-sky-50/90 text-sky-950 dark:bg-sky-500/10 dark:text-sky-50',
+    icon: 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-200',
+    title: 'text-sky-900 dark:text-sky-100',
+  },
+  note: {
+    accent: 'border-slate-300 dark:border-slate-600',
+    body: 'bg-slate-100/90 text-slate-900 dark:bg-slate-800/80 dark:text-slate-100',
+    icon: 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
+    title: 'text-slate-900 dark:text-slate-100',
+  },
+  tip: {
+    accent: 'border-emerald-300 dark:border-emerald-500/40',
+    body: 'bg-emerald-50/90 text-emerald-950 dark:bg-emerald-500/10 dark:text-emerald-50',
+    icon: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200',
+    title: 'text-emerald-900 dark:text-emerald-100',
+  },
+  warning: {
+    accent: 'border-amber-300 dark:border-amber-500/40',
+    body: 'bg-amber-50/90 text-amber-950 dark:bg-amber-500/10 dark:text-amber-50',
+    icon: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200',
+    title: 'text-amber-900 dark:text-amber-100',
+  },
+};
+
+const parseMarkdownContentBlocks = (content: string): MarkdownContentBlock[] => {
+  const lines = content.split('\n');
+  const blocks: MarkdownContentBlock[] = [];
+  const admonitionPattern =
+    /^:::(note|info|warning|important|tip|error|example)\s*$/i;
+  const buffer: string[] = [];
+  let currentAdmonitionKind: MarkdownAdmonitionKind | null = null;
+  let admonitionBuffer: string[] = [];
+
+  const flushMarkdownBuffer = () => {
+    const markdownContent = buffer.join('\n').trim();
+    if (markdownContent) {
+      blocks.push({
+        content: markdownContent,
+        type: 'markdown',
+      });
+    }
+    buffer.length = 0;
+  };
+
+  const flushAdmonitionBuffer = () => {
+    if (currentAdmonitionKind && admonitionBuffer.join('\n').trim()) {
+      blocks.push({
+        content: admonitionBuffer.join('\n').trim(),
+        kind: currentAdmonitionKind,
+        type: 'admonition',
+      });
+    }
+    admonitionBuffer = [];
+    currentAdmonitionKind = null;
+  };
+
+  lines.forEach((line) => {
+    const trimmedLine = line.trim();
+
+    if (currentAdmonitionKind) {
+      if (trimmedLine === ':::') {
+        flushAdmonitionBuffer();
+      } else {
+        admonitionBuffer.push(line);
+      }
+      return;
+    }
+
+    const admonitionMatch = trimmedLine.match(admonitionPattern);
+    if (admonitionMatch) {
+      flushMarkdownBuffer();
+      currentAdmonitionKind = admonitionMatch[1].toLowerCase() as MarkdownAdmonitionKind;
+      admonitionBuffer = [];
+      return;
+    }
+
+    buffer.push(line);
+  });
+
+  if (currentAdmonitionKind) {
+    buffer.push(`:::${currentAdmonitionKind}`, ...admonitionBuffer);
+  }
+
+  flushMarkdownBuffer();
+
+  return blocks;
 };
 
 function ImageZoomModal({
@@ -337,15 +481,77 @@ function MarkdownSectionAccordion({
       </summary>
 
       <div className="mt-3 border-t border-slate-200 pt-3 dark:border-slate-700">
+        <MarkdownContent blocks={parseMarkdownContentBlocks(section.body)} components={components} />
+      </div>
+    </details>
+  );
+}
+
+function MarkdownAdmonition({
+  block,
+  components,
+}: {
+  block: Extract<MarkdownContentBlock, { type: 'admonition' }>;
+  components: ReturnType<typeof createMarkdownComponents>;
+}) {
+  const tone = admonitionToneClasses[block.kind];
+
+  return (
+    <div
+      className={`my-4 overflow-hidden rounded-2xl border ${tone.accent} ${tone.body}`}
+    >
+      <div className="flex items-center gap-3 border-b border-black/5 px-4 py-3 dark:border-white/10">
+        <span
+          className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${tone.icon}`}
+          aria-hidden="true"
+        >
+          {admonitionLabels[block.kind].slice(0, 1)}
+        </span>
+        <span className={`text-sm font-semibold uppercase tracking-[0.16em] ${tone.title}`}>
+          {admonitionLabels[block.kind]}
+        </span>
+      </div>
+      <div className="px-4 py-3">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}
           components={components}
         >
-          {section.body}
+          {block.content}
         </ReactMarkdown>
       </div>
-    </details>
+    </div>
+  );
+}
+
+function MarkdownContent({
+  blocks,
+  components,
+}: {
+  blocks: MarkdownContentBlock[];
+  components: ReturnType<typeof createMarkdownComponents>;
+}) {
+  return (
+    <>
+      {blocks.map((block, index) =>
+        block.type === 'markdown' ? (
+          <ReactMarkdown
+            key={`markdown-${index}`}
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeHighlight]}
+            components={components}
+          >
+            {block.content}
+          </ReactMarkdown>
+        ) : (
+          <MarkdownAdmonition
+            key={`admonition-${block.kind}-${index}`}
+            block={block}
+            components={components}
+          />
+        ),
+      )}
+    </>
   );
 }
 
@@ -371,13 +577,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
     <>
       <div className="markdown-body min-w-0 break-words [overflow-wrap:anywhere]">
       {preamble ? (
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
+        <MarkdownContent
+          blocks={parseMarkdownContentBlocks(preamble)}
           components={markdownComponents}
-        >
-          {preamble}
-        </ReactMarkdown>
+        />
       ) : null}
 
       {sections.length ? (
