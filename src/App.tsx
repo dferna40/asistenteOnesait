@@ -7618,13 +7618,13 @@ export const App = () => {
                       } ${theme.chip}`}
                       style={buildThemeVars(category.color)}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                         <button
                           type="button"
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 flex-1 text-left"
                         >
-                          <span className="section-gradient-pill inline-flex rounded-full border px-3 py-2 text-sm font-medium">
+                          <span className="section-gradient-pill inline-flex max-w-full rounded-[1.1rem] border px-3 py-2 text-left text-sm font-medium leading-5 whitespace-normal break-words">
                             {category.name}
                           </span>
                           {!isCollapsed ? (
