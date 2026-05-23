@@ -66,6 +66,8 @@ export function AppCustomizationPanel({
   const [formState, setFormState] = useState<AppCustomizationSettings>(customization);
   const [quickViewDrafts, setQuickViewDrafts] = useState<QuickViewSettings[]>(quickViews);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [draggedExternalToolId, setDraggedExternalToolId] = useState('');
+  const [dragOverExternalToolId, setDragOverExternalToolId] = useState('');
 
   useEffect(() => {
     setFormState(customization);
@@ -74,6 +76,11 @@ export function AppCustomizationPanel({
   useEffect(() => {
     setQuickViewDrafts(quickViews);
   }, [quickViews]);
+
+  useEffect(() => {
+    setDraggedExternalToolId('');
+    setDragOverExternalToolId('');
+  }, [formState.externalTools.length, showAdvancedOptions]);
 
   const updateField = (
     field: keyof AppCustomizationSettings,
@@ -112,6 +119,45 @@ export function AppCustomizationPanel({
         ? [createToolDraft(0)]
         : formState.externalTools.filter((tool) => tool.id !== toolId),
     );
+  };
+
+  const moveItem = <T,>(items: T[], fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= items.length ||
+      toIndex >= items.length ||
+      fromIndex === toIndex
+    ) {
+      return items;
+    }
+
+    const nextItems = [...items];
+    const [movedItem] = nextItems.splice(fromIndex, 1);
+    nextItems.splice(toIndex, 0, movedItem);
+    return nextItems;
+  };
+
+  const handleExternalToolDrop = (targetToolId: string) => {
+    if (!draggedExternalToolId || draggedExternalToolId === targetToolId) {
+      setDraggedExternalToolId('');
+      setDragOverExternalToolId('');
+      return;
+    }
+
+    const visibleToolIds = formState.externalTools.map((tool) => tool.id);
+    const sourceIndex = visibleToolIds.indexOf(draggedExternalToolId);
+    const targetIndex = visibleToolIds.indexOf(targetToolId);
+
+    if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex !== targetIndex) {
+      updateField(
+        'externalTools',
+        moveItem(formState.externalTools, sourceIndex, targetIndex),
+      );
+    }
+
+    setDraggedExternalToolId('');
+    setDragOverExternalToolId('');
   };
 
   const getQuickViewMode = (quickView: QuickViewSettings) => {
@@ -501,9 +547,14 @@ export function AppCustomizationPanel({
             <>
               <div className="sidebar-panel rounded-3xl border border-slate-200 p-5 dark:border-slate-800">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                    Herramientas del menu lateral
-                  </h3>
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                      Herramientas del menu lateral
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      Arrastra cada acceso para reordenarlo igual que las secciones y fichas.
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={handleAddTool}
@@ -517,8 +568,52 @@ export function AppCustomizationPanel({
                   {formState.externalTools.map((tool, index) => (
                     <div
                       key={tool.id}
-                      className="soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-3 dark:border-slate-700 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)_auto]"
+                      draggable
+                      onDragStart={(event) => {
+                        setDraggedExternalToolId(tool.id);
+                        setDragOverExternalToolId(tool.id);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', tool.id);
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        if (dragOverExternalToolId !== tool.id) {
+                          setDragOverExternalToolId(tool.id);
+                        }
+                        event.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        handleExternalToolDrop(tool.id);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedExternalToolId('');
+                        setDragOverExternalToolId('');
+                      }}
+                      className={`soft-subpanel grid gap-3 rounded-2xl border border-slate-200 p-3 transition-all duration-200 dark:border-slate-700 lg:grid-cols-[auto_minmax(0,0.9fr)_minmax(0,1.1fr)_auto] ${
+                        dragOverExternalToolId === tool.id
+                          ? 'scale-[1.01] ring-2 ring-sky-400/70 ring-offset-2 ring-offset-slate-100 dark:ring-sky-400/60 dark:ring-offset-slate-950'
+                          : 'cursor-grab active:cursor-grabbing'
+                      }`}
                     >
+                      <div
+                        aria-hidden="true"
+                        title={`Arrastrar acceso ${tool.name || index + 1}`}
+                        className="inline-flex h-[46px] w-11 items-center justify-center rounded-xl border border-slate-200 bg-white/90 text-slate-500 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-300"
+                      >
+                        <svg
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          className="h-4 w-4"
+                        >
+                          <circle cx="7" cy="6" r="1.2" fill="currentColor" />
+                          <circle cx="13" cy="6" r="1.2" fill="currentColor" />
+                          <circle cx="7" cy="10" r="1.2" fill="currentColor" />
+                          <circle cx="13" cy="10" r="1.2" fill="currentColor" />
+                          <circle cx="7" cy="14" r="1.2" fill="currentColor" />
+                          <circle cx="13" cy="14" r="1.2" fill="currentColor" />
+                        </svg>
+                      </div>
                       <input
                         value={tool.name}
                         onChange={(event) =>

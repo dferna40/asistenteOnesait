@@ -81,6 +81,7 @@ export interface QuickViewSettings {
 export interface AppSettings {
   compactMode: boolean;
   customization: AppCustomizationSettings;
+  customEntryOrderByCategory: Record<string, string[]>;
   darkMode: boolean;
   quickViews: QuickViewSettings[];
 }

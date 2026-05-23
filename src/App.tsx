@@ -140,7 +140,7 @@ type SaveSyncState = 'error' | 'idle' | 'pending' | 'saved' | 'saving';
 type ManualOriginState = 'bundled' | 'local-storage' | 'server';
 type ServerHealthState = 'checking' | 'offline' | 'online';
 type ImportMode = 'merge' | 'replace';
-type ResultSortMode = 'pinned-latest' | 'latest' | 'oldest' | 'title';
+type ResultSortMode = 'custom' | 'pinned-latest' | 'latest' | 'oldest' | 'title';
 type EntryEditorViewMode = 'editor' | 'preview' | 'split';
 
 interface CategoryDeleteConfirmationState {
@@ -223,8 +223,42 @@ const defaultQuickViews: QuickViewDefinition[] = [
 const defaultSettings: AppSettings = {
   compactMode: false,
   customization: defaultAppCustomization,
+  customEntryOrderByCategory: {},
   darkMode: false,
   quickViews: defaultQuickViews,
+};
+
+const normalizeCustomEntryOrderByCategory = (
+  source: unknown,
+): Record<string, string[]> => {
+  if (!source || typeof source !== 'object') {
+    return {};
+  }
+
+  return Object.entries(source as Record<string, unknown>).reduce<
+    Record<string, string[]>
+  >((accumulator, [categoryName, entryIds]) => {
+    const normalizedCategoryName = categoryName.trim().toLowerCase();
+
+    if (!normalizedCategoryName || !Array.isArray(entryIds)) {
+      return accumulator;
+    }
+
+    const normalizedEntryIds = Array.from(
+      new Set(
+        entryIds
+          .filter((entryId): entryId is string => typeof entryId === 'string')
+          .map((entryId) => entryId.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (normalizedEntryIds.length) {
+      accumulator[normalizedCategoryName] = normalizedEntryIds;
+    }
+
+    return accumulator;
+  }, {});
 };
 
 type AdmonitionBlockKind =
@@ -548,6 +582,9 @@ const normalizeManualData = (source: unknown): ManualData => {
         ...defaultSettings,
         ...(candidate.settings ?? {}),
         customization: normalizeCustomization(candidate.settings?.customization),
+        customEntryOrderByCategory: normalizeCustomEntryOrderByCategory(
+          candidate.settings?.customEntryOrderByCategory,
+        ),
         quickViews: normalizeQuickViews(candidate.settings?.quickViews),
       },
       templates,
@@ -2350,6 +2387,12 @@ export const App = () => {
   const [resultSortMode, setResultSortMode] =
     useState<ResultSortMode>('pinned-latest');
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
+  const [draggedResultEntryId, setDraggedResultEntryId] = useState('');
+  const [dragOverResultEntryId, setDragOverResultEntryId] = useState('');
+  const [draggedHomeCategoryName, setDraggedHomeCategoryName] = useState('');
+  const [dragOverHomeCategoryName, setDragOverHomeCategoryName] = useState('');
+  const [draggedTemplateId, setDraggedTemplateId] = useState('');
+  const [dragOverTemplateId, setDragOverTemplateId] = useState('');
   const [activeView, setActiveView] = useState<'home' | 'settings' | 'templates'>('home');
   const [manualData, setManualData] = useState<ManualData>(
     () => initialManualSnapshotRef.current.manualData,
@@ -2509,14 +2552,18 @@ export const App = () => {
       ),
     [manualData.categories],
   );
+  const customEntryOrderByCategory = manualData.settings.customEntryOrderByCategory;
   const results = useSearch(
     manualData.entries,
     debouncedSearchTerm,
     activeCategoryFilter,
     activeTagFilters,
   );
-  const sortEntries = (entries: KnowledgeEntry[], sortMode: ResultSortMode) =>
-    [...entries].sort((firstEntry, secondEntry) => {
+  const compareEntriesBySortMode = (
+    firstEntry: KnowledgeEntry,
+    secondEntry: KnowledgeEntry,
+    sortMode: Exclude<ResultSortMode, 'custom'>,
+  ) => {
       if (sortMode === 'title') {
         return firstEntry.titulo.localeCompare(secondEntry.titulo, 'es');
       }
@@ -2538,14 +2585,64 @@ export const App = () => {
       }
 
       return dateDifference;
-    });
+    };
+  const sortEntries = (entries: KnowledgeEntry[], sortMode: ResultSortMode) => {
+    if (sortMode === 'custom') {
+      const entriesByCategory = new Map<string, KnowledgeEntry[]>();
+
+      entries.forEach((entry) => {
+        const normalizedCategoryName = entry.categoria.toLowerCase();
+        const currentEntries = entriesByCategory.get(normalizedCategoryName) ?? [];
+        currentEntries.push(entry);
+        entriesByCategory.set(normalizedCategoryName, currentEntries);
+      });
+
+      return Array.from(entriesByCategory.entries())
+        .sort(([firstCategoryName], [secondCategoryName]) =>
+          firstCategoryName.localeCompare(secondCategoryName, 'es'),
+        )
+        .flatMap(([categoryName, categoryEntries]) => {
+          const categoryOrder = customEntryOrderByCategory[categoryName] ?? [];
+          const orderIndexMap = new Map(
+            categoryOrder.map((entryId, index) => [entryId, index] as const),
+          );
+
+          return [...categoryEntries].sort((firstEntry, secondEntry) => {
+            const firstIndex = orderIndexMap.get(firstEntry.id);
+            const secondIndex = orderIndexMap.get(secondEntry.id);
+
+            if (firstIndex !== undefined && secondIndex !== undefined) {
+              return firstIndex - secondIndex;
+            }
+
+            if (firstIndex !== undefined) {
+              return -1;
+            }
+
+            if (secondIndex !== undefined) {
+              return 1;
+            }
+
+            return compareEntriesBySortMode(
+              firstEntry,
+              secondEntry,
+              'pinned-latest',
+            );
+          });
+        });
+    }
+
+    return [...entries].sort((firstEntry, secondEntry) =>
+      compareEntriesBySortMode(firstEntry, secondEntry, sortMode),
+    );
+  };
   const visibleResults = useMemo(
     () => (showPinnedOnly ? results.filter((entry) => entry.isPinned) : results),
     [results, showPinnedOnly],
   );
   const sortedResults = useMemo(
     () => sortEntries(visibleResults, resultSortMode),
-    [resultSortMode, visibleResults],
+    [customEntryOrderByCategory, resultSortMode, visibleResults],
   );
   const quickAccessEntries = useMemo(
     () =>
@@ -2553,7 +2650,7 @@ export const App = () => {
         manualData.entries.filter((entry) => entry.isPinned),
         'pinned-latest',
       ),
-    [manualData.entries],
+    [customEntryOrderByCategory, manualData.entries],
   );
   const visibleQuickAccessEntries = useMemo(
     () =>
@@ -2562,13 +2659,7 @@ export const App = () => {
         : quickAccessEntries.slice(0, HOME_PINNED_ENTRY_PREVIEW_LIMIT),
     [quickAccessEntries, showAllQuickAccessEntries],
   );
-  const sortedTemplates = useMemo(
-    () =>
-      [...manualData.templates].sort((firstTemplate, secondTemplate) =>
-        firstTemplate.name.localeCompare(secondTemplate.name, 'es'),
-      ),
-    [manualData.templates],
-  );
+  const sortedTemplates = useMemo(() => manualData.templates, [manualData.templates]);
   const favoriteTemplates = useMemo(
     () => sortedTemplates.filter((template) => template.isFavorite),
     [sortedTemplates],
@@ -2740,6 +2831,27 @@ export const App = () => {
     activeTagFilters,
     showPinnedOnly,
     resultSortMode,
+  ]);
+
+  useEffect(() => {
+    setDraggedResultEntryId('');
+    setDragOverResultEntryId('');
+  }, [activeCategoryFilter, activeTagFilters, debouncedSearchTerm, resultSortMode]);
+
+  useEffect(() => {
+    setDraggedHomeCategoryName('');
+    setDragOverHomeCategoryName('');
+  }, [activeView, manualData.categories.length]);
+
+  useEffect(() => {
+    setDraggedTemplateId('');
+    setDragOverTemplateId('');
+  }, [
+    activeView,
+    templateSearchTerm,
+    templateCategoryFilter,
+    showFavoriteTemplatesOnly,
+    manualData.templates.length,
   ]);
 
   useEffect(() => {
@@ -3144,6 +3256,215 @@ export const App = () => {
       persistManualData(nextManualData);
       return nextManualData;
     });
+  };
+
+  const moveItem = <T,>(items: T[], fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= items.length ||
+      toIndex >= items.length ||
+      fromIndex === toIndex
+    ) {
+      return items;
+    }
+
+    const nextItems = [...items];
+    const [movedItem] = nextItems.splice(fromIndex, 1);
+    nextItems.splice(toIndex, 0, movedItem);
+    return nextItems;
+  };
+
+  const persistCustomCategoryOrder = (
+    categoryName: string,
+    reorderedVisibleEntryIds: string[],
+  ) => {
+    const normalizedCategoryName = categoryName.trim().toLowerCase();
+
+    if (!normalizedCategoryName || reorderedVisibleEntryIds.length < 2) {
+      return;
+    }
+
+    updateManualData((currentManualData) => {
+      const categoryEntries = currentManualData.entries.filter(
+        (entry) => entry.categoria.toLowerCase() === normalizedCategoryName,
+      );
+      const categoryEntryIds = categoryEntries.map((entry) => entry.id);
+      const currentStoredOrder =
+        currentManualData.settings.customEntryOrderByCategory[normalizedCategoryName] ?? [];
+      const fullCategoryOrder = [
+        ...currentStoredOrder.filter((entryId) => categoryEntryIds.includes(entryId)),
+        ...categoryEntryIds.filter((entryId) => !currentStoredOrder.includes(entryId)),
+      ];
+      const reorderedVisibleSet = new Set(reorderedVisibleEntryIds);
+      const nextFullCategoryOrder: string[] = [];
+      let reorderedIndex = 0;
+
+      fullCategoryOrder.forEach((entryId) => {
+        if (reorderedVisibleSet.has(entryId)) {
+          nextFullCategoryOrder.push(reorderedVisibleEntryIds[reorderedIndex] ?? entryId);
+          reorderedIndex += 1;
+          return;
+        }
+
+        nextFullCategoryOrder.push(entryId);
+      });
+
+      const normalizedNextOrder = Array.from(
+        new Set(nextFullCategoryOrder.filter((entryId) => categoryEntryIds.includes(entryId))),
+      );
+
+      return {
+        ...currentManualData,
+        settings: {
+          ...currentManualData.settings,
+          customEntryOrderByCategory: {
+            ...currentManualData.settings.customEntryOrderByCategory,
+            [normalizedCategoryName]: normalizedNextOrder,
+          },
+        },
+      };
+    });
+  };
+
+  const persistHomeCategoryOrder = (reorderedCategoryNames: string[]) => {
+    if (reorderedCategoryNames.length < 2) {
+      return;
+    }
+
+    updateManualData((currentManualData) => {
+      const categoryIndexMap = new Map(
+        currentManualData.categories.map((category) => [
+          category.name.toLowerCase(),
+          category,
+        ]),
+      );
+      const normalizedIncomingOrder = reorderedCategoryNames.map((categoryName) =>
+        categoryName.toLowerCase(),
+      );
+      const nextCategories = [
+        ...normalizedIncomingOrder
+          .map((categoryName) => categoryIndexMap.get(categoryName))
+          .filter((category): category is CategoryDefinition => Boolean(category)),
+        ...currentManualData.categories.filter(
+          (category) =>
+            !normalizedIncomingOrder.includes(category.name.toLowerCase()),
+        ),
+      ];
+
+      return {
+        ...currentManualData,
+        categories: nextCategories,
+      };
+    });
+  };
+
+  const handleCustomResultDrop = (targetEntryId: string) => {
+    if (
+      !activeCategoryFilter ||
+      !draggedResultEntryId ||
+      draggedResultEntryId === targetEntryId
+    ) {
+      setDraggedResultEntryId('');
+      setDragOverResultEntryId('');
+      return;
+    }
+
+    const visibleCategoryEntryIds = sortedResults
+      .filter(
+        (entry) => entry.categoria.toLowerCase() === activeCategoryFilter.toLowerCase(),
+      )
+      .map((entry) => entry.id);
+    const sourceIndex = visibleCategoryEntryIds.indexOf(draggedResultEntryId);
+    const targetIndex = visibleCategoryEntryIds.indexOf(targetEntryId);
+
+    if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex !== targetIndex) {
+      persistCustomCategoryOrder(
+        activeCategoryFilter,
+        moveItem(visibleCategoryEntryIds, sourceIndex, targetIndex),
+      );
+      setResultSortMode('custom');
+    }
+
+    setDraggedResultEntryId('');
+    setDragOverResultEntryId('');
+  };
+
+  const handleHomeCategoryDrop = (targetCategoryName: string) => {
+    if (
+      !draggedHomeCategoryName ||
+      draggedHomeCategoryName === targetCategoryName
+    ) {
+      setDraggedHomeCategoryName('');
+      setDragOverHomeCategoryName('');
+      return;
+    }
+
+    const visibleCategoryNames = manualData.categories.map((category) => category.name);
+    const sourceIndex = visibleCategoryNames.indexOf(draggedHomeCategoryName);
+    const targetIndex = visibleCategoryNames.indexOf(targetCategoryName);
+
+    if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex !== targetIndex) {
+      persistHomeCategoryOrder(
+        moveItem(visibleCategoryNames, sourceIndex, targetIndex),
+      );
+    }
+
+    setDraggedHomeCategoryName('');
+    setDragOverHomeCategoryName('');
+  };
+
+  const persistTemplateOrder = (reorderedVisibleTemplateIds: string[]) => {
+    if (reorderedVisibleTemplateIds.length < 2) {
+      return;
+    }
+
+    updateManualData((currentManualData) => {
+      const allTemplateIds = currentManualData.templates.map((template) => template.id);
+      const reorderedVisibleSet = new Set(reorderedVisibleTemplateIds);
+      const nextTemplateIds: string[] = [];
+      let reorderedIndex = 0;
+
+      allTemplateIds.forEach((templateId) => {
+        if (reorderedVisibleSet.has(templateId)) {
+          nextTemplateIds.push(reorderedVisibleTemplateIds[reorderedIndex] ?? templateId);
+          reorderedIndex += 1;
+          return;
+        }
+
+        nextTemplateIds.push(templateId);
+      });
+
+      const templateById = new Map(
+        currentManualData.templates.map((template) => [template.id, template] as const),
+      );
+
+      return {
+        ...currentManualData,
+        templates: nextTemplateIds
+          .map((templateId) => templateById.get(templateId))
+          .filter((template): template is EntryTemplate => Boolean(template)),
+      };
+    });
+  };
+
+  const handleTemplateDrop = (targetTemplateId: string) => {
+    if (!draggedTemplateId || draggedTemplateId === targetTemplateId) {
+      setDraggedTemplateId('');
+      setDragOverTemplateId('');
+      return;
+    }
+
+    const visibleTemplateIds = filteredTemplates.map((template) => template.id);
+    const sourceIndex = visibleTemplateIds.indexOf(draggedTemplateId);
+    const targetIndex = visibleTemplateIds.indexOf(targetTemplateId);
+
+    if (sourceIndex >= 0 && targetIndex >= 0 && sourceIndex !== targetIndex) {
+      persistTemplateOrder(moveItem(visibleTemplateIds, sourceIndex, targetIndex));
+    }
+
+    setDraggedTemplateId('');
+    setDragOverTemplateId('');
   };
 
   const handleUndoRecentChange = () => {
@@ -6629,16 +6950,54 @@ export const App = () => {
               {sortedTemplates.length ? (
                 <section className="space-y-4">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
-                      Todas las plantillas
-                    </h3>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-300">
+                        Todas las plantillas
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Arrastra las tarjetas para reordenarlas. Las favoritas seguirán este mismo orden en la home.
+                      </p>
+                    </div>
                     <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                       Marca como favoritas las que quieras tener a mano en la home
                     </span>
                   </div>
                   {filteredTemplates.length ? (
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                      {filteredTemplates.map((template) => renderTemplateCard(template))}
+                      {filteredTemplates.map((template) => (
+                        <div
+                          key={template.id}
+                          draggable
+                          onDragStart={(event) => {
+                            setDraggedTemplateId(template.id);
+                            setDragOverTemplateId(template.id);
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', template.id);
+                          }}
+                          onDragOver={(event) => {
+                            event.preventDefault();
+                            if (dragOverTemplateId !== template.id) {
+                              setDragOverTemplateId(template.id);
+                            }
+                            event.dataTransfer.dropEffect = 'move';
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            handleTemplateDrop(template.id);
+                          }}
+                          onDragEnd={() => {
+                            setDraggedTemplateId('');
+                            setDragOverTemplateId('');
+                          }}
+                          className={`rounded-2xl transition-all duration-200 ${
+                            dragOverTemplateId === template.id
+                              ? 'scale-[1.01] ring-2 ring-sky-400/70 ring-offset-2 ring-offset-slate-100 dark:ring-sky-400/60 dark:ring-offset-slate-950'
+                              : 'cursor-grab active:cursor-grabbing'
+                          }`}
+                        >
+                          {renderTemplateCard(template)}
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-5 text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
@@ -6751,6 +7110,7 @@ export const App = () => {
                       }
                       className="bg-transparent text-sm outline-none"
                     >
+                      <option value="custom">Personalizado</option>
                       <option value="pinned-latest">Ancladas + recientes</option>
                       <option value="latest">Mas recientes</option>
                       <option value="oldest">Mas antiguas</option>
@@ -6797,28 +7157,83 @@ export const App = () => {
                   ) : null}
                 </div>
               </div>
+              {activeResultCategory ? (
+                <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                  Arrastra las fichas dentro de esta sección para guardar un orden personalizado.
+                </p>
+              ) : null}
               </div>
 
               {sortedResults.length ? (
                 <div className="grid gap-3">
                   {sortedResults.map((entry) => {
                     const category = categoryMap.get(entry.categoria.toLowerCase());
+                    const canDragResultCard =
+                      Boolean(activeCategoryFilter) &&
+                      entry.categoria.toLowerCase() === activeCategoryFilter.toLowerCase();
+                    const isDragOverResultCard = dragOverResultEntryId === entry.id;
 
                     return (
-                      <ResultCard
-                        activeTags={activeTagFilters}
+                      <div
                         key={entry.id}
-                        categoryColorKey={category?.color}
-                        compact={isCompactViewEnabled}
-                        entry={entry}
-                        onCommandSave={handleCommandSave}
-                        onDeleteEntry={handleDeleteEntry}
-                        onEditEntry={openEditEntryModal}
-                        onExportPdf={openEntryPdfExportModal}
-                        onTagClick={handleTagFilter}
-                        onTogglePin={handleTogglePinEntry}
-                        pdfIsGenerating={exportEntryId === entry.id}
-                      />
+                        draggable={canDragResultCard}
+                        onDragStart={(event) => {
+                          if (!canDragResultCard) {
+                            return;
+                          }
+
+                          setDraggedResultEntryId(entry.id);
+                          setDragOverResultEntryId(entry.id);
+                          event.dataTransfer.effectAllowed = 'move';
+                          event.dataTransfer.setData('text/plain', entry.id);
+                        }}
+                        onDragOver={(event) => {
+                          if (!canDragResultCard) {
+                            return;
+                          }
+
+                          event.preventDefault();
+                          if (dragOverResultEntryId !== entry.id) {
+                            setDragOverResultEntryId(entry.id);
+                          }
+                          event.dataTransfer.dropEffect = 'move';
+                        }}
+                        onDrop={(event) => {
+                          if (!canDragResultCard) {
+                            return;
+                          }
+
+                          event.preventDefault();
+                          handleCustomResultDrop(entry.id);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedResultEntryId('');
+                          setDragOverResultEntryId('');
+                        }}
+                        className={
+                          canDragResultCard
+                            ? `rounded-[1.8rem] transition-all ${
+                                isDragOverResultCard
+                                  ? 'scale-[1.01] ring-2 ring-sky-400/70 ring-offset-2 ring-offset-slate-100 dark:ring-sky-400/60 dark:ring-offset-slate-950'
+                                  : 'cursor-grab active:cursor-grabbing'
+                              }`
+                            : ''
+                        }
+                      >
+                        <ResultCard
+                          activeTags={activeTagFilters}
+                          categoryColorKey={category?.color}
+                          compact={isCompactViewEnabled}
+                          entry={entry}
+                          onCommandSave={handleCommandSave}
+                          onDeleteEntry={handleDeleteEntry}
+                          onEditEntry={openEditEntryModal}
+                          onExportPdf={openEntryPdfExportModal}
+                          onTagClick={handleTagFilter}
+                          onTogglePin={handleTogglePinEntry}
+                          pdfIsGenerating={exportEntryId === entry.id}
+                        />
+                      </div>
                     );
                   })}
                 </div>
@@ -7136,7 +7551,7 @@ export const App = () => {
                     Secciones principales
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Colapsa o expande tarjetas para reducir ruido visual en la home.
+                    Arrastra las tarjetas para reordenar secciones y colapsa las que no necesites.
                   </p>
                 </div>
                 {manualData.categories.length ? (
@@ -7166,14 +7581,41 @@ export const App = () => {
                       entry.categoria.toLowerCase() === category.name.toLowerCase(),
                   ).length;
                   const isCollapsed = collapsedHomeCategories.includes(category.name);
+                  const isDragOverCategory = dragOverHomeCategoryName === category.name;
 
                   return (
                     <div
                       key={category.name}
+                      draggable
+                      onDragStart={(event) => {
+                        setDraggedHomeCategoryName(category.name);
+                        setDragOverHomeCategoryName(category.name);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', category.name);
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        if (dragOverHomeCategoryName !== category.name) {
+                          setDragOverHomeCategoryName(category.name);
+                        }
+                        event.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        handleHomeCategoryDrop(category.name);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedHomeCategoryName('');
+                        setDragOverHomeCategoryName('');
+                      }}
                       ref={(element) => {
                         homeCategoryRefs.current[category.name] = element;
                       }}
-                      className={`neon-card section-gradient-card rounded-2xl border p-4 transition-all duration-200 ${theme.chip}`}
+                      className={`neon-card section-gradient-card rounded-2xl border p-4 transition-all duration-200 ${
+                        isDragOverCategory
+                          ? 'scale-[1.01] ring-2 ring-sky-400/70 ring-offset-2 ring-offset-slate-100 dark:ring-sky-400/60 dark:ring-offset-slate-950'
+                          : 'cursor-grab active:cursor-grabbing'
+                      } ${theme.chip}`}
                       style={buildThemeVars(category.color)}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -7196,6 +7638,24 @@ export const App = () => {
                         </button>
 
                         <div className="flex shrink-0 items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            title={`Arrastrar sección ${category.name}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current/80 transition-colors dark:bg-slate-950/80"
+                          >
+                            <svg
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              className="h-4 w-4"
+                            >
+                              <circle cx="7" cy="6" r="1.2" fill="currentColor" />
+                              <circle cx="13" cy="6" r="1.2" fill="currentColor" />
+                              <circle cx="7" cy="10" r="1.2" fill="currentColor" />
+                              <circle cx="13" cy="10" r="1.2" fill="currentColor" />
+                              <circle cx="7" cy="14" r="1.2" fill="currentColor" />
+                              <circle cx="13" cy="14" r="1.2" fill="currentColor" />
+                            </svg>
+                          </span>
                           <button
                             type="button"
                             onClick={() => handleToggleHomeCategoryCollapse(category.name)}
