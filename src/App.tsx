@@ -1077,8 +1077,7 @@ const insertAdmonitionBlockAtCursor = (
   setValue: (nextValue: string) => void,
   kind: AdmonitionBlockKind,
 ) => {
-  const label = admonitionBlockOptions.find((option) => option.kind === kind)?.label ?? 'Nota';
-  const snippet = `:::${kind}\n${label}\n:::\n`;
+  const snippet = `:::${kind}\n\n:::\n`;
   const cursorOffset = `:::${kind}\n`.length;
 
   insertSnippetAtCursor(
@@ -1087,7 +1086,7 @@ const insertAdmonitionBlockAtCursor = (
     setValue,
     snippet,
     cursorOffset,
-    label.length,
+    0,
   );
 };
 

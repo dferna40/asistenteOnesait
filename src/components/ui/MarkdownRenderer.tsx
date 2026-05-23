@@ -205,6 +205,69 @@ const admonitionToneClasses: Record<
   },
 };
 
+function AdmonitionIcon({ kind }: { kind: MarkdownAdmonitionKind }) {
+  if (kind === 'info') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+        <circle cx="10" cy="10" r="7" />
+        <path d="M10 8v5M10 5.7h.01" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (kind === 'warning') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+        <path d="M10 3.5 17 16H3L10 3.5Z" strokeLinejoin="round" />
+        <path d="M10 7.4v4.8M10 14.5h.01" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (kind === 'important') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+        <path d="M10 3.5v8.5M10 15.1h.01" strokeLinecap="round" />
+        <path d="M5.5 3.5h9l-1 9H6.5l-1-9Z" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
+  if (kind === 'tip') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+        <path d="M7.5 11.8c-1.1-.8-1.8-2.1-1.8-3.6a4.3 4.3 0 1 1 8.6 0c0 1.5-.7 2.8-1.8 3.6-.7.5-1 1-1.1 1.7H8.6c-.1-.7-.4-1.2-1.1-1.7Z" strokeLinejoin="round" />
+        <path d="M8.4 15.2h3.2M8.9 17h2.2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (kind === 'error') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+        <circle cx="10" cy="10" r="7" />
+        <path d="m7.5 7.5 5 5m0-5-5 5" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (kind === 'example') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+        <path d="M6 4.5h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" />
+        <path d="M7.8 8h4.4M7.8 10.5h4.4M7.8 13h2.8" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4 fill-none stroke-current" strokeWidth="1.8">
+      <path d="M5.5 4.5h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" />
+      <path d="M7.8 8h4.4M7.8 11h4.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const parseMarkdownContentBlocks = (content: string): MarkdownContentBlock[] => {
   const lines = content.split('\n');
   const blocks: MarkdownContentBlock[] = [];
@@ -505,7 +568,7 @@ function MarkdownAdmonition({
           className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${tone.icon}`}
           aria-hidden="true"
         >
-          {admonitionLabels[block.kind].slice(0, 1)}
+          <AdmonitionIcon kind={block.kind} />
         </span>
         <span className={`text-sm font-semibold uppercase tracking-[0.16em] ${tone.title}`}>
           {admonitionLabels[block.kind]}
