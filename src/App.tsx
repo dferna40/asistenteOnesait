@@ -2370,6 +2370,7 @@ export const App = () => {
   );
   const [showEntryAdvancedOptions, setShowEntryAdvancedOptions] = useState(false);
   const [isEntryContextCollapsed, setIsEntryContextCollapsed] = useState(false);
+  const [isEntryEditorFocused, setIsEntryEditorFocused] = useState(false);
   const [showTemplateTechnicalOptions, setShowTemplateTechnicalOptions] =
     useState(false);
   const [backupImportState, setBackupImportState] =
@@ -2755,6 +2756,7 @@ export const App = () => {
     if (modalState?.type === 'entry') {
       setEntryEditorViewMode('editor');
       setIsEntryContextCollapsed(false);
+      setIsEntryEditorFocused(false);
     }
   }, [modalState]);
 
@@ -6022,8 +6024,13 @@ export const App = () => {
     { label: 'Vista previa', value: 'preview' },
     { label: 'Dividido', value: 'split' },
   ];
-  const showEntryEditorPane = entryEditorViewMode !== 'preview';
-  const showEntryPreviewPane = entryEditorViewMode !== 'editor';
+  const showEntryEditorPane = isEntryEditorFocused
+    ? true
+    : entryEditorViewMode !== 'preview';
+  const showEntryPreviewPane = isEntryEditorFocused
+    ? false
+    : entryEditorViewMode !== 'editor';
+  const showFocusedEntryEditor = isEntryEditorFocused && showEntryEditorPane;
   const renderAdmonitionToolbarMenu = (
     menuId: 'entry' | 'template',
     textarea: HTMLTextAreaElement | null,
@@ -7751,7 +7758,8 @@ export const App = () => {
                       : ''
                   }`}
                 >
-                  <div className="space-y-6 p-5 sm:p-6">
+                  <div className={`${showFocusedEntryEditor ? 'flex min-h-full flex-col p-5 sm:p-6' : 'space-y-6 p-5 sm:p-6'}`}>
+                    {!showFocusedEntryEditor ? (
                     <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -7948,12 +7956,19 @@ export const App = () => {
                       </>
                       ) : null}
                     </section>
+                    ) : null}
 
-                    <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
+                    <section className={`section-gradient-card neon-card rounded-3xl border border-slate-200 shadow-sm dark:border-slate-800 ${
+                      showFocusedEntryEditor ? 'flex min-h-0 flex-1 flex-col p-4 sm:p-5' : 'space-y-4 p-5'
+                    }`} style={entryThemeVars}>
                       <div
-                        className="flex flex-wrap items-center gap-2 rounded-xl border-b border-slate-200 bg-slate-50/80 px-2 py-2 dark:bg-slate-900/80 dark:border-slate-800"
+                        className={`z-10 rounded-xl border-b border-slate-200 bg-slate-50/80 dark:bg-slate-900/80 dark:border-slate-800 ${
+                          showFocusedEntryEditor ? 'sticky top-0 space-y-3 px-2 py-2 pb-3' : ''
+                        }`}
                         style={toolbarContainerStyle}
                       >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
                         {toolbarActions.map((action, index) => {
                           const isActive = activeToolbarActionId === `${index}`;
 
@@ -8008,12 +8023,47 @@ export const App = () => {
                               setContentEditorSelection,
                             ),
                         )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setIsEntryEditorFocused((currentValue) => !currentValue)
+                            }
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
+                          >
+                            <span>{showFocusedEntryEditor ? 'Salir de enfoque' : 'Expandir editor'}</span>
+                            <svg
+                              aria-hidden="true"
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              className="h-4 w-4"
+                            >
+                              {showFocusedEntryEditor ? (
+                                <path
+                                  d="M7 3.5H3.5V7M13 3.5h3.5V7M7 16.5H3.5V13M13 16.5h3.5V13"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              ) : (
+                                <path
+                                  d="M7 3.5H3.5V7M13 3.5h3.5V7M7 16.5H3.5V13M13 16.5h3.5V13M6.5 6.5l-3 3M13.5 6.5l3 3M6.5 13.5l-3-3M13.5 13.5l3-3"
+                                  stroke="currentColor"
+                                  strokeWidth="1.6"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              )}
+                            </svg>
+                          </button>
+                        </div>
+                        <p className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                          {buildToolbarContextLabel(contentEditorSelection)}
+                        </p>
                       </div>
-                      <p className="rounded-2xl border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
-                        {buildToolbarContextLabel(contentEditorSelection)}
-                      </p>
 
-                      <div className="space-y-2">
+                      <div className={`${showFocusedEntryEditor ? 'mt-4 flex min-h-0 flex-1 flex-col space-y-2' : 'space-y-2'}`}>
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             Documento Markdown
@@ -8092,12 +8142,13 @@ export const App = () => {
                                 })),
                             )
                           }
-                          className={`themed-field min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white ${isUploadingImage ? 'cursor-wait' : ''}`}
+                          className={`themed-field w-full rounded-2xl border border-slate-200 bg-slate-950 px-4 py-4 font-mono text-sm leading-7 text-slate-100 outline-none dark:border-slate-800 dark:bg-slate-950 dark:text-white ${showFocusedEntryEditor ? 'min-h-0 flex-1' : 'min-h-[420px]'} ${isUploadingImage ? 'cursor-wait' : ''}`}
                           placeholder="# Título de sección&#10;&#10;Escribe aquí tu documentación en Markdown..."
                         />
                       </div>
                     </section>
 
+                    {!showFocusedEntryEditor ? (
                     <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
                       <label className="block space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                         Pasos
@@ -8204,8 +8255,9 @@ export const App = () => {
                         </div>
                       </div>
                     </section>
+                    ) : null}
 
-                    {formError ? (
+                    {!showFocusedEntryEditor && formError ? (
                       <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         {formError}
                       </div>
