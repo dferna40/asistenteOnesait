@@ -2369,6 +2369,7 @@ export const App = () => {
     null,
   );
   const [showEntryAdvancedOptions, setShowEntryAdvancedOptions] = useState(false);
+  const [isEntryContextCollapsed, setIsEntryContextCollapsed] = useState(false);
   const [showTemplateTechnicalOptions, setShowTemplateTechnicalOptions] =
     useState(false);
   const [backupImportState, setBackupImportState] =
@@ -2753,6 +2754,7 @@ export const App = () => {
   useEffect(() => {
     if (modalState?.type === 'entry') {
       setEntryEditorViewMode('editor');
+      setIsEntryContextCollapsed(false);
     }
   }, [modalState]);
 
@@ -7751,15 +7753,43 @@ export const App = () => {
                 >
                   <div className="space-y-6 p-5 sm:p-6">
                     <section className="section-gradient-card neon-card space-y-4 rounded-3xl border border-slate-200 p-5 shadow-sm dark:border-slate-800" style={entryThemeVars}>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                          Contexto de la ficha
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
-                          Define sección, metadatos y soporte operativo antes de redactar el documento.
-                        </p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                            Contexto de la ficha
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+                            Define sección, metadatos y soporte operativo antes de redactar el documento.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setIsEntryContextCollapsed((currentValue) => !currentValue)
+                          }
+                          aria-expanded={!isEntryContextCollapsed}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-950/70 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
+                        >
+                          <span>{isEntryContextCollapsed ? 'Mostrar' : 'Ocultar'}</span>
+                          <svg
+                            aria-hidden="true"
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            className={`h-4 w-4 transition-transform ${isEntryContextCollapsed ? '' : 'rotate-180'}`}
+                          >
+                            <path
+                              d="m5.5 8 4.5 4 4.5-4"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </button>
                       </div>
 
+                      {!isEntryContextCollapsed ? (
+                      <>
                       <div className="grid gap-4 md:grid-cols-2">
                         <label className="space-y-2 text-sm font-medium text-slate-700 dark:text-slate-200">
                           Seccion
@@ -7914,6 +7944,8 @@ export const App = () => {
                           </span>
                           , con la descripción actual de la Home.
                         </div>
+                      ) : null}
+                      </>
                       ) : null}
                     </section>
 
