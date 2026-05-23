@@ -2388,18 +2388,16 @@ const buildCategoryChipLines = (label: string) => {
     targetLineCount >= 4 ? 12 : targetLineCount === 3 ? 14 : 18;
   const lines: string[] = [];
 
-  normalizedTokens.forEach((token, index) => {
+  normalizedTokens.forEach((token) => {
     const currentLine = lines.at(-1) ?? '';
     const candidateLine = currentLine
       ? `${currentLine}${currentLine.endsWith('/') ? '' : ' '}${token}`
       : token;
-    const remainingTokens = normalizedTokens.length - index - 1;
     const remainingLineSlots = targetLineCount - lines.length;
 
     if (
       currentLine &&
       candidateLine.length > maxLineLength &&
-      remainingTokens > 0 &&
       remainingLineSlots > 0
     ) {
       lines.push(token);
