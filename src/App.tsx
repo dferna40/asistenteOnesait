@@ -7627,26 +7627,7 @@ export const App = () => {
                       } ${theme.chip}`}
                       style={buildThemeVars(category.color)}
                     >
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
-                        <button
-                          type="button"
-                          onClick={() => handleCategoryFilter(category.name)}
-                          className="min-w-0 pr-1 text-left"
-                        >
-                          <div className="min-h-[4.75rem]">
-                            <div className="inline-flex items-center gap-2 rounded-full border border-current/15 bg-white/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-current shadow-sm dark:bg-slate-950/70">
-                              <span
-                                className={`inline-block h-2.5 w-2.5 rounded-full ${theme.badge}`}
-                                aria-hidden="true"
-                              />
-                              Sección
-                            </div>
-                            <h4 className="mt-2 overflow-hidden text-balance text-base font-semibold leading-5 text-slate-900 dark:text-slate-50 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
-                              {category.name}
-                            </h4>
-                          </div>
-                        </button>
-
+                      <div className="flex items-start justify-end">
                         <div className="flex min-w-[7.5rem] shrink-0 items-center justify-end gap-1.5 sm:min-w-[8.75rem] sm:gap-2">
                           <span
                             aria-hidden="true"
@@ -7718,6 +7699,18 @@ export const App = () => {
                           </button>
                         </div>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCategoryFilter(category.name)}
+                        className="mt-3 block w-full text-left"
+                      >
+                        <div className="min-h-[4.25rem]">
+                          <h4 className="overflow-hidden text-balance text-base font-semibold leading-5 text-slate-900 dark:text-slate-50 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
+                            {category.name}
+                          </h4>
+                        </div>
+                      </button>
 
                       {!isCollapsed ? (
                         <button
