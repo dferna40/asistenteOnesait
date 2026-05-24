@@ -2382,10 +2382,8 @@ const buildCategoryChipLines = (label: string) => {
     return [label];
   }
 
-  const targetLineCount =
-    normalizedTokens.length >= 5 ? 4 : normalizedTokens.length >= 3 ? 3 : 2;
-  const maxLineLength =
-    targetLineCount >= 4 ? 12 : targetLineCount === 3 ? 14 : 18;
+  const targetLineCount = normalizedTokens.length >= 4 ? 3 : 2;
+  const maxLineLength = targetLineCount === 3 ? 16 : 22;
   const lines: string[] = [];
 
   normalizedTokens.forEach((token) => {
@@ -2419,7 +2417,7 @@ const renderCategoryChipLabel = (label: string) =>
   buildCategoryChipLines(label).map((line, index, lines) => (
     <span
       key={`${line}-${index}`}
-      className="block max-w-full break-words [overflow-wrap:anywhere]"
+      className="block max-w-full [overflow-wrap:normal] [word-break:normal]"
     >
       {line}
       {index < lines.length - 1 ? <br /> : null}
@@ -7696,7 +7694,7 @@ export const App = () => {
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 pr-1 text-left"
                         >
-                          <span className="section-gradient-pill inline-flex min-h-[4.5rem] w-full max-w-[12.25rem] flex-col items-center justify-center overflow-hidden rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word] sm:max-w-[12.75rem]">
+                          <span className="section-gradient-pill inline-flex min-h-[4.5rem] w-full max-w-[13rem] flex-col items-center justify-center overflow-hidden rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal [overflow-wrap:normal] [word-break:normal] sm:max-w-[13.5rem]">
                             {renderCategoryChipLabel(category.name)}
                           </span>
                         </button>
