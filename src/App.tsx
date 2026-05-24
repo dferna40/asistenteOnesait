@@ -864,6 +864,126 @@ const normalizeTags = (value: string) =>
     ),
   );
 
+const automaticTagStopWords = new Set([
+  'a',
+  'al',
+  'ante',
+  'bajo',
+  'cabe',
+  'con',
+  'contra',
+  'de',
+  'del',
+  'desde',
+  'durante',
+  'el',
+  'en',
+  'entre',
+  'es',
+  'esta',
+  'este',
+  'hacia',
+  'hasta',
+  'la',
+  'las',
+  'lo',
+  'los',
+  'mediante',
+  'o',
+  'para',
+  'por',
+  'segun',
+  'sin',
+  'sobre',
+  'su',
+  'sus',
+  'tras',
+  'un',
+  'una',
+  'uno',
+  'unos',
+  'unas',
+  'y',
+]);
+
+const normalizeTagWords = (value: string) =>
+  normalizeComparableText(value)
+    .replace(/[^a-z0-9\s/-]+/g, ' ')
+    .split(/[\s/-]+/)
+    .map((word) => word.trim())
+    .filter(Boolean)
+    .filter(
+      (word) =>
+        !automaticTagStopWords.has(word) &&
+        (word.length >= 4 ||
+          ['api', 'aws', 'bdd', 'git', 'mdd', 'pdf', 'sql', 'svn', 'ui', 'url', 'vpn'].includes(
+            word,
+          )),
+    );
+
+const buildSearchableTag = (value: string) => {
+  const words = normalizeTagWords(value).slice(0, 3);
+
+  if (!words.length) {
+    return '';
+  }
+
+  return words.join('-');
+};
+
+const generateAutomaticEntryTags = (entry: {
+  categoria: string;
+  comandos: CommandOption[];
+  contenido: string;
+  pasos: string[];
+  titulo: string;
+}) => {
+  const rankedKeywords = new Map<string, number>();
+  const nextTags: string[] = [];
+  const pushTag = (value: string) => {
+    if (!value || nextTags.includes(value)) {
+      return;
+    }
+
+    nextTags.push(value);
+  };
+  const addWeightedWords = (value: string, weight: number) => {
+    normalizeTagWords(value).forEach((word) => {
+      rankedKeywords.set(word, (rankedKeywords.get(word) ?? 0) + weight);
+    });
+  };
+
+  pushTag(buildSearchableTag(entry.categoria));
+
+  entry.titulo
+    .split(/[:|,;()]+/)
+    .map((segment) => buildSearchableTag(segment))
+    .filter(Boolean)
+    .forEach(pushTag);
+
+  addWeightedWords(entry.titulo, 4);
+  addWeightedWords(entry.categoria, 3);
+  entry.pasos.forEach((step) => addWeightedWords(step, 2));
+  entry.comandos.forEach((command) => {
+    addWeightedWords(command.label, 2);
+    addWeightedWords(command.value, 1);
+  });
+  addWeightedWords(entry.contenido, 1);
+
+  Array.from(rankedKeywords.entries())
+    .sort((firstEntry, secondEntry) => {
+      if (secondEntry[1] !== firstEntry[1]) {
+        return secondEntry[1] - firstEntry[1];
+      }
+
+      return firstEntry[0].localeCompare(secondEntry[0], 'es');
+    })
+    .map(([word]) => word)
+    .forEach(pushTag);
+
+  return nextTags.slice(0, 5);
+};
+
 const normalizeComparableText = (value: string) =>
   value
     .trim()
@@ -5058,13 +5178,18 @@ export const App = () => {
         tags:
           entryForm.tags.trim().length > 0
             ? normalizeTags(entryForm.tags)
-            : Array.from(
-                new Set(
-                  [trimmedCategory, trimmedTitle]
-                    .flatMap((value) => value.split(/\s+/))
-                    .map((value) => value.toLowerCase()),
-                ),
-              ),
+            : generateAutomaticEntryTags({
+                categoria: trimmedCategory,
+                comandos: entryForm.comandos
+                  .map((command) => ({
+                    label: command.label.trim(),
+                    value: command.value,
+                  }))
+                  .filter((command) => command.label.length > 0),
+                contenido: trimmedContent,
+                pasos: splitLines(entryForm.pasos),
+                titulo: trimmedTitle,
+              }),
         titulo: trimmedTitle,
         isPinned: originalEntry?.isPinned ?? false,
         updatedAt: getCurrentIsoDate(),
