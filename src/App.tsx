@@ -7173,13 +7173,13 @@ export const App = () => {
                       onChange={(event) =>
                         setResultSortMode(event.target.value as ResultSortMode)
                       }
-                      className="bg-transparent text-sm outline-none"
+                      className="rounded-lg bg-white/90 px-2 py-1 text-sm text-slate-800 outline-none transition-colors dark:bg-slate-950 dark:text-slate-100"
                     >
-                      <option value="custom">Personalizado</option>
-                      <option value="pinned-latest">Ancladas + recientes</option>
-                      <option value="latest">Mas recientes</option>
-                      <option value="oldest">Mas antiguas</option>
-                      <option value="title">Título</option>
+                      <option value="custom" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">Personalizado</option>
+                      <option value="pinned-latest" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">Ancladas + recientes</option>
+                      <option value="latest" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">Mas recientes</option>
+                      <option value="oldest" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">Mas antiguas</option>
+                      <option value="title" className="bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100">Título</option>
                     </select>
                   </label>
 
@@ -7324,8 +7324,8 @@ export const App = () => {
                 <div className="hero-orb hero-orb-primary" aria-hidden="true" />
                 <div className="hero-orb hero-orb-secondary" aria-hidden="true" />
 
-                <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="max-w-3xl">
+                <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+                  <div className="min-w-0 flex-1 lg:max-w-5xl">
                     <div className="flex items-center gap-4">
                       <AppLogo
                         appIconDataUrl={customization.appIconDataUrl}
@@ -7342,7 +7342,7 @@ export const App = () => {
                       </div>
                     </div>
 
-                    <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
+                    <p className="mt-5 max-w-none text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
                       {customization.heroDescription}
                     </p>
                     <div className="mt-5 flex flex-wrap gap-2.5">
@@ -7683,18 +7683,18 @@ export const App = () => {
                       } ${theme.chip}`}
                       style={buildThemeVars(category.color)}
                     >
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                      <div className="grid grid-cols-[minmax(0,1fr)_8.75rem] items-start gap-3">
                         <button
                           type="button"
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 justify-self-start text-left"
                         >
-                          <span className="section-gradient-pill inline-flex max-w-full flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word]">
+                          <span className="section-gradient-pill inline-flex min-h-[4.75rem] w-[10.5rem] max-w-full flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word] sm:w-[11rem]">
                             {renderCategoryChipLabel(category.name)}
                           </span>
                         </button>
 
-                        <div className="flex shrink-0 items-center gap-2">
+                        <div className="flex w-[8.75rem] shrink-0 items-center justify-end gap-2">
                           <span
                             aria-hidden="true"
                             title={`Arrastrar sección ${category.name}`}
