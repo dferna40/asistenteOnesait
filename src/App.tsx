@@ -2417,7 +2417,10 @@ const buildCategoryChipLines = (label: string) => {
 
 const renderCategoryChipLabel = (label: string) =>
   buildCategoryChipLines(label).map((line, index, lines) => (
-    <span key={`${line}-${index}`} className="block">
+    <span
+      key={`${line}-${index}`}
+      className="block max-w-full break-words [overflow-wrap:anywhere]"
+    >
       {line}
       {index < lines.length - 1 ? <br /> : null}
     </span>
@@ -7693,7 +7696,7 @@ export const App = () => {
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 pr-1 text-left"
                         >
-                          <span className="section-gradient-pill inline-flex min-h-[4.5rem] w-full max-w-[12.25rem] flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word] sm:max-w-[12.75rem]">
+                          <span className="section-gradient-pill inline-flex min-h-[4.5rem] w-full max-w-[12.25rem] flex-col items-center justify-center overflow-hidden rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word] sm:max-w-[12.75rem]">
                             {renderCategoryChipLabel(category.name)}
                           </span>
                         </button>
