@@ -7324,25 +7324,77 @@ export const App = () => {
                 <div className="hero-orb hero-orb-primary" aria-hidden="true" />
                 <div className="hero-orb hero-orb-secondary" aria-hidden="true" />
 
-                <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
-                  <div className="min-w-0 flex-1 lg:max-w-5xl">
-                    <div className="flex items-center gap-4">
-                      <AppLogo
-                        appIconDataUrl={customization.appIconDataUrl}
-                        appName={customization.appName}
-                        className="h-16 w-16 shrink-0 sm:h-20 sm:w-20"
-                      />
-                      <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sky-700 dark:text-sky-300">
-                          Centro operativo
-                        </p>
-                        <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-[2.5rem]">
-                          {customization.heroTitle}
-                        </h2>
+                <div className="relative z-10 space-y-5">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-4">
+                        <AppLogo
+                          appIconDataUrl={customization.appIconDataUrl}
+                          appName={customization.appName}
+                          className="h-16 w-16 shrink-0 sm:h-20 sm:w-20"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black uppercase tracking-[0.28em] text-sky-700 dark:text-sky-300">
+                            Centro operativo
+                          </p>
+                          <h2 className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl lg:text-[2.5rem]">
+                            {customization.heroTitle}
+                          </h2>
+                        </div>
                       </div>
                     </div>
 
-                    <p className="mt-5 max-w-none text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
+                    <div className="relative z-10 flex flex-wrap gap-3 lg:shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleOpenTemplatesView}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-sky-500/60 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 hover:text-sky-800 dark:border-sky-400/50 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15 dark:hover:text-sky-200"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          className="h-5 w-5"
+                        >
+                          <path
+                            d="M6 3.5h8a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 14 16.5H6A1.5 1.5 0 0 1 4.5 15V5A1.5 1.5 0 0 1 6 3.5Z"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                          />
+                          <path
+                            d="M7.5 7h5M7.5 10h5M7.5 13h3"
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                        Plantillas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={openCreateCategoryModal}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
+                      >
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 20 20"
+                          fill="none"
+                          className="h-5 w-5"
+                        >
+                          <path
+                            d="M10 4v12M4 10h12"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeWidth="1.8"
+                          />
+                        </svg>
+                        Nueva Seccion
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-w-none">
+                    <p className="text-base leading-7 text-slate-600 dark:text-slate-200 sm:text-lg">
                       {customization.heroDescription}
                     </p>
                     <div className="mt-5 flex flex-wrap gap-2.5">
@@ -7372,54 +7424,6 @@ export const App = () => {
                         </button>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="relative z-10 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={handleOpenTemplatesView}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-sky-500/60 bg-sky-500/10 px-4 py-2.5 text-sm font-medium text-sky-700 transition-colors hover:border-sky-500 hover:bg-sky-500/15 hover:text-sky-800 dark:border-sky-400/50 dark:bg-sky-500/10 dark:text-sky-300 dark:hover:border-sky-300 dark:hover:bg-sky-400/15 dark:hover:text-sky-200"
-                    >
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        className="h-5 w-5"
-                      >
-                        <path
-                          d="M6 3.5h8a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 14 16.5H6A1.5 1.5 0 0 1 4.5 15V5A1.5 1.5 0 0 1 6 3.5Z"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                        />
-                        <path
-                          d="M7.5 7h5M7.5 10h5M7.5 13h3"
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      Plantillas
-                    </button>
-                    <button
-                      type="button"
-                      onClick={openCreateCategoryModal}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-emerald-500/60 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:border-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-800 dark:border-emerald-400/50 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:border-emerald-300 dark:hover:bg-emerald-400/15 dark:hover:text-emerald-200"
-                    >
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 20 20"
-                        fill="none"
-                        className="h-5 w-5"
-                      >
-                        <path
-                          d="M10 4v12M4 10h12"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeWidth="1.8"
-                        />
-                      </svg>
-                      Nueva Seccion
-                    </button>
                   </div>
                 </div>
               </div>
@@ -7683,27 +7687,27 @@ export const App = () => {
                       } ${theme.chip}`}
                       style={buildThemeVars(category.color)}
                     >
-                      <div className="grid grid-cols-[minmax(0,1fr)_8.75rem] items-start gap-3">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                         <button
                           type="button"
                           onClick={() => handleCategoryFilter(category.name)}
-                          className="min-w-0 justify-self-start text-left"
+                          className="min-w-0 pr-1 text-left"
                         >
-                          <span className="section-gradient-pill inline-flex min-h-[4.75rem] w-[10.5rem] max-w-full flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word] sm:w-[11rem]">
+                          <span className="section-gradient-pill inline-flex min-h-[4.5rem] w-full max-w-[12.25rem] flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word] sm:max-w-[12.75rem]">
                             {renderCategoryChipLabel(category.name)}
                           </span>
                         </button>
 
-                        <div className="flex w-[8.75rem] shrink-0 items-center justify-end gap-2">
+                        <div className="flex min-w-[7.5rem] shrink-0 items-center justify-end gap-1.5 sm:min-w-[8.75rem] sm:gap-2">
                           <span
                             aria-hidden="true"
                             title={`Arrastrar sección ${category.name}`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current/80 transition-colors dark:bg-slate-950/80"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current/80 transition-colors dark:bg-slate-950/80 sm:h-9 sm:w-9"
                           >
                             <svg
                               viewBox="0 0 20 20"
                               fill="none"
-                              className="h-4 w-4"
+                              className="h-3.5 w-3.5 sm:h-4 sm:w-4"
                             >
                               <circle cx="7" cy="6" r="1.2" fill="currentColor" />
                               <circle cx="13" cy="6" r="1.2" fill="currentColor" />
@@ -7718,13 +7722,13 @@ export const App = () => {
                             onClick={() => handleToggleHomeCategoryCollapse(category.name)}
                             aria-label={`${isCollapsed ? 'Expandir' : 'Colapsar'} sección ${category.name}`}
                             title={`${isCollapsed ? 'Expandir' : 'Colapsar'} sección ${category.name}`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900 sm:h-9 sm:w-9"
                           >
                             <svg
                               aria-hidden="true"
                               viewBox="0 0 20 20"
                               fill="none"
-                              className={`h-5 w-5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}
+                              className={`h-4 w-4 transition-transform sm:h-5 sm:w-5 ${isCollapsed ? '-rotate-90' : 'rotate-0'}`}
                             >
                               <path
                                 d="m6 8 4 4 4-4"
@@ -7740,13 +7744,13 @@ export const App = () => {
                             onClick={() => openCategoryModal(category.name)}
                             aria-label={`Editar sección ${category.name}`}
                             title={`Editar sección ${category.name}`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-current/15 bg-white/70 text-current transition-colors hover:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-900 sm:h-9 sm:w-9"
                           >
                             <svg
                               aria-hidden="true"
                               viewBox="0 0 20 20"
                               fill="none"
-                              className="icon-neon h-5 w-5"
+                              className="icon-neon h-4 w-4 sm:h-5 sm:w-5"
                             >
                               <path
                                 d="M10 2.5a1 1 0 0 1 1 1v.6a6.3 6.3 0 0 1 1.8.8l.4-.4a1 1 0 0 1 1.4 0l1 1a1 1 0 0 1 0 1.4l-.4.4c.3.6.6 1.2.8 1.8h.6a1 1 0 0 1 1 1v1.4a1 1 0 0 1-1 1h-.6a6.3 6.3 0 0 1-.8 1.8l.4.4a1 1 0 0 1 0 1.4l-1 1a1 1 0 0 1-1.4 0l-.4-.4a6.3 6.3 0 0 1-1.8.8v.6a1 1 0 0 1-1 1H8.6a1 1 0 0 1-1-1v-.6a6.3 6.3 0 0 1-1.8-.8l-.4.4a1 1 0 0 1-1.4 0l-1-1a1 1 0 0 1 0-1.4l.4-.4a6.3 6.3 0 0 1-.8-1.8H2a1 1 0 0 1-1-1V9.9a1 1 0 0 1 1-1h.6a6.3 6.3 0 0 1 .8-1.8L3 6.7a1 1 0 0 1 0-1.4l1-1a1 1 0 0 1 1.4 0l.4.4a6.3 6.3 0 0 1 1.8-.8v-.6a1 1 0 0 1 1-1H10Z"
