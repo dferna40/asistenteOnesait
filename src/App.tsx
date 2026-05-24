@@ -2363,67 +2363,6 @@ const loadPdfFontBase64 = async (fileName: string) => {
   return arrayBufferToBase64(buffer);
 };
 
-const buildCategoryChipLines = (label: string) => {
-  const normalizedTokens = label
-    .trim()
-    .split(/\s+/)
-    .flatMap((part) => part.split(/(?<=[/_-])/).filter(Boolean))
-    .reduce<string[]>((tokens, token) => {
-      if ((token === '/' || token === '_' || token === '-') && tokens.length) {
-        tokens[tokens.length - 1] = `${tokens[tokens.length - 1]}${token}`;
-        return tokens;
-      }
-
-      tokens.push(token);
-      return tokens;
-    }, []);
-
-  if (normalizedTokens.length <= 1) {
-    return [label];
-  }
-
-  const targetLineCount = normalizedTokens.length >= 4 ? 3 : 2;
-  const maxLineLength = targetLineCount === 3 ? 16 : 22;
-  const lines: string[] = [];
-
-  normalizedTokens.forEach((token) => {
-    const currentLine = lines.at(-1) ?? '';
-    const candidateLine = currentLine
-      ? `${currentLine}${currentLine.endsWith('/') ? '' : ' '}${token}`
-      : token;
-    const remainingLineSlots = targetLineCount - lines.length;
-
-    if (
-      currentLine &&
-      candidateLine.length > maxLineLength &&
-      remainingLineSlots > 0
-    ) {
-      lines.push(token);
-      return;
-    }
-
-    if (currentLine) {
-      lines[lines.length - 1] = candidateLine;
-      return;
-    }
-
-    lines.push(token);
-  });
-
-  return lines;
-};
-
-const renderCategoryChipLabel = (label: string) =>
-  buildCategoryChipLines(label).map((line, index, lines) => (
-    <span
-      key={`${line}-${index}`}
-      className="block max-w-full [overflow-wrap:normal] [word-break:normal]"
-    >
-      {line}
-      {index < lines.length - 1 ? <br /> : null}
-    </span>
-  ));
-
 export const App = () => {
   const initialManualSnapshotRef = useRef<StoredManualSnapshot>(
     getFallbackManualSnapshot(),
@@ -7694,9 +7633,18 @@ export const App = () => {
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 pr-1 text-left"
                         >
-                          <span className="section-gradient-pill inline-flex min-h-[4.5rem] w-full max-w-[13rem] flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal [overflow-wrap:normal] [word-break:normal] sm:max-w-[13.5rem]">
-                            {renderCategoryChipLabel(category.name)}
-                          </span>
+                          <div className="min-h-[4.75rem]">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-current/15 bg-white/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-current shadow-sm dark:bg-slate-950/70">
+                              <span
+                                className={`inline-block h-2.5 w-2.5 rounded-full ${theme.badge}`}
+                                aria-hidden="true"
+                              />
+                              Sección
+                            </div>
+                            <h4 className="mt-2 overflow-hidden text-balance text-base font-semibold leading-5 text-slate-900 dark:text-slate-50 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]">
+                              {category.name}
+                            </h4>
+                          </div>
                         </button>
 
                         <div className="flex min-w-[7.5rem] shrink-0 items-center justify-end gap-1.5 sm:min-w-[8.75rem] sm:gap-2">
