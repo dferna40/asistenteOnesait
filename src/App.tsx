@@ -2828,17 +2828,16 @@ export const App = () => {
   const sectionPdfEntries = useMemo(
     () =>
       sectionPdfExportState
-        ? manualData.entries
-            .filter(
+        ? sortEntries(
+            manualData.entries.filter(
               (entry) =>
                 entry.categoria.toLowerCase() ===
                 sectionPdfExportState.categoryName.toLowerCase(),
-            )
-            .sort((firstEntry, secondEntry) =>
-              firstEntry.titulo.localeCompare(secondEntry.titulo, 'es'),
-            )
+            ),
+            'custom',
+          )
         : [],
-    [manualData.entries, sectionPdfExportState],
+    [manualData.entries, sectionPdfExportState, customEntryOrderByCategory],
   );
   const restorableTrashCategories = useMemo<TrashCategorySummary[]>(() => {
     const trashCategoryMap = new Map<string, TrashCategorySummary>();
@@ -5006,13 +5005,12 @@ export const App = () => {
   };
 
   const openSectionPdfExportModal = (categoryName: string) => {
-    const categoryEntries = manualData.entries
-      .filter(
+    const categoryEntries = sortEntries(
+      manualData.entries.filter(
         (entry) => entry.categoria.toLowerCase() === categoryName.toLowerCase(),
-      )
-      .sort((firstEntry, secondEntry) =>
-        firstEntry.titulo.localeCompare(secondEntry.titulo, 'es'),
-      );
+      ),
+      'custom',
+    );
 
     if (!categoryEntries.length) {
       setSaveToast({
@@ -5055,16 +5053,10 @@ export const App = () => {
       return;
     }
 
-    const selectedEntries = manualData.entries
-      .filter(
-        (entry) =>
-          entry.categoria.toLowerCase() ===
-            sectionPdfExportState.categoryName.toLowerCase() &&
-          sectionPdfExportState.selectedEntryIds.includes(entry.id),
-      )
-      .sort((firstEntry, secondEntry) =>
-        firstEntry.titulo.localeCompare(secondEntry.titulo, 'es'),
-      );
+    const selectedEntryIdSet = new Set(sectionPdfExportState.selectedEntryIds);
+    const selectedEntries = sectionPdfEntries.filter((entry) =>
+      selectedEntryIdSet.has(entry.id),
+    );
 
     if (!selectedEntries.length) {
       setSaveToast({
