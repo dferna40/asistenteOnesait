@@ -7694,7 +7694,7 @@ export const App = () => {
                           onClick={() => handleCategoryFilter(category.name)}
                           className="min-w-0 pr-1 text-left"
                         >
-                          <span className="section-gradient-pill inline-flex min-h-[4.5rem] w-full max-w-[13rem] flex-col items-center justify-center overflow-hidden rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal [overflow-wrap:normal] [word-break:normal] sm:max-w-[13.5rem]">
+                          <span className="section-gradient-pill inline-flex min-h-[4.5rem] w-full max-w-[13rem] flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal [overflow-wrap:normal] [word-break:normal] sm:max-w-[13.5rem]">
                             {renderCategoryChipLabel(category.name)}
                           </span>
                         </button>
