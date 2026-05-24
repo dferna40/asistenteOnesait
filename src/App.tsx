@@ -6137,6 +6137,7 @@ export const App = () => {
   const handleCategoryFilter = (categoryName: string) => {
     setActiveView('home');
     setActiveCategoryFilter(categoryName);
+    setResultSortMode('custom');
   };
   const isQuickViewActive = (quickView: QuickViewDefinition) =>
     (quickView.categoryName ?? '') === activeCategoryFilter &&
@@ -6150,7 +6151,11 @@ export const App = () => {
     setActiveTagFilters([]);
     setShowPinnedOnly(Boolean(quickView.showPinnedOnly));
     setResultSortMode(
-      quickView.showPinnedOnly ? 'pinned-latest' : 'pinned-latest',
+      quickView.showPinnedOnly
+        ? 'pinned-latest'
+        : quickView.categoryName
+          ? 'custom'
+          : 'pinned-latest',
     );
   };
   const handleTagFilter = (tag: string) => {
@@ -7682,18 +7687,10 @@ export const App = () => {
                         <button
                           type="button"
                           onClick={() => handleCategoryFilter(category.name)}
-                          className="min-w-0 flex-1 text-left"
+                          className="min-w-0 justify-self-start text-left"
                         >
                           <span className="section-gradient-pill inline-flex max-w-full flex-col items-center justify-center rounded-[1.1rem] border px-3 py-2 text-center text-sm font-medium leading-5 whitespace-normal break-words [overflow-wrap:break-word]">
                             {renderCategoryChipLabel(category.name)}
-                          </span>
-                          {!isCollapsed ? (
-                            <span className="mt-2 block text-[11px] leading-5 text-slate-500 dark:text-slate-300 sm:text-xs sm:leading-5">
-                              {category.description}
-                            </span>
-                          ) : null}
-                          <span className="mt-3 block text-[11px] font-semibold uppercase tracking-[0.16em] text-current/80 dark:text-slate-100">
-                            {entryCount} ficha{entryCount === 1 ? '' : 's'}
                           </span>
                         </button>
 
@@ -7768,6 +7765,28 @@ export const App = () => {
                           </button>
                         </div>
                       </div>
+
+                      {!isCollapsed ? (
+                        <button
+                          type="button"
+                          onClick={() => handleCategoryFilter(category.name)}
+                          className="mt-2 block w-full text-left"
+                        >
+                          <span className="block text-[11px] leading-5 text-slate-500 dark:text-slate-300 sm:text-xs sm:leading-5">
+                            {category.description}
+                          </span>
+                        </button>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => handleCategoryFilter(category.name)}
+                        className="mt-3 block w-full text-left"
+                      >
+                        <span className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-current/80 dark:text-slate-100">
+                          {entryCount} ficha{entryCount === 1 ? '' : 's'}
+                        </span>
+                      </button>
 
                       {!isCollapsed ? (
                         <div className="mt-4 flex flex-wrap gap-2">
