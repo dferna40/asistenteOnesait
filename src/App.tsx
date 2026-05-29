@@ -4870,7 +4870,15 @@ export const App = () => {
             const wrappedLines = trimmedParagraph
               ? (pdf.splitTextToSize(trimmedParagraph, textWidth) as string[])
               : [''];
-            pdf.text(wrappedLines, margin + paddingX, innerCursorY);
+
+            wrappedLines.forEach((wrappedLine, wrappedLineIndex) => {
+              pdf.text(
+                wrappedLine,
+                margin + paddingX,
+                innerCursorY + wrappedLineIndex * lineHeight,
+              );
+            });
+
             innerCursorY += Math.max(1, wrappedLines.length) * lineHeight;
           });
         }
