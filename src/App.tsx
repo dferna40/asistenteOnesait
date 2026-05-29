@@ -2252,7 +2252,7 @@ const parsePdfContentBlocks = (value: string): PdfContentBlock[] => {
       if (/^\s+/.test(line) && currentIndentLevel >= lastIndentLevel) {
         listBuffer[listBuffer.length - 1] = {
           ...lastListItem,
-          text: `${lastListItem.text} ${normalizePdfRichText(trimmedLine)}`.trim(),
+          text: `${lastListItem.text}\n${normalizePdfRichText(trimmedLine)}`.trim(),
         };
         return;
       }
@@ -4362,151 +4362,232 @@ export const App = () => {
         }
       };
 
-      const writeListBlock = (items: PdfListItem[]) => {
+      const writeListBlock = async (items: PdfListItem[]) => {
         const markerWidth = 12;
         const itemGap = 2.5;
         const indentWidth = 8;
 
-        items.forEach((item) => {
+        for (const item of items) {
           const itemX = margin + item.indentLevel * indentWidth;
           const textX = itemX + markerWidth;
           const textWidth = Math.max(24, pageWidth - margin - textX);
-          const segments = parsePdfInlineSegments(item.text);
-          const measurePieceWidth = (piece: PdfInlineSegment) => {
-            const pieceFont =
-              piece.type === 'code'
-                ? getPdfCodeFont()
-                : getPdfTextFont();
-            const pieceFontStyle =
-              piece.type === 'link' || piece.type === 'code'
-                ? 'normal'
-                : piece.fontStyle;
-            pdf.setFont(pieceFont, getPdfFontStyle(pieceFontStyle));
-            pdf.setFontSize(10);
-            return pdf.getTextWidth(piece.text);
-          };
-          const pieces: PdfInlineSegment[] = [];
-
-          segments.forEach((segment) => {
-            const tokens = segment.text.match(/\S+\s*|\s+/g) ?? [segment.text];
-            tokens.forEach((token) => {
-              if (token.length) {
-                pieces.push({ ...segment, text: token });
-              }
-            });
-          });
-
-          const lines: PdfInlineSegment[][] = [];
-          let currentLine: PdfInlineSegment[] = [];
-          let currentWidth = 0;
-
-          const pushLine = () => {
-            lines.push(
-              currentLine.length
-                ? currentLine
-                : [{ fontStyle: 'normal', text: ' ', type: 'text' }],
-            );
-            currentLine = [];
-            currentWidth = 0;
-          };
-
-          const appendPiece = (piece: PdfInlineSegment) => {
-            const pieceWidth = measurePieceWidth(piece);
-
-            if (!currentLine.length || currentWidth + pieceWidth <= textWidth) {
-              currentLine.push(piece);
-              currentWidth += pieceWidth;
-              return;
-            }
-
-            pushLine();
-            currentLine.push(piece);
-            currentWidth = pieceWidth;
-          };
-
-          pieces.forEach((piece) => {
-            const pieceWidth = measurePieceWidth(piece);
-
-            if (pieceWidth <= textWidth) {
-              appendPiece(piece);
-              return;
-            }
-
-            let chunk = '';
-
-            for (const character of piece.text) {
-              const candidate = `${chunk}${character}`;
-              const candidatePiece = { ...piece, text: candidate };
-
-              if (measurePieceWidth(candidatePiece) > textWidth && chunk) {
-                appendPiece({ ...piece, text: chunk });
-                chunk = character;
-                continue;
-              }
-
-              chunk = candidate;
-            }
-
-            if (chunk) {
-              appendPiece({ ...piece, text: chunk });
-            }
-          });
-
-          if (currentLine.length) {
-            pushLine();
-          }
-
           const lineHeight = 10 * 0.3528 * 1.55;
-          const itemHeight = lines.length * lineHeight + 2;
+          let markerPrinted = false;
+          let itemHeight = 0;
+          const itemLines = item.text.split('\n');
 
-          ensureSpace(itemHeight + itemGap);
-          pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
-          pdf.setFontSize(10);
-          pdf.setTextColor(51, 65, 85);
-          pdf.text(item.marker, itemX, cursorY + 4);
-
-          lines.forEach((linePieces, lineIndex) => {
-            let cursorX = textX;
-            const lineY = cursorY + 4 + lineIndex * lineHeight;
-
-            linePieces.forEach((piece) => {
-              const isLink = piece.type === 'link' && piece.href;
-              const isCode = piece.type === 'code';
-              const pieceColor = isLink
-                ? [37, 99, 235] as [number, number, number]
-                : isCode
-                  ? [30, 41, 59] as [number, number, number]
-                  : [15, 23, 42] as [number, number, number];
-              const pieceWidth = measurePieceWidth(piece);
+          const writeListTextLine = (
+            line: string,
+            y: number,
+            shouldPrintMarker: boolean,
+          ) => {
+            const segments = parsePdfInlineSegments(line);
+            const measurePieceWidth = (piece: PdfInlineSegment) => {
               const pieceFont =
-                isCode
+                piece.type === 'code'
                   ? getPdfCodeFont()
                   : getPdfTextFont();
               const pieceFontStyle =
-                isLink || isCode
+                piece.type === 'link' || piece.type === 'code'
                   ? 'normal'
                   : piece.fontStyle;
-
               pdf.setFont(pieceFont, getPdfFontStyle(pieceFontStyle));
               pdf.setFontSize(10);
-              pdf.setTextColor(...pieceColor);
-              pdf.text(piece.text, cursorX, lineY);
+              return pdf.getTextWidth(piece.text);
+            };
+            const pieces: PdfInlineSegment[] = [];
 
-              if (isLink) {
-                pdf.setDrawColor(...pieceColor);
-                pdf.setLineWidth(0.2);
-                pdf.line(cursorX, lineY + 0.6, cursorX + pieceWidth, lineY + 0.6);
-                pdf.link(cursorX, lineY - 2.8, pieceWidth, lineHeight, {
-                  url: piece.href!,
-                });
+            segments.forEach((segment) => {
+              const tokens = segment.text.match(/\S+\s*|\s+/g) ?? [segment.text];
+              tokens.forEach((token) => {
+                if (token.length) {
+                  pieces.push({ ...segment, text: token });
+                }
+              });
+            });
+
+            const wrappedLines: PdfInlineSegment[][] = [];
+            let currentLine: PdfInlineSegment[] = [];
+            let currentWidth = 0;
+
+            const pushLine = () => {
+              wrappedLines.push(
+                currentLine.length
+                  ? currentLine
+                  : [{ fontStyle: 'normal', text: ' ', type: 'text' }],
+              );
+              currentLine = [];
+              currentWidth = 0;
+            };
+
+            const appendPiece = (piece: PdfInlineSegment) => {
+              const pieceWidth = measurePieceWidth(piece);
+
+              if (!currentLine.length || currentWidth + pieceWidth <= textWidth) {
+                currentLine.push(piece);
+                currentWidth += pieceWidth;
+                return;
               }
 
-              cursorX += pieceWidth;
+              pushLine();
+              currentLine.push(piece);
+              currentWidth = pieceWidth;
+            };
+
+            pieces.forEach((piece) => {
+              const pieceWidth = measurePieceWidth(piece);
+
+              if (pieceWidth <= textWidth) {
+                appendPiece(piece);
+                return;
+              }
+
+              let chunk = '';
+
+              for (const character of piece.text) {
+                const candidate = `${chunk}${character}`;
+                const candidatePiece = { ...piece, text: candidate };
+
+                if (measurePieceWidth(candidatePiece) > textWidth && chunk) {
+                  appendPiece({ ...piece, text: chunk });
+                  chunk = character;
+                  continue;
+                }
+
+                chunk = candidate;
+              }
+
+              if (chunk) {
+                appendPiece({ ...piece, text: chunk });
+              }
             });
-          });
+
+            if (currentLine.length) {
+              pushLine();
+            }
+
+            if (shouldPrintMarker) {
+              pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
+              pdf.setFontSize(10);
+              pdf.setTextColor(51, 65, 85);
+              pdf.text(item.marker, itemX, y + 4);
+            }
+
+            wrappedLines.forEach((linePieces, lineIndex) => {
+              let cursorX = textX;
+              const lineY = y + 4 + lineIndex * lineHeight;
+
+              linePieces.forEach((piece) => {
+                const isLink = piece.type === 'link' && piece.href;
+                const isCode = piece.type === 'code';
+                const pieceColor = isLink
+                  ? [37, 99, 235] as [number, number, number]
+                  : isCode
+                    ? [30, 41, 59] as [number, number, number]
+                    : [15, 23, 42] as [number, number, number];
+                const pieceWidth = measurePieceWidth(piece);
+                const pieceFont =
+                  isCode ? getPdfCodeFont() : getPdfTextFont();
+                const pieceFontStyle =
+                  isLink || isCode ? 'normal' : piece.fontStyle;
+
+                pdf.setFont(pieceFont, getPdfFontStyle(pieceFontStyle));
+                pdf.setFontSize(10);
+                pdf.setTextColor(...pieceColor);
+                pdf.text(piece.text, cursorX, lineY);
+
+                if (isLink) {
+                  pdf.setDrawColor(...pieceColor);
+                  pdf.setLineWidth(0.2);
+                  pdf.line(cursorX, lineY + 0.6, cursorX + pieceWidth, lineY + 0.6);
+                  pdf.link(cursorX, lineY - 2.8, pieceWidth, lineHeight, {
+                    url: piece.href!,
+                  });
+                }
+
+                cursorX += pieceWidth;
+              });
+            });
+
+            return wrappedLines.length * lineHeight + 2;
+          };
+
+          for (const rawLine of itemLines) {
+            const line = rawLine.trim();
+
+            if (!line) {
+              itemHeight += lineHeight * 0.5;
+              continue;
+            }
+
+            const imageMatches = Array.from(line.matchAll(markdownImagePattern));
+
+            if (!imageMatches.length) {
+              ensureSpace(lineHeight + itemGap);
+              const renderedHeight = writeListTextLine(
+                line,
+                cursorY + itemHeight,
+                !markerPrinted,
+              );
+              markerPrinted = true;
+              itemHeight += renderedHeight;
+              continue;
+            }
+
+            let lastIndex = 0;
+
+            for (const match of imageMatches) {
+              const [fullMatch, , imageSource = ''] = match;
+              const matchIndex = match.index ?? 0;
+              const beforeText = line.slice(lastIndex, matchIndex).trim();
+
+              if (beforeText) {
+                ensureSpace(lineHeight + itemGap);
+                const renderedHeight = writeListTextLine(
+                  beforeText,
+                  cursorY + itemHeight,
+                  !markerPrinted,
+                );
+                markerPrinted = true;
+                itemHeight += renderedHeight;
+              }
+
+              if (!markerPrinted) {
+                pdf.setFont(getPdfTextFont(), getPdfFontStyle('bold'));
+                pdf.setFontSize(10);
+                pdf.setTextColor(51, 65, 85);
+                pdf.text(item.marker, itemX, cursorY + itemHeight + 4);
+                markerPrinted = true;
+              }
+
+              ensureSpace(96 + itemGap);
+              const originalCursorY = cursorY;
+              cursorY = cursorY + itemHeight;
+              await writeImageToPdf(imageSource, {
+                maxHeight: 90,
+                maxWidth: textWidth,
+                x: textX,
+              });
+              itemHeight = cursorY - originalCursorY;
+              cursorY = originalCursorY;
+              lastIndex = matchIndex + fullMatch.length;
+            }
+
+            const afterText = line.slice(lastIndex).trim();
+            if (afterText) {
+              ensureSpace(lineHeight + itemGap);
+              const renderedHeight = writeListTextLine(
+                afterText,
+                cursorY + itemHeight,
+                !markerPrinted,
+              );
+              markerPrinted = true;
+              itemHeight += renderedHeight;
+            }
+          }
 
           cursorY += itemHeight + itemGap;
-        });
+        }
       };
 
       const writeTableBlock = (rows: PdfTableRow[]) => {
@@ -4571,70 +4652,177 @@ export const App = () => {
         cursorY += 2;
       };
 
-      const writeAdmonitionBlock = (kind: AdmonitionBlockKind, content: string) => {
+      const writeAdmonitionBlock = async (kind: AdmonitionBlockKind, content: string) => {
         const tone = admonitionPdfStyles[kind];
         const label = tone.label.toUpperCase();
         const innerBlocks = parsePdfContentBlocks(content);
-        const flattenedLines: string[] = [];
+        const admonitionRenderItems: Array<
+          | { text: string; type: 'text' }
+          | { source: string; type: 'image' }
+          | { type: 'spacer' }
+        > = [];
 
         innerBlocks.forEach((block) => {
           if (block.type === 'heading') {
-            flattenedLines.push(block.content);
+            admonitionRenderItems.push({ text: block.content, type: 'text' });
             return;
           }
 
           if (block.type === 'list') {
             block.items.forEach((item) => {
-              flattenedLines.push(`${'  '.repeat(item.indentLevel)}${item.marker} ${flattenPdfInlineMarkdown(item.text)}`);
+              admonitionRenderItems.push({
+                text: `${'  '.repeat(item.indentLevel)}${item.marker} ${flattenPdfInlineMarkdown(item.text)}`,
+                type: 'text',
+              });
             });
             return;
           }
 
           if (block.type === 'table') {
-            block.rows.forEach((row, rowIndex) => {
-              flattenedLines.push(
-                `${rowIndex === 0 ? '' : ''}${flattenPdfInlineMarkdown(row.cells.join(' | '))}`,
-              );
+            block.rows.forEach((row) => {
+              admonitionRenderItems.push({
+                text: flattenPdfInlineMarkdown(row.cells.join(' | ')),
+                type: 'text',
+              });
             });
             return;
           }
 
           if (block.type === 'code') {
             block.content.split('\n').forEach((line) => {
-              flattenedLines.push(line);
+              admonitionRenderItems.push({ text: line, type: 'text' });
             });
             return;
           }
 
           if (block.type === 'spacer') {
-            flattenedLines.push('');
+            admonitionRenderItems.push({ type: 'spacer' });
             return;
           }
 
           if (block.type === 'admonition') {
-            flattenedLines.push(admonitionPdfStyles[block.kind].label);
-            flattenedLines.push(flattenPdfInlineMarkdown(block.content));
+            admonitionRenderItems.push({
+              text: admonitionPdfStyles[block.kind].label,
+              type: 'text',
+            });
+            block.content.split('\n').forEach((line) => {
+              const matches = Array.from(line.matchAll(markdownImagePattern));
+
+              if (!matches.length) {
+                admonitionRenderItems.push({
+                  text: flattenPdfInlineMarkdown(line),
+                  type: 'text',
+                });
+                return;
+              }
+
+              let lastIndex = 0;
+              matches.forEach((match) => {
+                const [fullMatch, , imageSource = ''] = match;
+                const matchIndex = match.index ?? 0;
+                const beforeText = line.slice(lastIndex, matchIndex).trim();
+
+                if (beforeText) {
+                  admonitionRenderItems.push({
+                    text: flattenPdfInlineMarkdown(beforeText),
+                    type: 'text',
+                  });
+                }
+
+                admonitionRenderItems.push({ source: imageSource, type: 'image' });
+                lastIndex = matchIndex + fullMatch.length;
+              });
+
+              const afterText = line.slice(lastIndex).trim();
+              if (afterText) {
+                admonitionRenderItems.push({
+                  text: flattenPdfInlineMarkdown(afterText),
+                  type: 'text',
+                });
+              }
+            });
             return;
           }
 
           block.content.split('\n').forEach((line) => {
-            flattenedLines.push(flattenPdfInlineMarkdown(line));
+            const matches = Array.from(line.matchAll(markdownImagePattern));
+
+            if (!matches.length) {
+              admonitionRenderItems.push({
+                text: flattenPdfInlineMarkdown(line),
+                type: 'text',
+              });
+              return;
+            }
+
+            let lastIndex = 0;
+            matches.forEach((match) => {
+              const [fullMatch, , imageSource = ''] = match;
+              const matchIndex = match.index ?? 0;
+              const beforeText = line.slice(lastIndex, matchIndex).trim();
+
+              if (beforeText) {
+                admonitionRenderItems.push({
+                  text: flattenPdfInlineMarkdown(beforeText),
+                  type: 'text',
+                });
+              }
+
+              admonitionRenderItems.push({ source: imageSource, type: 'image' });
+              lastIndex = matchIndex + fullMatch.length;
+            });
+
+            const afterText = line.slice(lastIndex).trim();
+            if (afterText) {
+              admonitionRenderItems.push({
+                text: flattenPdfInlineMarkdown(afterText),
+                type: 'text',
+              });
+            }
           });
         });
 
         const paddingX = 4;
         const paddingY = 4;
         const textWidth = contentWidth - paddingX * 2;
+        const contentStartY = cursorY + paddingY + 9 + 3;
+        const maxAdmonitionImageHeight = 90;
         pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
         pdf.setFontSize(10);
-        const wrappedLines = flattenedLines.flatMap((line) =>
-          line.trim()
-            ? (pdf.splitTextToSize(line, textWidth) as string[])
-            : [''],
-        );
         const lineHeight = 10 * 0.3528 * 1.5;
         const labelHeight = 9;
-        const contentHeight = Math.max(1, wrappedLines.length) * lineHeight;
+        let contentHeight = 0;
+
+        for (const item of admonitionRenderItems) {
+          if (item.type === 'spacer') {
+            contentHeight += lineHeight * 0.6;
+            continue;
+          }
+
+          if (item.type === 'image') {
+            try {
+              const imageAsset = await resolvePdfImageAsset(item.source);
+              let renderWidth = textWidth;
+              let renderHeight = (imageAsset.height / imageAsset.width) * renderWidth;
+
+              if (renderHeight > maxAdmonitionImageHeight) {
+                renderHeight = maxAdmonitionImageHeight;
+                renderWidth = (imageAsset.width / imageAsset.height) * renderHeight;
+              }
+
+              contentHeight += renderHeight + 6;
+            } catch {
+              contentHeight += lineHeight;
+            }
+            continue;
+          }
+
+          const wrappedLines = item.text.trim()
+            ? (pdf.splitTextToSize(item.text, textWidth) as string[])
+            : [''];
+          contentHeight += Math.max(1, wrappedLines.length) * lineHeight;
+        }
+
         const totalHeight = paddingY * 2 + labelHeight + contentHeight + 1;
 
         ensureSpace(totalHeight + 4);
@@ -4650,20 +4838,46 @@ export const App = () => {
         pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
         pdf.setFontSize(10);
         pdf.setTextColor(...tone.text);
-        pdf.text(
-          wrappedLines,
-          margin + paddingX,
-          cursorY + paddingY + labelHeight + 3,
-        );
+        let innerCursorY = contentStartY;
+
+        for (const item of admonitionRenderItems) {
+          if (item.type === 'spacer') {
+            innerCursorY += lineHeight * 0.6;
+            continue;
+          }
+
+          if (item.type === 'image') {
+            const originalCursorY = cursorY;
+            cursorY = innerCursorY;
+            await writeImageToPdf(item.source, {
+              maxHeight: maxAdmonitionImageHeight,
+              maxWidth: textWidth,
+              x: margin + paddingX,
+            });
+            innerCursorY = cursorY;
+            cursorY = originalCursorY;
+            continue;
+          }
+
+          const wrappedLines = item.text.trim()
+            ? (pdf.splitTextToSize(item.text, textWidth) as string[])
+            : [''];
+          pdf.text(wrappedLines, margin + paddingX, innerCursorY);
+          innerCursorY += Math.max(1, wrappedLines.length) * lineHeight;
+        }
 
         cursorY += totalHeight + 4;
       };
 
-      const writeImageToPdf = async (source: string) => {
+      const writeImageToPdf = async (
+        source: string,
+        options?: { maxHeight?: number; maxWidth?: number; x?: number },
+      ) => {
         try {
           const imageAsset = await resolvePdfImageAsset(source);
-          const maxWidth = contentWidth;
-          const maxHeight = 120;
+          const maxWidth = options?.maxWidth ?? contentWidth;
+          const maxHeight = options?.maxHeight ?? 120;
+          const renderX = options?.x ?? margin;
           let renderWidth = maxWidth;
           let renderHeight = (imageAsset.height / imageAsset.width) * renderWidth;
 
@@ -4680,7 +4894,7 @@ export const App = () => {
           pdf.addImage(
             imageAsset.dataUrl,
             imageFormat,
-            margin,
+            renderX,
             cursorY,
             renderWidth,
             renderHeight,
@@ -4781,7 +4995,7 @@ export const App = () => {
         }
 
         if (block.type === 'admonition') {
-          writeAdmonitionBlock(block.kind, block.content);
+          await writeAdmonitionBlock(block.kind, block.content);
           continue;
         }
 
