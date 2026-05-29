@@ -4750,7 +4750,7 @@ export const App = () => {
 
               let lastIndex = 0;
               matches.forEach((match) => {
-                const [fullMatch, , imageSource = ''] = match;
+                const [fullMatch] = match;
                 const matchIndex = match.index ?? 0;
                 const beforeText = line.slice(lastIndex, matchIndex).trim();
 
@@ -4760,8 +4760,6 @@ export const App = () => {
                     type: 'text',
                   });
                 }
-
-                admonitionRenderItems.push({ source: imageSource, type: 'image' });
                 lastIndex = matchIndex + fullMatch.length;
               });
 
@@ -4789,7 +4787,7 @@ export const App = () => {
 
             let lastIndex = 0;
             matches.forEach((match) => {
-              const [fullMatch, , imageSource = ''] = match;
+              const [fullMatch] = match;
               const matchIndex = match.index ?? 0;
               const beforeText = line.slice(lastIndex, matchIndex).trim();
 
@@ -4799,8 +4797,6 @@ export const App = () => {
                   type: 'text',
                 });
               }
-
-              admonitionRenderItems.push({ source: imageSource, type: 'image' });
               lastIndex = matchIndex + fullMatch.length;
             });
 
@@ -4818,7 +4814,6 @@ export const App = () => {
         const paddingY = 4;
         const textWidth = contentWidth - paddingX * 2;
         const contentStartY = cursorY + paddingY + 9 + 3;
-        const maxAdmonitionImageHeight = 90;
         pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
         pdf.setFontSize(10);
         const lineHeight = 10 * 0.3528 * 1.5;
@@ -4832,20 +4827,6 @@ export const App = () => {
           }
 
           if (item.type === 'image') {
-            try {
-              const imageAsset = await resolvePdfImageAsset(item.source);
-              let renderWidth = textWidth;
-              let renderHeight = (imageAsset.height / imageAsset.width) * renderWidth;
-
-              if (renderHeight > maxAdmonitionImageHeight) {
-                renderHeight = maxAdmonitionImageHeight;
-                renderWidth = (imageAsset.width / imageAsset.height) * renderHeight;
-              }
-
-              contentHeight += renderHeight + 6;
-            } catch {
-              contentHeight += lineHeight;
-            }
             continue;
           }
 
@@ -4879,15 +4860,6 @@ export const App = () => {
           }
 
           if (item.type === 'image') {
-            const originalCursorY = cursorY;
-            cursorY = innerCursorY;
-            await writeImageToPdf(item.source, {
-              maxHeight: maxAdmonitionImageHeight,
-              maxWidth: textWidth,
-              x: margin + paddingX,
-            });
-            innerCursorY = cursorY;
-            cursorY = originalCursorY;
             continue;
           }
 
