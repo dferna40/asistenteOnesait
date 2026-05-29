@@ -4793,7 +4793,6 @@ export const App = () => {
         const paddingX = 4;
         const paddingY = 4;
         const textWidth = contentWidth - paddingX * 2;
-        const contentStartY = cursorY + paddingY + 9 + 3;
         pdf.setFont(getPdfTextFont(), getPdfFontStyle('normal'));
         pdf.setFontSize(10);
         const lineHeight = 10 * 0.3528 * 1.5;
@@ -4815,6 +4814,7 @@ export const App = () => {
         const totalHeight = paddingY * 2 + labelHeight + contentHeight + 1;
 
         ensureSpace(totalHeight + 4);
+        const contentStartY = cursorY + paddingY + labelHeight + 3;
         pdf.setFillColor(...tone.fill);
         pdf.setDrawColor(...tone.border);
         pdf.roundedRect(margin, cursorY, contentWidth, totalHeight, 2.5, 2.5, 'FD');
