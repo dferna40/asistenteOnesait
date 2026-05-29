@@ -4661,6 +4661,24 @@ export const App = () => {
           | { source: string; type: 'image' }
           | { type: 'spacer' }
         > = [];
+        const measureWrappedTextLineCount = (value: string, availableWidth: number) => {
+          const paragraphs = value.split('\n');
+          let count = 0;
+
+          paragraphs.forEach((paragraph) => {
+            const trimmedParagraph = paragraph.trim();
+
+            if (!trimmedParagraph) {
+              count += 1;
+              return;
+            }
+
+            const wrappedLines = pdf.splitTextToSize(trimmedParagraph, availableWidth) as string[];
+            count += Math.max(1, wrappedLines.length);
+          });
+
+          return count;
+        };
 
         innerBlocks.forEach((block) => {
           if (block.type === 'heading') {
@@ -4670,8 +4688,22 @@ export const App = () => {
 
           if (block.type === 'list') {
             block.items.forEach((item) => {
+              const itemLines = item.text.split('\n');
+              const firstLine = itemLines[0]?.trim() ?? '';
+              const continuationLines = itemLines
+                .slice(1)
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0);
+              const indentPrefix = '  '.repeat(item.indentLevel);
+              const continuationPrefix = `${indentPrefix}   `;
+
               admonitionRenderItems.push({
-                text: `${'  '.repeat(item.indentLevel)}${item.marker} ${flattenPdfInlineMarkdown(item.text)}`,
+                text: [
+                  `${indentPrefix}${item.marker} ${flattenPdfInlineMarkdown(firstLine)}`.trimEnd(),
+                  ...continuationLines.map(
+                    (line) => `${continuationPrefix}${flattenPdfInlineMarkdown(line)}`,
+                  ),
+                ].join('\n'),
                 type: 'text',
               });
             });
@@ -4818,9 +4850,9 @@ export const App = () => {
           }
 
           const wrappedLines = item.text.trim()
-            ? (pdf.splitTextToSize(item.text, textWidth) as string[])
-            : [''];
-          contentHeight += Math.max(1, wrappedLines.length) * lineHeight;
+            ? measureWrappedTextLineCount(item.text, textWidth)
+            : 1;
+          contentHeight += Math.max(1, wrappedLines) * lineHeight;
         }
 
         const totalHeight = paddingY * 2 + labelHeight + contentHeight + 1;
@@ -4859,11 +4891,16 @@ export const App = () => {
             continue;
           }
 
-          const wrappedLines = item.text.trim()
-            ? (pdf.splitTextToSize(item.text, textWidth) as string[])
-            : [''];
-          pdf.text(wrappedLines, margin + paddingX, innerCursorY);
-          innerCursorY += Math.max(1, wrappedLines.length) * lineHeight;
+          const paragraphs = item.text.trim() ? item.text.split('\n') : [''];
+
+          paragraphs.forEach((paragraph) => {
+            const trimmedParagraph = paragraph.trim();
+            const wrappedLines = trimmedParagraph
+              ? (pdf.splitTextToSize(trimmedParagraph, textWidth) as string[])
+              : [''];
+            pdf.text(wrappedLines, margin + paddingX, innerCursorY);
+            innerCursorY += Math.max(1, wrappedLines.length) * lineHeight;
+          });
         }
 
         cursorY += totalHeight + 4;
@@ -5000,7 +5037,7 @@ export const App = () => {
         }
 
         if (block.type === 'list') {
-          writeListBlock(block.items);
+          await writeListBlock(block.items);
           continue;
         }
 
