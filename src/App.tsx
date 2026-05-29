@@ -4656,11 +4656,16 @@ export const App = () => {
         const tone = admonitionPdfStyles[kind];
         const label = tone.label.toUpperCase();
         const innerBlocks = parsePdfContentBlocks(content);
-        const admonitionRenderItems: Array<
-          | { text: string; type: 'text' }
-          | { source: string; type: 'image' }
-          | { type: 'spacer' }
-        > = [];
+        const admonitionParagraphs: string[] = [];
+        const pushAdmonitionParagraph = (value: string) => {
+          const normalizedValue = value.trimEnd();
+          if (!normalizedValue.length) {
+            admonitionParagraphs.push('');
+            return;
+          }
+
+          admonitionParagraphs.push(normalizedValue);
+        };
         const measureWrappedTextLineCount = (value: string, availableWidth: number) => {
           const paragraphs = value.split('\n');
           let count = 0;
@@ -4682,7 +4687,7 @@ export const App = () => {
 
         innerBlocks.forEach((block) => {
           if (block.type === 'heading') {
-            admonitionRenderItems.push({ text: block.content, type: 'text' });
+            pushAdmonitionParagraph(block.content);
             return;
           }
 
@@ -4697,54 +4702,44 @@ export const App = () => {
               const indentPrefix = '  '.repeat(item.indentLevel);
               const continuationPrefix = `${indentPrefix}   `;
 
-              admonitionRenderItems.push({
-                text: [
+              pushAdmonitionParagraph(
+                [
                   `${indentPrefix}${item.marker} ${flattenPdfInlineMarkdown(firstLine)}`.trimEnd(),
                   ...continuationLines.map(
                     (line) => `${continuationPrefix}${flattenPdfInlineMarkdown(line)}`,
                   ),
                 ].join('\n'),
-                type: 'text',
-              });
+              );
             });
             return;
           }
 
           if (block.type === 'table') {
             block.rows.forEach((row) => {
-              admonitionRenderItems.push({
-                text: flattenPdfInlineMarkdown(row.cells.join(' | ')),
-                type: 'text',
-              });
+              pushAdmonitionParagraph(flattenPdfInlineMarkdown(row.cells.join(' | ')));
             });
             return;
           }
 
           if (block.type === 'code') {
             block.content.split('\n').forEach((line) => {
-              admonitionRenderItems.push({ text: line, type: 'text' });
+              pushAdmonitionParagraph(line);
             });
             return;
           }
 
           if (block.type === 'spacer') {
-            admonitionRenderItems.push({ type: 'spacer' });
+            pushAdmonitionParagraph('');
             return;
           }
 
           if (block.type === 'admonition') {
-            admonitionRenderItems.push({
-              text: admonitionPdfStyles[block.kind].label,
-              type: 'text',
-            });
+            pushAdmonitionParagraph(admonitionPdfStyles[block.kind].label);
             block.content.split('\n').forEach((line) => {
               const matches = Array.from(line.matchAll(markdownImagePattern));
 
               if (!matches.length) {
-                admonitionRenderItems.push({
-                  text: flattenPdfInlineMarkdown(line),
-                  type: 'text',
-                });
+                pushAdmonitionParagraph(flattenPdfInlineMarkdown(line));
                 return;
               }
 
@@ -4755,20 +4750,14 @@ export const App = () => {
                 const beforeText = line.slice(lastIndex, matchIndex).trim();
 
                 if (beforeText) {
-                  admonitionRenderItems.push({
-                    text: flattenPdfInlineMarkdown(beforeText),
-                    type: 'text',
-                  });
+                  pushAdmonitionParagraph(flattenPdfInlineMarkdown(beforeText));
                 }
                 lastIndex = matchIndex + fullMatch.length;
               });
 
               const afterText = line.slice(lastIndex).trim();
               if (afterText) {
-                admonitionRenderItems.push({
-                  text: flattenPdfInlineMarkdown(afterText),
-                  type: 'text',
-                });
+                pushAdmonitionParagraph(flattenPdfInlineMarkdown(afterText));
               }
             });
             return;
@@ -4778,10 +4767,7 @@ export const App = () => {
             const matches = Array.from(line.matchAll(markdownImagePattern));
 
             if (!matches.length) {
-              admonitionRenderItems.push({
-                text: flattenPdfInlineMarkdown(line),
-                type: 'text',
-              });
+              pushAdmonitionParagraph(flattenPdfInlineMarkdown(line));
               return;
             }
 
@@ -4792,20 +4778,14 @@ export const App = () => {
               const beforeText = line.slice(lastIndex, matchIndex).trim();
 
               if (beforeText) {
-                admonitionRenderItems.push({
-                  text: flattenPdfInlineMarkdown(beforeText),
-                  type: 'text',
-                });
+                pushAdmonitionParagraph(flattenPdfInlineMarkdown(beforeText));
               }
               lastIndex = matchIndex + fullMatch.length;
             });
 
             const afterText = line.slice(lastIndex).trim();
             if (afterText) {
-              admonitionRenderItems.push({
-                text: flattenPdfInlineMarkdown(afterText),
-                type: 'text',
-              });
+              pushAdmonitionParagraph(flattenPdfInlineMarkdown(afterText));
             }
           });
         });
@@ -4820,18 +4800,14 @@ export const App = () => {
         const labelHeight = 9;
         let contentHeight = 0;
 
-        for (const item of admonitionRenderItems) {
-          if (item.type === 'spacer') {
+        for (const paragraph of admonitionParagraphs) {
+          if (!paragraph.trim()) {
             contentHeight += lineHeight * 0.6;
             continue;
           }
 
-          if (item.type === 'image') {
-            continue;
-          }
-
-          const wrappedLines = item.text.trim()
-            ? measureWrappedTextLineCount(item.text, textWidth)
+          const wrappedLines = paragraph.trim()
+            ? measureWrappedTextLineCount(paragraph, textWidth)
             : 1;
           contentHeight += Math.max(1, wrappedLines) * lineHeight;
         }
@@ -4853,20 +4829,16 @@ export const App = () => {
         pdf.setTextColor(...tone.text);
         let innerCursorY = contentStartY;
 
-        for (const item of admonitionRenderItems) {
-          if (item.type === 'spacer') {
+        for (const paragraph of admonitionParagraphs) {
+          if (!paragraph.trim()) {
             innerCursorY += lineHeight * 0.6;
             continue;
           }
 
-          if (item.type === 'image') {
-            continue;
-          }
+          const paragraphLines = paragraph.trim() ? paragraph.split('\n') : [''];
 
-          const paragraphs = item.text.trim() ? item.text.split('\n') : [''];
-
-          paragraphs.forEach((paragraph) => {
-            const trimmedParagraph = paragraph.trim();
+          paragraphLines.forEach((paragraphLine) => {
+            const trimmedParagraph = paragraphLine.trim();
             const wrappedLines = trimmedParagraph
               ? (pdf.splitTextToSize(trimmedParagraph, textWidth) as string[])
               : [''];
